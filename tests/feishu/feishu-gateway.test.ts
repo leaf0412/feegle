@@ -31,6 +31,22 @@ describe("parseFeishuCommand", () => {
     });
   });
 
+  it("parses help commands with optional groups", () => {
+    expect(parseFeishuCommand("/help repo")).toEqual({
+      type: "help",
+      groupKey: "repo"
+    });
+  });
+
+  it("recognizes registered slash commands without sending them to the agent", () => {
+    const parsed = parseFeishuCommand("/role list");
+
+    expect(parsed.type).toBe("slash_command");
+    if (parsed.type === "slash_command") {
+      expect(parsed.definition.id).toBe("role_list");
+    }
+  });
+
   it("returns unknown for malformed commands while preserving raw text", () => {
     const raw = "  /repo select  ";
 

@@ -1,6 +1,9 @@
 import { parsePlatformAction, type PlatformAction } from "../platform/platform-action.js";
+import { findSlashCommandByInput, type SlashCommandDefinition } from "../platform/slash-command-catalog.js";
 
 export type FeishuCommand =
+  | { type: "help"; groupKey?: string }
+  | { type: "slash_command"; definition: SlashCommandDefinition; raw: string }
   | { type: "repo_select"; repositoryIds: string[] }
   | { type: "push_repository"; requirementId: string; repositoryId: string }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
@@ -12,6 +15,17 @@ export function parseFeishuCommand(raw: string): FeishuCommand {
 
   if (parts[0] === "/repo" && parts[1] === "select" && parts.length > 2) {
     return { type: "repo_select", repositoryIds: parts.slice(2) };
+  }
+
+  if (parts[0] === "/help") {
+    return { type: "help", groupKey: parts[1] };
+  }
+
+  if (trimmed.startsWith("/")) {
+    const definition = findSlashCommandByInput(trimmed);
+    if (definition) {
+      return { type: "slash_command", definition, raw };
+    }
   }
 
   const cardParts = trimmed.split(":");

@@ -68,6 +68,79 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
+  it("replies to /help with a navigable command card", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress));
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_help",
+      command: { type: "help", groupKey: "repo" }
+    });
+
+    expect(replies).toEqual([]);
+    expect(JSON.stringify(progress)).toContain("命令面板 · 仓库");
+    expect(JSON.stringify(progress)).toContain("nav:/command bind");
+  });
+
+  it("updates the current card for help navigation actions", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress));
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_card",
+      command: {
+        type: "platform_action",
+        action: { kind: "nav", command: "/command", args: "role_add", raw: "nav:/command role_add" }
+      }
+    });
+
+    expect(replies).toEqual([]);
+    expect(progress).toEqual([
+      expect.objectContaining({
+        kind: "updateCard",
+        messageId: "om_card"
+      })
+    ]);
+    expect(JSON.stringify(progress)).toContain("/role add admin|developer|pm");
+    expect(JSON.stringify(progress)).toContain("nav:/help roles");
+  });
+
+  it("acknowledges registered slash commands without invoking the agent", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const agentCalls: unknown[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent(agentCalls, "should not be called")
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_role",
+      command: {
+        type: "slash_command",
+        definition: {
+          id: "role_list",
+          command: "/role list",
+          description: "查看当前宗门名册",
+          groupKey: "roles",
+          source: "feegle",
+          action: "nav:/command role_list"
+        },
+        raw: "/role list"
+      }
+    });
+
+    expect(agentCalls).toEqual([]);
+    expect(replies.at(-1)?.text).toContain("已登记命令：/role list");
+  });
+
   it("replies with help text for unknown commands", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];
@@ -244,7 +317,9 @@ function fakeClient(
       progress.push({ kind: "replyCard", messageId, card });
       return "om_progress";
     },
-    async updateInteractiveCard() {},
+    async updateInteractiveCard(messageId, card) {
+      progress.push({ kind: "updateCard", messageId, card });
+    },
     async updateProgress(messageId, snapshot) {
       progress.push({ kind: "updateProgress", messageId, snapshot });
     },

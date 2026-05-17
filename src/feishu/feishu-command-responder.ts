@@ -4,7 +4,9 @@ import type { PlatformProgressEntry, PlatformProgressSnapshot } from "../platfor
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
+import { renderFeishuCard } from "./feishu-card-renderer.js";
 import { renderFeishuProgressCard } from "./feishu-progress-card.js";
+import { buildSlashCommandDetailCard, buildSlashCommandHelpCard } from "../platform/slash-command-help-card.js";
 
 export class FeishuCommandResponder implements FeishuCommandHandler {
   constructor(
@@ -19,6 +21,18 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     messageId: string;
     command: FeishuCommand;
   }): Promise<void> {
+    if (input.command.type === "help") {
+      await this.client.replyInteractiveCard(input.messageId, renderFeishuCard(buildSlashCommandHelpCard(input.command.groupKey)));
+      return;
+    }
+
+    if (input.command.type === "platform_action") {
+      const handled = await this.handlePlatformAction(input.messageId, input.command);
+      if (handled) {
+        return;
+      }
+    }
+
     if (input.command.type === "unknown" && this.agent) {
       const agentDisplayName = this.options.agentDisplayName ?? "Codex";
       const reactionId = await this.addProcessingReaction(input.messageId);
@@ -72,6 +86,27 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     }
 
     await this.client.replyText(input.messageId, buildReplyText(input.command));
+  }
+
+  private async handlePlatformAction(
+    messageId: string,
+    command: Extract<FeishuCommand, { type: "platform_action" }>
+  ): Promise<boolean> {
+    if (command.action.kind !== "nav") {
+      return false;
+    }
+
+    if (command.action.command === "/help") {
+      await this.client.updateInteractiveCard(messageId, renderFeishuCard(buildSlashCommandHelpCard(command.action.args)));
+      return true;
+    }
+
+    if (command.action.command === "/command") {
+      await this.client.updateInteractiveCard(messageId, renderFeishuCard(buildSlashCommandDetailCard(command.action.args)));
+      return true;
+    }
+
+    return false;
   }
 
   private async addProcessingReaction(messageId: string): Promise<string | undefined> {
@@ -135,6 +170,14 @@ function buildReplyText(command: FeishuCommand): string {
 
   if (command.type === "platform_action") {
     return `已收到卡片动作：${command.action.raw}。\n当前入口还没有接入动作路由器。`;
+  }
+
+  if (command.type === "help") {
+    return "正在打开命令面板。";
+  }
+
+  if (command.type === "slash_command") {
+    return `已登记命令：${command.definition.command}\n${command.definition.description}\n当前入口已能识别该命令，具体执行器会在后续切片接入。`;
   }
 
   return `我收到了消息，但还不认识这个指令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
