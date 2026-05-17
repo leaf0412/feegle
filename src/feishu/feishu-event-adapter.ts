@@ -17,6 +17,18 @@ export interface FeishuCommandEnvelope {
   message?: PlatformIncomingMessage;
 }
 
+export interface FeishuTextMessageDropReason {
+  reason:
+    | "app_sender"
+    | "missing_message"
+    | "missing_chat_id"
+    | "missing_message_id"
+    | "non_text_message"
+    | "missing_content"
+    | "invalid_text_content"
+    | "blocked_by_options";
+}
+
 export interface FeishuPlatformMessageEnvelope extends FeishuCommandEnvelope {
   message: PlatformIncomingMessage;
   shouldRespond: boolean;
@@ -76,34 +88,58 @@ export function extractTextMessageCommand(
   event: FeishuMessageReceiveEvent,
   options?: FeishuMessageExtractOptions
 ): FeishuCommandEnvelope | null {
+  const extracted = explainTextMessageCommand(event, options);
+  return extracted.ok ? extracted.envelope : null;
+}
+
+export type FeishuTextMessageExtractionResult =
+  | { ok: true; envelope: FeishuCommandEnvelope }
+  | { ok: false; drop: FeishuTextMessageDropReason };
+
+export function explainTextMessageCommand(
+  event: FeishuMessageReceiveEvent,
+  options?: FeishuMessageExtractOptions
+): FeishuTextMessageExtractionResult {
   const message = event.message;
-  if (
-    event.sender?.sender_type === "app" ||
-    !message?.chat_id ||
-    !message.message_id ||
-    message.message_type !== "text" ||
-    typeof message.content !== "string"
-  ) {
-    return null;
+  if (event.sender?.sender_type === "app") {
+    return { ok: false, drop: { reason: "app_sender" } };
+  }
+  if (!message) {
+    return { ok: false, drop: { reason: "missing_message" } };
+  }
+  if (!message.chat_id) {
+    return { ok: false, drop: { reason: "missing_chat_id" } };
+  }
+  if (!message.message_id) {
+    return { ok: false, drop: { reason: "missing_message_id" } };
+  }
+  if (message.message_type !== "text") {
+    return { ok: false, drop: { reason: "non_text_message" } };
+  }
+  if (typeof message.content !== "string") {
+    return { ok: false, drop: { reason: "missing_content" } };
   }
 
   const text = parseTextContent(message.content);
   if (text === null) {
-    return null;
+    return { ok: false, drop: { reason: "invalid_text_content" } };
   }
 
   const platformMessage = options ? normalizeFeishuTextMessage(event, options, text) : null;
   if (options && platformMessage === null) {
-    return null;
+    return { ok: false, drop: { reason: "blocked_by_options" } };
   }
 
   const commandText = platformMessage?.text ?? text;
   return {
-    chatId: message.chat_id,
-    messageId: message.message_id,
-    command: parseFeishuCommand(commandText),
-    shouldRespond: options ? canRespondToFeishuTextMessage(event, options) : true,
-    ...(platformMessage ? { message: platformMessage } : {})
+    ok: true,
+    envelope: {
+      chatId: message.chat_id,
+      messageId: message.message_id,
+      command: parseFeishuCommand(commandText),
+      shouldRespond: options ? canRespondToFeishuTextMessage(event, options) : true,
+      ...(platformMessage ? { message: platformMessage } : {})
+    }
   };
 }
 

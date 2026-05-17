@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCardActionCommand,
-  extractTextMessageCommand
+  extractTextMessageCommand,
+  explainTextMessageCommand
 } from "../../src/feishu/feishu-event-adapter.js";
 
 describe("feishu event adapter", () => {
@@ -53,6 +54,21 @@ describe("feishu event adapter", () => {
         }
       })
     ).toBeNull();
+  });
+
+  it("explains why a text message event was ignored", () => {
+    expect(
+      explainTextMessageCommand({
+        sender: { sender_type: "app" },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      })
+    ).toEqual({ ok: false, drop: { reason: "app_sender" } });
   });
 
   it("extracts push card action commands from card.action.trigger events", () => {
