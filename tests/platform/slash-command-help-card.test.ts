@@ -13,11 +13,11 @@ describe("slash command help cards", () => {
   });
 
   it("builds a command detail card with back navigation", () => {
-    const card = buildSlashCommandDetailCard("role_add");
+    const card = buildSlashCommandDetailCard("repo_list");
     const json = JSON.stringify(card);
 
-    expect(card.header?.title).toBe("/role add admin|developer|pm <用户名>");
+    expect(card.header?.title).toBe("/repo list");
     expect(json).toContain("Feegle 计划新增");
-    expect(json).toContain("nav:/help roles");
+    expect(json).toContain("nav:/help repo");
   });
 });

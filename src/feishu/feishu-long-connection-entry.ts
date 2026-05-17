@@ -1,7 +1,7 @@
 import * as lark from "@larksuiteoapi/node-sdk";
 import { createFeegleAgent, type FeegleAgentKind } from "../agent/agent-factory.js";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
-import { FeishuCommandResponder } from "./feishu-command-responder.js";
+import { FeishuCommandResponder, logFeishuCommandTrace } from "./feishu-command-responder.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
 
@@ -41,7 +41,8 @@ const configuredAgent = createFeegleAgent({
 const handler = new FeishuCommandResponder(feishuClient, configuredAgent.agent, {
   agentDisplayName: configuredAgent.displayName,
   reactionEmoji: config.reactionEmoji,
-  doneEmoji: config.doneEmoji
+  doneEmoji: config.doneEmoji,
+  trace: logFeishuCommandTrace
 });
 
 const runtime = new FeishuLongConnectionRuntime(

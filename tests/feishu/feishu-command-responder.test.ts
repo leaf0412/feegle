@@ -411,7 +411,128 @@ describe("FeishuCommandResponder", () => {
       consoleWarn.mockRestore();
     }
   });
+
+  it("does not block the agent reply when adding the processing reaction hangs", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const responder = new FeishuCommandResponder(
+      {
+        ...fakeClient(replies, [], progress),
+        async addReaction() {
+          await new Promise(() => undefined);
+          return "never";
+        }
+      },
+      fakeAgent([], "收到 hello"),
+      { reactionEmoji: "OnIt", reactionTimeoutMs: 1 }
+    );
+
+    try {
+      await expect(
+        Promise.race([
+          responder.handleCommand({
+            source: "message",
+            chatId: "oc_1",
+            messageId: "om_reaction_hangs",
+            command: { type: "unknown", raw: "hello" }
+          }),
+          delay(20).then(() => {
+            throw new Error("handleCommand stayed blocked on addReaction");
+          })
+        ])
+      ).resolves.toBeUndefined();
+
+      expect(replies).toEqual([
+        {
+          messageId: "om_reaction_hangs",
+          text: "收到 hello"
+        }
+      ]);
+      expect(consoleWarn).toHaveBeenCalledWith("Feishu reaction add timed out", {
+        messageId: "om_reaction_hangs",
+        timeoutMs: 1
+      });
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it("emits trace stages around visible replies and agent execution", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const stages: string[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent([], "收到 hello"),
+      {
+        trace: (event) => stages.push(event.stage)
+      }
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_trace",
+      command: { type: "unknown", raw: "hello" }
+    });
+
+    expect(stages).toEqual([
+      "received",
+      "progress_reply_start",
+      "progress_reply_done",
+      "progress_update_start",
+      "progress_update_done",
+      "agent_start",
+      "progress_update_start",
+      "progress_update_done",
+      "agent_done",
+      "progress_update_start",
+      "progress_update_done",
+      "reply_text_start",
+      "reply_text_done",
+      "progress_update_start",
+      "progress_update_done",
+      "completed"
+    ]);
+  });
+
+  it("keeps handling the message when the trace hook throws", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent([], "trace hook did not block"),
+      {
+        trace: () => {
+          throw new Error("trace sink failed");
+        }
+      }
+    );
+
+    try {
+      await responder.handleCommand({
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_trace_throws",
+        command: { type: "unknown", raw: "hello" }
+      });
+
+      expect(replies).toEqual([
+        {
+          messageId: "om_trace_throws",
+          text: "trace hook did not block"
+        }
+      ]);
+      expect(consoleWarn).toHaveBeenCalledWith("Feishu command trace hook failed", "trace sink failed");
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
 });
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function fakeClient(
   replies: Array<{ messageId: string; text: string }>,
