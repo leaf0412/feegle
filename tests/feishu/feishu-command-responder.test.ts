@@ -363,6 +363,9 @@ function fakeClient(
     async fetchMessage() {
       return undefined;
     },
+    async fetchMergeForwardItems() {
+      return [];
+    },
     async sendImage() {
       return undefined;
     },

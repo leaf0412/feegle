@@ -179,6 +179,7 @@ function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
     fetchChatName: fallback,
     fetchChatMembers: async () => [],
     fetchMessage: fallback,
+    fetchMergeForwardItems: async () => [],
     sendImage: fallback,
     sendAudio: fallback,
     downloadResource: fallback,

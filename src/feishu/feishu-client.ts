@@ -125,6 +125,7 @@ export interface FeishuClientPort {
   fetchChatName(chatId: string): Promise<string | undefined>;
   fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>>;
   fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined>;
+  fetchMergeForwardItems(messageId: string): Promise<FeishuMergeForwardItem[]>;
   sendImage(chatId: string, image: Buffer): Promise<string | undefined>;
   sendAudio(chatId: string, audio: Buffer, options?: { format?: "opus"; fileName?: string }): Promise<string | undefined>;
   downloadResource(
@@ -145,6 +146,17 @@ export interface FeishuFetchedMessage {
   parentId?: string;
   senderId?: string;
   senderType?: string;
+  content?: string;
+  mentions: FeishuFetchedMessageMention[];
+}
+
+export interface FeishuMergeForwardItem {
+  messageId: string;
+  messageType: string;
+  upperMessageId?: string;
+  senderId?: string;
+  senderType?: string;
+  createTimeMs?: number;
   content?: string;
   mentions: FeishuFetchedMessageMention[];
 }
@@ -407,6 +419,17 @@ export class LarkFeishuClient implements FeishuClientPort {
     return extractFetchedMessage(response);
   }
 
+  async fetchMergeForwardItems(messageId: string): Promise<FeishuMergeForwardItem[]> {
+    if (!this.client.request) {
+      return [];
+    }
+    const response = await this.client.request({
+      url: `/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
+      method: "GET"
+    });
+    return extractMergeForwardItems(response);
+  }
+
   private cachedBotOpenId: string | undefined;
 
   async fetchBotOpenId(): Promise<string | undefined> {
@@ -546,6 +569,71 @@ function extractFetchedMessage(response: unknown): FeishuFetchedMessage | undefi
     mentions.push({ key, name });
   }
   return { messageType, parentId, senderId, senderType, content, mentions };
+}
+
+function extractMergeForwardItems(response: unknown): FeishuMergeForwardItem[] {
+  const items = readNestedArray(response, ["data", "items"]) ?? readNestedArray(response, ["items"]);
+  if (!items) {
+    return [];
+  }
+  const result: FeishuMergeForwardItem[] = [];
+  for (const raw of items) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      continue;
+    }
+    const record = raw as Record<string, unknown>;
+    const messageId = typeof record.message_id === "string" ? record.message_id : "";
+    const messageType = typeof record.msg_type === "string" ? record.msg_type : "";
+    if (messageId === "" || messageType === "") {
+      continue;
+    }
+    const upper = typeof record.upper_message_id === "string" && record.upper_message_id !== ""
+      ? record.upper_message_id
+      : undefined;
+    let senderId: string | undefined;
+    let senderType: string | undefined;
+    if (record.sender && typeof record.sender === "object" && !Array.isArray(record.sender)) {
+      const sender = record.sender as Record<string, unknown>;
+      if (typeof sender.id === "string") {
+        senderId = sender.id;
+      }
+      if (typeof sender.sender_type === "string") {
+        senderType = sender.sender_type;
+      }
+    }
+    const body = record.body;
+    const content = body && typeof body === "object" && !Array.isArray(body) && typeof (body as { content?: unknown }).content === "string"
+      ? ((body as { content: string }).content)
+      : undefined;
+    const createTimeMs = typeof record.create_time === "string" && record.create_time !== ""
+      ? Number(record.create_time)
+      : undefined;
+    const mentionsRaw = Array.isArray(record.mentions) ? record.mentions : [];
+    const mentions: FeishuFetchedMessageMention[] = [];
+    for (const m of mentionsRaw) {
+      if (!m || typeof m !== "object" || Array.isArray(m)) {
+        continue;
+      }
+      const mention = m as Record<string, unknown>;
+      const key = typeof mention.key === "string" ? mention.key : undefined;
+      const name = typeof mention.name === "string" ? mention.name : undefined;
+      if (key === undefined && name === undefined) {
+        continue;
+      }
+      mentions.push({ key, name });
+    }
+    result.push({
+      messageId,
+      messageType,
+      upperMessageId: upper,
+      senderId,
+      senderType,
+      createTimeMs: createTimeMs === undefined || Number.isNaN(createTimeMs) ? undefined : createTimeMs,
+      content,
+      mentions
+    });
+  }
+  return result;
 }
 
 function extractBotOpenId(response: unknown): string | undefined {
