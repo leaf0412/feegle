@@ -67,6 +67,16 @@ export interface FeishuMessageMention {
   key?: string;
 }
 
+export interface FeishuMessageRecalledEvent {
+  message_id?: string;
+  recall_time?: string;
+  recall_type?: string;
+  chat_id?: string;
+  message?: {
+    message_id?: string;
+  };
+}
+
 export interface FeishuCardActionTriggerEvent {
   context?: {
     open_chat_id?: string;

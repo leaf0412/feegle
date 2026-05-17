@@ -4,9 +4,11 @@ import {
   extractCardActionCommand,
   explainTextMessageCommand,
   type FeishuCardActionTriggerEvent,
-  type FeishuMessageReceiveEvent
+  type FeishuMessageReceiveEvent,
+  type FeishuMessageRecalledEvent
 } from "./feishu-event-adapter.js";
 import { FeishuMessageDedup } from "./feishu-dedup.js";
+import { FeishuRecallTracker } from "./feishu-recall-tracker.js";
 
 export interface FeishuLongConnectionConfig extends FeishuPlatformConfigInput {}
 
@@ -35,6 +37,7 @@ export interface FeishuEventDispatcher {
   register(handles: {
     "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
     "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
   }): FeishuEventDispatcher;
 }
 
@@ -45,6 +48,7 @@ export interface FeishuWsClient {
 export class FeishuLongConnectionRuntime {
   private readonly dedup = new FeishuMessageDedup();
   private readonly platformConfig;
+  readonly recallTracker = new FeishuRecallTracker();
 
   constructor(
     private readonly config: FeishuLongConnectionConfig,
@@ -114,6 +118,13 @@ export class FeishuLongConnectionRuntime {
           void this.handler
             .handleCommand({ source: "card", ...envelope })
             .catch((error) => console.error("Feishu card handler failed", error));
+        }
+      },
+      "im.message.recalled_v1": async (event) => {
+        const messageId = event.message_id ?? event.message?.message_id;
+        if (typeof messageId === "string" && messageId !== "") {
+          this.recallTracker.mark(messageId);
+          console.info("Feishu message recalled", { messageId });
         }
       }
     });

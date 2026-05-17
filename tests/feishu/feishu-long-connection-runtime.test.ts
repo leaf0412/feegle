@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type FeishuCardActionTriggerEvent,
-  type FeishuMessageReceiveEvent
+  type FeishuMessageReceiveEvent,
+  type FeishuMessageRecalledEvent
 } from "../../src/feishu/feishu-event-adapter.js";
 import {
   FeishuLongConnectionRuntime
@@ -20,6 +21,7 @@ describe("FeishuLongConnectionRuntime", () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const starts: unknown[] = [];
     const handled: unknown[] = [];
@@ -84,7 +86,11 @@ describe("FeishuLongConnectionRuntime", () => {
       });
 
       expect(starts).toHaveLength(1);
-      expect(Object.keys(registered).sort()).toEqual(["card.action.trigger", "im.message.receive_v1"]);
+      expect(Object.keys(registered).sort()).toEqual([
+        "card.action.trigger",
+        "im.message.recalled_v1",
+        "im.message.receive_v1"
+      ]);
       expect(handled).toEqual([
         {
           source: "message",
@@ -108,10 +114,43 @@ describe("FeishuLongConnectionRuntime", () => {
     }
   });
 
+  it("marks recalled message ids in the recall tracker", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+    } = {};
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+        "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      { handleCommand: async () => {} }
+    );
+    await runtime.start();
+    await registered["im.message.recalled_v1"]?.({ message_id: "om_recalled" });
+    expect(runtime.recallTracker.isRecalled("om_recalled")).toBe(true);
+  });
+
   it("does not handle the same source and message id twice", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
 
@@ -173,6 +212,7 @@ describe("FeishuLongConnectionRuntime", () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
 
@@ -243,6 +283,7 @@ describe("FeishuLongConnectionRuntime", () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
     const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -301,6 +342,7 @@ describe("FeishuLongConnectionRuntime", () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
 
@@ -359,6 +401,7 @@ describe("FeishuLongConnectionRuntime", () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
