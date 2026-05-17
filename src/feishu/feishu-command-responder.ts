@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import type { AgentCli } from "../agent/agent-cli.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
@@ -6,7 +7,8 @@ import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 export class FeishuCommandResponder implements FeishuCommandHandler {
   constructor(
     private readonly client: FeishuClientPort,
-    private readonly agent?: AgentCli
+    private readonly agent?: AgentCli,
+    private readonly options: { agentDisplayName?: string } = {}
   ) {}
 
   async handleCommand(input: {
@@ -16,16 +18,23 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     command: FeishuCommand;
   }): Promise<void> {
     if (input.command.type === "unknown" && this.agent) {
-      await this.client.sendText(input.chatId, "收到需求，正在交给 Codex 分析...");
+      const agentDisplayName = this.options.agentDisplayName ?? "Codex";
+      await this.client.sendText(input.chatId, `收到需求，正在交给 ${agentDisplayName} 分析...`);
       try {
         const plan = await this.agent.generatePlan({
           requirementId: input.messageId,
           title: input.command.raw.split("\n")[0] ?? input.messageId,
           requirementText: input.command.raw
         });
-        await this.client.sendText(input.chatId, plan);
+        const reply = await buildAgentReply(plan);
+        if (reply.text) {
+          await this.client.sendText(input.chatId, reply.text);
+        }
+        for (const filePath of reply.filePaths) {
+          await this.client.sendFile(input.chatId, filePath);
+        }
       } catch (error) {
-        await this.client.sendText(input.chatId, `Codex 分析失败：${errorMessage(error)}`);
+        await this.client.sendText(input.chatId, `${agentDisplayName} 分析失败：${errorMessage(error)}`);
       }
       return;
     }
@@ -51,4 +60,40 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+interface AgentReply {
+  text: string;
+  filePaths: string[];
+}
+
+async function buildAgentReply(output: string): Promise<AgentReply> {
+  const textLines: string[] = [];
+  const filePaths: string[] = [];
+
+  for (const line of output.split("\n")) {
+    const filePath = parseFileMarker(line);
+    if (filePath === null) {
+      textLines.push(line);
+      continue;
+    }
+
+    await access(filePath);
+    filePaths.push(filePath);
+  }
+
+  return {
+    text: textLines.join("\n").trim(),
+    filePaths
+  };
+}
+
+function parseFileMarker(line: string): string | null {
+  const trimmed = line.trim();
+  const prefix = "feegle:file:";
+  if (!trimmed.startsWith(prefix)) {
+    return null;
+  }
+  const filePath = trimmed.slice(prefix.length).trim();
+  return filePath.startsWith("/") ? filePath : null;
 }

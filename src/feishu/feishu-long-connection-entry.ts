@@ -1,6 +1,5 @@
 import * as lark from "@larksuiteoapi/node-sdk";
-import { CodexAgentAdapter } from "../agent/codex-agent-adapter.js";
-import { createCodexCliPromptRunner } from "../agent/codex-cli-runner.js";
+import { createFeegleAgent, type FeegleAgentKind } from "../agent/agent-factory.js";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { FeishuCommandResponder } from "./feishu-command-responder.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
@@ -17,16 +16,18 @@ const feishuClient: FeishuClientPort = new LarkFeishuClient(
     appSecret: config.appSecret
   })
 );
-const agent = new CodexAgentAdapter(
-  createCodexCliPromptRunner({
-    command: process.env.FEEGLE_AGENT_COMMAND ?? "codex",
-    cwd: process.env.FEEGLE_AGENT_CWD ?? process.cwd(),
-    sandbox: readSandboxEnv(),
-    approvalPolicy: readApprovalPolicyEnv(),
-    timeoutMs: readTimeoutMsEnv()
-  })
-);
-const handler = new FeishuCommandResponder(feishuClient, agent);
+const agentKind = readAgentKindEnv();
+const configuredAgent = createFeegleAgent({
+  kind: agentKind,
+  command: readAgentCommandEnv(agentKind),
+  cwd: process.env.FEEGLE_AGENT_CWD ?? process.cwd(),
+  sandbox: readSandboxEnv(),
+  approvalPolicy: readApprovalPolicyEnv(),
+  timeoutMs: readTimeoutMsEnv()
+});
+const handler = new FeishuCommandResponder(feishuClient, configuredAgent.agent, {
+  agentDisplayName: configuredAgent.displayName
+});
 
 const runtime = new FeishuLongConnectionRuntime(
   config,
@@ -42,6 +43,24 @@ function readRequiredEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function readAgentKindEnv(): FeegleAgentKind {
+  const value = process.env.FEEGLE_AGENT_KIND;
+  if (value === undefined || value === "codex") {
+    return "codex";
+  }
+  if (value === "claude_code") {
+    return "claude_code";
+  }
+  throw new Error(`Invalid FEEGLE_AGENT_KIND: ${value}`);
+}
+
+function readAgentCommandEnv(agentKind: FeegleAgentKind): string | undefined {
+  if (process.env.FEEGLE_AGENT_COMMAND) {
+    return process.env.FEEGLE_AGENT_COMMAND;
+  }
+  return agentKind === "claude_code" ? "claude" : "codex";
 }
 
 function readSandboxEnv(): "read-only" | "workspace-write" | "danger-full-access" {

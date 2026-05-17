@@ -58,6 +58,7 @@ Optional values:
 ```bash
 export FEISHU_VERIFICATION_TOKEN="xxx"
 export FEISHU_ENCRYPT_KEY="xxx"
+export FEEGLE_AGENT_KIND="codex"
 export FEEGLE_AGENT_COMMAND="codex"
 export FEEGLE_AGENT_CWD="/path/to/workspace"
 export FEEGLE_AGENT_SANDBOX="workspace-write"
@@ -83,11 +84,32 @@ npm run start:feishu
 
 When the connection is active, send a message in the Feishu group. Deterministic commands are handled by code. Natural-language requirement messages are sent to the configured Agent CLI, and the agent result is sent back to the same Feishu chat.
 
-By default, the agent command is:
+By default, `FEEGLE_AGENT_KIND` is `codex`, and the agent command is:
 
 ```bash
 codex --ask-for-approval never exec --cd "$FEEGLE_AGENT_CWD" --sandbox workspace-write --output-last-message /tmp/feegle-last-message.txt -
 ```
+
+To send natural-language messages to Claude Code instead:
+
+```bash
+export FEEGLE_AGENT_KIND="claude_code"
+export FEEGLE_AGENT_COMMAND="claude"
+```
+
+The Claude Code runner uses headless stream JSON mode:
+
+```bash
+claude -p --output-format stream-json --input-format stream-json --verbose
+```
+
+If an agent creates a local file that should be sent back to Feishu, it should include one marker line per file in its final response:
+
+```text
+feegle:file:/absolute/path/to/file.zip
+```
+
+Feegle removes those marker lines from the text reply, uploads each existing local file to Feishu, and sends it to the same chat as a file message.
 
 Example command:
 
@@ -126,6 +148,7 @@ The OpenAPI client supports:
 
 - `sendText(chatId, text)`
 - `sendInteractiveCard(chatId, card)`
+- `sendFile(chatId, filePath)`
 - `updateInteractiveCard(messageId, card)`
 
 ## What Is Not Wired Yet

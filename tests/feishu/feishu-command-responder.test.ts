@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
 import type { AgentCli } from "../../src/agent/agent-cli.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
@@ -100,9 +103,70 @@ describe("FeishuCommandResponder", () => {
       }
     ]);
   });
+
+  it("sends files referenced by agent output after the text reply", async () => {
+    const replies: Array<{ chatId: string; text: string }> = [];
+    const files: Array<{ chatId: string; filePath: string }> = [];
+    const directory = await mkdtemp(join(tmpdir(), "feegle-agent-file-"));
+    const filePath = join(directory, "prototype.zip");
+    await writeFile(filePath, "zip");
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies, files),
+      fakeAgent([], `原型已生成。\nfeegle:file:${filePath}`)
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_5",
+      command: { type: "unknown", raw: "做一个登录页原型" }
+    });
+
+    expect(replies).toEqual([
+      {
+        chatId: "oc_1",
+        text: "收到需求，正在交给 Codex 分析..."
+      },
+      {
+        chatId: "oc_1",
+        text: "原型已生成。"
+      }
+    ]);
+    expect(files).toEqual([{ chatId: "oc_1", filePath }]);
+  });
+
+  it("uses the configured agent display name in progress and failure replies", async () => {
+    const replies: Array<{ chatId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      failingAgent("claude failed"),
+      { agentDisplayName: "Claude Code" }
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_6",
+      command: { type: "unknown", raw: "处理这个需求" }
+    });
+
+    expect(replies).toEqual([
+      {
+        chatId: "oc_1",
+        text: "收到需求，正在交给 Claude Code 分析..."
+      },
+      {
+        chatId: "oc_1",
+        text: "Claude Code 分析失败：claude failed"
+      }
+    ]);
+  });
 });
 
-function fakeClient(replies: Array<{ chatId: string; text: string }>): FeishuClientPort {
+function fakeClient(
+  replies: Array<{ chatId: string; text: string }>,
+  files: Array<{ chatId: string; filePath: string }> = []
+): FeishuClientPort {
   return {
     async sendText(chatId, text) {
       replies.push({ chatId, text });
@@ -110,6 +174,10 @@ function fakeClient(replies: Array<{ chatId: string; text: string }>): FeishuCli
     },
     async sendInteractiveCard() {
       return "om_card";
+    },
+    async sendFile(chatId, filePath) {
+      files.push({ chatId, filePath });
+      return "om_file";
     },
     async updateInteractiveCard() {}
   };
