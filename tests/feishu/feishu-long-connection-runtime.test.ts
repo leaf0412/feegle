@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type FeishuBotMenuEvent,
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent,
   type FeishuMessageRecalledEvent
@@ -87,6 +88,7 @@ describe("FeishuLongConnectionRuntime", () => {
 
       expect(starts).toHaveLength(1);
       expect(Object.keys(registered).sort()).toEqual([
+        "application.bot.menu_v6",
         "card.action.trigger",
         "im.message.recalled_v1",
         "im.message.receive_v1"
@@ -112,6 +114,49 @@ describe("FeishuLongConnectionRuntime", () => {
     } finally {
       expect(consoleInfo).toHaveBeenCalled();
     }
+  });
+
+  it("routes bot menu clicks through the command handler as slash commands", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+      "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+        "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+        "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      { handleCommand: async (input) => { handled.push(input); } }
+    );
+    await runtime.start();
+    await registered["application.bot.menu_v6"]?.({
+      event: {
+        event_key: "help",
+        operator: { operator_id: { open_id: "ou_alice" } }
+      }
+    });
+    expect(handled).toHaveLength(1);
+    const first = handled[0] as { chatId: string; command: { type: string } };
+    expect(first.chatId).toBe("ou_alice");
+    expect(first.command.type).toBe("help");
   });
 
   it("marks recalled message ids in the recall tracker", async () => {

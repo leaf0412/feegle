@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractBotMenuCommand,
   extractCardActionCommand,
   extractTextMessageCommand,
   explainTextMessageCommand
@@ -383,5 +384,39 @@ describe("feishu event adapter", () => {
     );
 
     expect(parsed).toBeNull();
+  });
+});
+
+describe("extractBotMenuCommand", () => {
+  it("treats event_key as a slash command and routes via the operator's DM scope", () => {
+    let tick = 1_700_000_000_000;
+    const envelope = extractBotMenuCommand(
+      {
+        event: {
+          event_key: "help",
+          operator: { operator_id: { open_id: "ou_alice" } }
+        }
+      },
+      { now: () => tick++ }
+    );
+    expect(envelope).not.toBeNull();
+    expect(envelope?.chatId).toBe("ou_alice");
+    expect(envelope?.messageId).toMatch(/^menu:ou_alice:help:\d+$/);
+    expect(envelope?.command).toEqual({ type: "help", groupKey: undefined });
+  });
+
+  it("prepends a slash when event_key is provided without one", () => {
+    const envelope = extractBotMenuCommand({
+      event_key: "list",
+      operator: { operator_id: { open_id: "ou_alice" } }
+    });
+    expect(envelope?.command.type).toMatch(/unknown|slash_command/);
+  });
+
+  it("returns null when event_key or operator id is missing", () => {
+    expect(
+      extractBotMenuCommand({ event: { operator: { operator_id: { open_id: "ou_alice" } } } })
+    ).toBeNull();
+    expect(extractBotMenuCommand({ event_key: "help" })).toBeNull();
   });
 });

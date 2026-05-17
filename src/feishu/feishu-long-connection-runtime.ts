@@ -1,8 +1,10 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
 import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "./feishu-platform-config.js";
 import {
+  extractBotMenuCommand,
   extractCardActionCommand,
   explainTextMessageCommand,
+  type FeishuBotMenuEvent,
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent,
   type FeishuMessageRecalledEvent
@@ -38,6 +40,7 @@ export interface FeishuEventDispatcher {
     "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
     "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
     "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+    "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
   }): FeishuEventDispatcher;
 }
 
@@ -125,6 +128,29 @@ export class FeishuLongConnectionRuntime {
         if (typeof messageId === "string" && messageId !== "") {
           this.recallTracker.mark(messageId);
           console.info("Feishu message recalled", { messageId });
+        }
+      },
+      "application.bot.menu_v6": async (event) => {
+        const envelope = extractBotMenuCommand(event);
+        if (!envelope) {
+          console.warn("Feishu bot menu ignored", { eventKey: event.event?.event_key ?? event.event_key });
+          return;
+        }
+        console.info("Feishu bot menu routed", {
+          chatId: envelope.chatId,
+          messageId: envelope.messageId,
+          commandType: envelope.command.type
+        });
+        if (this.markUnhandled("message", envelope.messageId)) {
+          void this.handler
+            .handleCommand({
+              source: "message",
+              chatId: envelope.chatId,
+              messageId: envelope.messageId,
+              command: envelope.command,
+              shouldRespond: envelope.shouldRespond
+            })
+            .catch((error) => console.error("Feishu bot menu handler failed", error));
         }
       }
     });

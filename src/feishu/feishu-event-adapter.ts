@@ -67,6 +67,28 @@ export interface FeishuMessageMention {
   key?: string;
 }
 
+export interface FeishuBotMenuEvent {
+  event_key?: string;
+  operator?: {
+    operator_id?: {
+      open_id?: string;
+      union_id?: string;
+      user_id?: string;
+    };
+  };
+  event?: {
+    event_key?: string;
+    operator?: {
+      operator_id?: {
+        open_id?: string;
+        union_id?: string;
+        user_id?: string;
+      };
+    };
+  };
+  timestamp?: number;
+}
+
 export interface FeishuMessageRecalledEvent {
   message_id?: string;
   recall_time?: string;
@@ -165,6 +187,34 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
     messageId,
     shouldRespond: true,
     command: parseFeishuCardActionValue(event.action?.value)
+  };
+}
+
+export function extractBotMenuCommand(
+  event: FeishuBotMenuEvent,
+  options: { now?: () => number } = {}
+): FeishuCommandEnvelope | null {
+  const eventKey = event.event?.event_key ?? event.event_key;
+  if (typeof eventKey !== "string" || eventKey === "") {
+    return null;
+  }
+  const operator = event.event?.operator ?? event.operator;
+  const userId =
+    operator?.operator_id?.open_id ??
+    operator?.operator_id?.user_id ??
+    operator?.operator_id?.union_id ??
+    "";
+  if (userId === "") {
+    return null;
+  }
+  const raw = eventKey.startsWith("/") ? eventKey : `/${eventKey}`;
+  const now = options.now ?? (() => Date.now());
+  const messageId = `menu:${userId}:${eventKey}:${now()}`;
+  return {
+    chatId: userId,
+    messageId,
+    shouldRespond: true,
+    command: parseFeishuCommand(raw)
   };
 }
 
