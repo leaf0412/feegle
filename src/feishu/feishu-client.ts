@@ -103,6 +103,21 @@ export interface FeishuClientPort {
   fetchUserName(openId: string): Promise<string | undefined>;
   fetchChatName(chatId: string): Promise<string | undefined>;
   fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>>;
+  fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined>;
+}
+
+export interface FeishuFetchedMessageMention {
+  key?: string;
+  name?: string;
+}
+
+export interface FeishuFetchedMessage {
+  messageType: string;
+  parentId?: string;
+  senderId?: string;
+  senderType?: string;
+  content?: string;
+  mentions: FeishuFetchedMessageMention[];
 }
 
 export class LarkFeishuClient implements FeishuClientPort {
@@ -264,6 +279,18 @@ export class LarkFeishuClient implements FeishuClientPort {
     return [];
   }
 
+  async fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined> {
+    if (!this.client.request) {
+      return undefined;
+    }
+    const response = await this.client.request({
+      url: `/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
+      method: "GET",
+      params: { card_msg_content_type: "raw_card_content" }
+    });
+    return extractFetchedMessage(response);
+  }
+
   private cachedBotOpenId: string | undefined;
 
   async fetchBotOpenId(): Promise<string | undefined> {
@@ -342,6 +369,55 @@ function extractChatMember(raw: unknown): { memberId: string; name: string } | n
     return null;
   }
   return { memberId, name };
+}
+
+function extractFetchedMessage(response: unknown): FeishuFetchedMessage | undefined {
+  const items = readNestedArray(response, ["data", "items"]) ?? readNestedArray(response, ["items"]);
+  if (!items || items.length === 0) {
+    return undefined;
+  }
+  const first = items[0];
+  if (!first || typeof first !== "object" || Array.isArray(first)) {
+    return undefined;
+  }
+  const record = first as Record<string, unknown>;
+  const messageType = typeof record.msg_type === "string" ? record.msg_type : "";
+  if (messageType === "") {
+    return undefined;
+  }
+  const body = record.body;
+  const content =
+    body && typeof body === "object" && !Array.isArray(body) && typeof (body as { content?: unknown }).content === "string"
+      ? ((body as { content: string }).content)
+      : undefined;
+  const sender = record.sender;
+  let senderId: string | undefined;
+  let senderType: string | undefined;
+  if (sender && typeof sender === "object" && !Array.isArray(sender)) {
+    const senderRecord = sender as Record<string, unknown>;
+    if (typeof senderRecord.id === "string") {
+      senderId = senderRecord.id;
+    }
+    if (typeof senderRecord.sender_type === "string") {
+      senderType = senderRecord.sender_type;
+    }
+  }
+  const parentId = typeof record.parent_id === "string" && record.parent_id !== "" ? record.parent_id : undefined;
+  const mentionsRaw = Array.isArray(record.mentions) ? record.mentions : [];
+  const mentions: FeishuFetchedMessageMention[] = [];
+  for (const raw of mentionsRaw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      continue;
+    }
+    const mention = raw as Record<string, unknown>;
+    const key = typeof mention.key === "string" ? mention.key : undefined;
+    const name = typeof mention.name === "string" ? mention.name : undefined;
+    if (key === undefined && name === undefined) {
+      continue;
+    }
+    mentions.push({ key, name });
+  }
+  return { messageType, parentId, senderId, senderType, content, mentions };
 }
 
 function extractBotOpenId(response: unknown): string | undefined {

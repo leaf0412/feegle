@@ -359,6 +359,9 @@ function fakeClient(
     },
     async fetchChatMembers() {
       return [];
+    },
+    async fetchMessage() {
+      return undefined;
     }
   };
 }
