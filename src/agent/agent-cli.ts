@@ -24,7 +24,13 @@ export interface AgentRunOptions {
   onProgress?: (update: AgentProgressUpdate) => void | Promise<void>;
 }
 
+export interface AgentChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface AgentCli {
+  chat(messages: ReadonlyArray<AgentChatMessage>, options?: AgentRunOptions): Promise<string>;
   generatePrototype(
     context: AgentRequirementContext,
     options?: AgentRunOptions

@@ -1,9 +1,22 @@
-import type { AgentCli, AgentRepositoryContext, AgentRequirementContext, AgentRunOptions } from "./agent-cli.js";
+import type {
+  AgentChatMessage,
+  AgentCli,
+  AgentRepositoryContext,
+  AgentRequirementContext,
+  AgentRunOptions
+} from "./agent-cli.js";
 
 export type PromptRunner = (prompt: string, options?: AgentRunOptions) => Promise<string>;
 
 export class PromptAgentAdapter implements AgentCli {
   constructor(private readonly runner: PromptRunner) {}
+
+  chat(messages: ReadonlyArray<AgentChatMessage>, options?: AgentRunOptions): Promise<string> {
+    if (messages.length === 0) {
+      return Promise.reject(new Error("chat() requires at least one message"));
+    }
+    return this.runner(buildChatPrompt(messages), options);
+  }
 
   generatePrototype(context: AgentRequirementContext, options?: AgentRunOptions): Promise<string> {
     return this.runner(
@@ -65,4 +78,18 @@ ${fieldBlocks}`;
 
 function fenced(value: string): string {
   return `~~~json\n${JSON.stringify(value)}\n~~~`;
+}
+
+function buildChatPrompt(messages: ReadonlyArray<AgentChatMessage>): string {
+  if (messages.length === 1 && messages[0].role === "user") {
+    return messages[0].content;
+  }
+  const turns = messages
+    .map((message) => `${roleLabel(message.role)}:\n${message.content}`)
+    .join("\n\n");
+  return `${turns}\n\nAssistant:`;
+}
+
+function roleLabel(role: AgentChatMessage["role"]): string {
+  return role === "assistant" ? "Assistant" : "User";
 }
