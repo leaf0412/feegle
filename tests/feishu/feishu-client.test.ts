@@ -102,6 +102,81 @@ describe("LarkFeishuClient", () => {
     ]);
   });
 
+  it("replies to the original message with text and cards", async () => {
+    const calls: unknown[] = [];
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          message: {
+            create: async () => ({ data: { message_id: "unused" } }),
+            patch: async () => ({}),
+            reply: async (input: unknown) => {
+              calls.push(input);
+              return { data: { message_id: "om_reply" } };
+            }
+          }
+        }
+      }
+    });
+
+    await expect(client.replyText("om_trigger", "收到")).resolves.toBe("om_reply");
+    await expect(client.replyInteractiveCard("om_trigger", { elements: [] })).resolves.toBe("om_reply");
+
+    expect(calls).toEqual([
+      {
+        path: { message_id: "om_trigger" },
+        data: {
+          msg_type: "text",
+          content: JSON.stringify({ text: "收到" })
+        }
+      },
+      {
+        path: { message_id: "om_trigger" },
+        data: {
+          msg_type: "interactive",
+          content: JSON.stringify({ elements: [] })
+        }
+      }
+    ]);
+  });
+
+  it("adds and removes message reactions", async () => {
+    const calls: unknown[] = [];
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          messageReaction: {
+            create: async (input: unknown) => {
+              calls.push(input);
+              return { data: { reaction_id: "reaction_1" } };
+            },
+            delete: async (input: unknown) => {
+              calls.push(input);
+              return {};
+            }
+          },
+          message: {
+            create: async () => ({ data: { message_id: "unused" } }),
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+
+    await expect(client.addReaction("om_1", "OnIt")).resolves.toBe("reaction_1");
+    await client.removeReaction("om_1", "reaction_1");
+
+    expect(calls).toEqual([
+      {
+        path: { message_id: "om_1" },
+        data: { reaction_type: { emoji_type: "OnIt" } }
+      },
+      {
+        path: { message_id: "om_1", reaction_id: "reaction_1" }
+      }
+    ]);
+  });
+
   it("updates progress cards in place", async () => {
     const calls: unknown[] = [];
     const client = new LarkFeishuClient({

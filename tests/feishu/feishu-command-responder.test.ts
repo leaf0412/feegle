@@ -8,7 +8,7 @@ import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 
 describe("FeishuCommandResponder", () => {
   it("replies with selected repositories", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies));
 
     await responder.handleCommand({
@@ -20,14 +20,14 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
+        messageId: "om_1",
         text: "已收到仓库选择：web、api。\n下一步我会基于这些仓库建议需求分支名称。"
       }
     ]);
   });
 
   it("replies to push card actions", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies));
 
     await responder.handleCommand({
@@ -39,14 +39,14 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
+        messageId: "om_2",
         text: "已收到推送请求：需求 req_1，仓库 web。\n当前入口还没有接入 git push 执行器。"
       }
     ]);
   });
 
   it("surfaces platform actions until the action router is connected", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies));
 
     await responder.handleCommand({
@@ -62,17 +62,18 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
+        messageId: "om_2",
         text: "已收到卡片动作：act:/push repo web。\n当前入口还没有接入动作路由器。"
       }
     ]);
   });
 
   it("replies with help text for unknown commands", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
     const agentCalls: unknown[] = [];
     const responder = new FeishuCommandResponder(
-      fakeClient(replies),
+      fakeClient(replies, [], progress),
       fakeAgent(agentCalls, "Codex 计划：先绑定仓库，再创建分支。")
     );
 
@@ -85,14 +86,12 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
-        text: "收到需求，正在交给 Codex 分析..."
-      },
-      {
-        chatId: "oc_1",
+        messageId: "om_3",
         text: "Codex 计划：先绑定仓库，再创建分支。"
       }
     ]);
+    expect(JSON.stringify(progress)).toContain("Codex · 进行中");
+    expect(JSON.stringify(progress)).toContain("\"state\":\"completed\"");
     expect(agentCalls).toEqual([
       {
         requirementId: "om_3",
@@ -103,8 +102,9 @@ describe("FeishuCommandResponder", () => {
   });
 
   it("reports agent failures back to Feishu instead of throwing", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
-    const responder = new FeishuCommandResponder(fakeClient(replies), failingAgent("codex exec failed"));
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), failingAgent("codex exec failed"));
 
     await expect(
       responder.handleCommand({
@@ -117,18 +117,15 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
-        text: "收到需求，正在交给 Codex 分析..."
-      },
-      {
-        chatId: "oc_1",
+        messageId: "om_4",
         text: "Codex 分析失败：codex exec failed"
       }
     ]);
+    expect(JSON.stringify(progress)).toContain("\"state\":\"failed\"");
   });
 
   it("sends files referenced by agent output after the text reply", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
     const files: Array<{ chatId: string; filePath: string }> = [];
     const directory = await mkdtemp(join(tmpdir(), "feegle-agent-file-"));
     const filePath = join(directory, "prototype.zip");
@@ -147,11 +144,7 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
-        text: "收到需求，正在交给 Codex 分析..."
-      },
-      {
-        chatId: "oc_1",
+        messageId: "om_5",
         text: "原型已生成。"
       }
     ]);
@@ -159,7 +152,7 @@ describe("FeishuCommandResponder", () => {
   });
 
   it("reports missing files referenced by agent output", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(
       fakeClient(replies),
       fakeAgent([], "结果已生成。\nfeegle:file:/tmp/does-not-exist.zip")
@@ -176,9 +169,10 @@ describe("FeishuCommandResponder", () => {
   });
 
   it("uses the configured agent display name in progress and failure replies", async () => {
-    const replies: Array<{ chatId: string; text: string }> = [];
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
     const responder = new FeishuCommandResponder(
-      fakeClient(replies),
+      fakeClient(replies, [], progress),
       failingAgent("claude failed"),
       { agentDisplayName: "Claude Code" }
     );
@@ -192,24 +186,46 @@ describe("FeishuCommandResponder", () => {
 
     expect(replies).toEqual([
       {
-        chatId: "oc_1",
-        text: "收到需求，正在交给 Claude Code 分析..."
-      },
-      {
-        chatId: "oc_1",
+        messageId: "om_6",
         text: "Claude Code 分析失败：claude failed"
       }
+    ]);
+    expect(JSON.stringify(progress)).toContain("\"state\":\"failed\"");
+  });
+
+  it("adds processing reaction and swaps it for done reaction", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const reactions: unknown[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies, [], [], reactions),
+      fakeAgent([], "完成"),
+      { reactionEmoji: "OnIt", doneEmoji: "DONE" }
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_8",
+      command: { type: "unknown", raw: "处理这个需求" }
+    });
+
+    expect(reactions).toEqual([
+      { kind: "add", messageId: "om_8", emojiType: "OnIt" },
+      { kind: "remove", messageId: "om_8", reactionId: "reaction_OnIt" },
+      { kind: "add", messageId: "om_8", emojiType: "DONE" }
     ]);
   });
 });
 
 function fakeClient(
-  replies: Array<{ chatId: string; text: string }>,
-  files: Array<{ chatId: string; filePath: string }> = []
+  replies: Array<{ messageId: string; text: string }>,
+  files: Array<{ chatId: string; filePath: string }> = [],
+  progress: unknown[] = [],
+  reactions: unknown[] = []
 ): FeishuClientPort {
   return {
     async sendText(chatId, text) {
-      replies.push({ chatId, text });
+      replies.push({ messageId: chatId, text });
       return "om_reply";
     },
     async sendInteractiveCard() {
@@ -219,8 +235,25 @@ function fakeClient(
       files.push({ chatId, filePath });
       return "om_file";
     },
+    async replyText(messageId, text) {
+      replies.push({ messageId, text });
+      return "om_reply";
+    },
+    async replyInteractiveCard(messageId, card) {
+      progress.push({ kind: "replyCard", messageId, card });
+      return "om_progress";
+    },
     async updateInteractiveCard() {},
-    async updateProgress() {}
+    async updateProgress(messageId, snapshot) {
+      progress.push({ kind: "updateProgress", messageId, snapshot });
+    },
+    async addReaction(messageId, emojiType) {
+      reactions.push({ kind: "add", messageId, emojiType });
+      return `reaction_${emojiType}`;
+    },
+    async removeReaction(messageId, reactionId) {
+      reactions.push({ kind: "remove", messageId, reactionId });
+    }
   };
 }
 

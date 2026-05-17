@@ -39,7 +39,9 @@ const configuredAgent = createFeegleAgent({
   timeoutMs: readTimeoutMsEnv()
 });
 const handler = new FeishuCommandResponder(feishuClient, configuredAgent.agent, {
-  agentDisplayName: configuredAgent.displayName
+  agentDisplayName: configuredAgent.displayName,
+  reactionEmoji: config.reactionEmoji,
+  doneEmoji: config.doneEmoji
 });
 
 const runtime = new FeishuLongConnectionRuntime(

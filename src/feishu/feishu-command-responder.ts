@@ -1,14 +1,16 @@
 import { access } from "node:fs/promises";
 import type { AgentCli } from "../agent/agent-cli.js";
+import type { PlatformProgressEntry, PlatformProgressSnapshot } from "../platform/progress.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
+import { renderFeishuProgressCard } from "./feishu-progress-card.js";
 
 export class FeishuCommandResponder implements FeishuCommandHandler {
   constructor(
     private readonly client: FeishuClientPort,
     private readonly agent?: AgentCli,
-    private readonly options: { agentDisplayName?: string } = {}
+    private readonly options: { agentDisplayName?: string; reactionEmoji?: string; doneEmoji?: string } = {}
   ) {}
 
   async handleCommand(input: {
@@ -19,31 +21,95 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   }): Promise<void> {
     if (input.command.type === "unknown" && this.agent) {
       const agentDisplayName = this.options.agentDisplayName ?? "Codex";
-      await this.client.sendText(input.chatId, `收到需求，正在交给 ${agentDisplayName} 分析...`);
+      const reactionId = await this.addProcessingReaction(input.messageId);
+      const progressMessageId = await this.client.replyInteractiveCard(
+        input.messageId,
+        renderFeishuProgressCard(
+          createProgressSnapshot(agentDisplayName, "running", [
+            { kind: "thinking", text: "收到需求，正在准备分析。" }
+          ])
+        )
+      );
       try {
+        await this.updateProgress(progressMessageId, agentDisplayName, "running", [
+          { kind: "thinking", text: "正在调用 Agent 分析需求。" },
+          { kind: "tool_use", tool: agentDisplayName, text: input.command.raw }
+        ]);
         const plan = await this.agent.generatePlan({
           requirementId: input.messageId,
           title: input.command.raw.split("\n")[0] ?? input.messageId,
           requirementText: input.command.raw
         });
+        await this.updateProgress(progressMessageId, agentDisplayName, "running", [
+          { kind: "thinking", text: "Agent 已返回结果，正在整理并发送回复。" }
+        ]);
         const reply = await buildAgentReply(plan);
         if (reply.text) {
-          await this.client.sendText(input.chatId, reply.text);
+          await this.client.replyText(input.messageId, reply.text);
         }
         for (const filePath of reply.filePaths) {
           await this.client.sendFile(input.chatId, filePath);
         }
         for (const filePath of reply.missingFilePaths) {
-          await this.client.sendText(input.chatId, `文件发送失败：${filePath} 不存在或不可读取。`);
+          await this.client.replyText(input.messageId, `文件发送失败：${filePath} 不存在或不可读取。`);
         }
+        await this.updateProgress(progressMessageId, agentDisplayName, "completed", [
+          { kind: "info", text: "分析完成，结果已回复。" }
+        ]);
+        await this.finishReactions(input.messageId, reactionId);
       } catch (error) {
-        await this.client.sendText(input.chatId, `${agentDisplayName} 分析失败：${errorMessage(error)}`);
+        await this.updateProgress(progressMessageId, agentDisplayName, "failed", [
+          { kind: "error", text: errorMessage(error) }
+        ]);
+        await this.client.replyText(input.messageId, `${agentDisplayName} 分析失败：${errorMessage(error)}`);
+        await this.finishReactions(input.messageId, reactionId);
       }
       return;
     }
 
-    await this.client.sendText(input.chatId, buildReplyText(input.command));
+    await this.client.replyText(input.messageId, buildReplyText(input.command));
   }
+
+  private async addProcessingReaction(messageId: string): Promise<string | undefined> {
+    if (!this.options.reactionEmoji) {
+      return undefined;
+    }
+    return this.client.addReaction(messageId, this.options.reactionEmoji);
+  }
+
+  private async finishReactions(messageId: string, reactionId: string | undefined): Promise<void> {
+    if (reactionId) {
+      await this.client.removeReaction(messageId, reactionId);
+    }
+    if (this.options.doneEmoji) {
+      await this.client.addReaction(messageId, this.options.doneEmoji);
+    }
+  }
+
+  private async updateProgress(
+    progressMessageId: string | undefined,
+    title: string,
+    state: PlatformProgressSnapshot["state"],
+    entries: PlatformProgressEntry[]
+  ): Promise<void> {
+    if (!progressMessageId) {
+      return;
+    }
+    await this.client.updateProgress(progressMessageId, createProgressSnapshot(title, state, entries));
+  }
+}
+
+function createProgressSnapshot(
+  title: string,
+  state: PlatformProgressSnapshot["state"],
+  entries: PlatformProgressEntry[]
+): PlatformProgressSnapshot {
+  return {
+    title,
+    state,
+    truncated: false,
+    entries
+  };
 }
 
 function buildReplyText(command: FeishuCommand): string {
