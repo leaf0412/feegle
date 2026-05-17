@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import type { PromptRunner } from "./codex-agent-adapter.js";
+import type { AgentRunOptions } from "./agent-cli.js";
 
 export interface CodexCliRunnerOptions {
   command?: string;
@@ -33,14 +34,14 @@ export function createCodexCliPromptRunner(
   options: CodexCliRunnerOptions,
   runner: CodexCliCommandRunner = defaultRunner
 ): PromptRunner {
-  return async (prompt) => {
+  return async (prompt, runOptions) => {
     const result = await runner(options.command ?? "codex", buildCodexArgs(options), {
       cwd: options.cwd,
       input: prompt,
       timeout: options.timeoutMs ?? 300_000
     });
 
-    return parseCodexJsonOutput(result.stdout);
+    return parseCodexJsonOutput(result.stdout, runOptions);
   };
 }
 
@@ -59,7 +60,7 @@ function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
   ];
 }
 
-function parseCodexJsonOutput(stdout: string): string {
+function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): string {
   const messages: string[] = [];
 
   for (const line of stdout.split(/\r?\n/)) {
@@ -69,6 +70,7 @@ function parseCodexJsonOutput(stdout: string): string {
     }
     const event = parseCodexEvent(trimmed);
     if (event.type === "turn.failed") {
+      options?.onProgress?.({ kind: "error", text: readTurnFailureMessage(event) });
       throw new Error(readTurnFailureMessage(event));
     }
     if (event.type !== "item.completed") {
@@ -76,6 +78,7 @@ function parseCodexJsonOutput(stdout: string): string {
     }
     const item = readRecord(event.item);
     const itemType = readString(item.type);
+    emitCodexProgress(itemType, item, options);
     if (itemType !== "agent_message" && itemType !== "message") {
       continue;
     }
@@ -90,6 +93,34 @@ function parseCodexJsonOutput(stdout: string): string {
     throw new Error("Codex completed without an agent message");
   }
   return response;
+}
+
+function emitCodexProgress(itemType: string, item: Record<string, unknown>, options?: AgentRunOptions): void {
+  if (!options?.onProgress) {
+    return;
+  }
+  if (itemType === "tool_call" || itemType === "function_call") {
+    options.onProgress({
+      kind: "tool_use",
+      tool: readString(item.name) || readString(item.tool_name) || "Tool",
+      text: readString(item.arguments) || readString(item.input) || stringifyRecord(item)
+    });
+    return;
+  }
+  if (itemType === "tool_result" || itemType === "function_call_output") {
+    options.onProgress({
+      kind: "tool_result",
+      tool: readString(item.name) || readString(item.tool_name) || undefined,
+      text: readString(item.output) || readString(item.result) || stringifyRecord(item)
+    });
+    return;
+  }
+  if (itemType === "agent_message" || itemType === "message") {
+    const text = extractItemText(item);
+    if (text) {
+      options.onProgress({ kind: "thinking", text });
+    }
+  }
 }
 
 function parseCodexEvent(line: string): Record<string, unknown> {
@@ -137,6 +168,14 @@ function readRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function stringifyRecord(value: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function errorMessage(error: unknown): string {

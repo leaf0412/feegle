@@ -92,6 +92,7 @@ describe("FeishuCommandResponder", () => {
     ]);
     expect(JSON.stringify(progress)).toContain("Codex · 进行中");
     expect(JSON.stringify(progress)).toContain("\"state\":\"completed\"");
+    expect(JSON.stringify(progress)).toContain("工具结果");
     expect(agentCalls).toEqual([
       {
         requirementId: "om_3",
@@ -262,8 +263,9 @@ function fakeAgent(calls: unknown[], plan: string): AgentCli {
     async generatePrototype() {
       throw new Error("generatePrototype should not be called");
     },
-    async generatePlan(context) {
+    async generatePlan(context, options) {
       calls.push(context);
+      await options?.onProgress?.({ kind: "tool_result", tool: "Codex", text: "工具结果" });
       return plan;
     },
     async runDevelopmentTask() {

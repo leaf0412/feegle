@@ -14,12 +14,26 @@ export type PrototypeGenerationResult = string;
 export type PlanGenerationResult = string;
 export type DevelopmentTaskResult = string;
 
+export interface AgentProgressUpdate {
+  kind: "thinking" | "tool_use" | "tool_result" | "error" | "info";
+  text: string;
+  tool?: string;
+}
+
+export interface AgentRunOptions {
+  onProgress?: (update: AgentProgressUpdate) => void | Promise<void>;
+}
+
 export interface AgentCli {
-  generatePrototype(context: AgentRequirementContext): Promise<PrototypeGenerationResult>;
-  generatePlan(context: AgentRequirementContext): Promise<PlanGenerationResult>;
+  generatePrototype(
+    context: AgentRequirementContext,
+    options?: AgentRunOptions
+  ): Promise<PrototypeGenerationResult>;
+  generatePlan(context: AgentRequirementContext, options?: AgentRunOptions): Promise<PlanGenerationResult>;
   runDevelopmentTask(
     context: AgentRequirementContext,
     repository: AgentRepositoryContext,
-    task: string
+    task: string,
+    options?: AgentRunOptions
   ): Promise<DevelopmentTaskResult>;
 }

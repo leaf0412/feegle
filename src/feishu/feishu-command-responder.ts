@@ -31,18 +31,22 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         )
       );
       try {
-        await this.updateProgress(progressMessageId, agentDisplayName, "running", [
-          { kind: "thinking", text: "正在调用 Agent 分析需求。" },
-          { kind: "tool_use", tool: agentDisplayName, text: input.command.raw }
-        ]);
+        const progressEntries: PlatformProgressEntry[] = [
+          { kind: "thinking", text: "正在调用 Agent 分析需求。" }
+        ];
+        await this.updateProgress(progressMessageId, agentDisplayName, "running", progressEntries);
         const plan = await this.agent.generatePlan({
           requirementId: input.messageId,
           title: input.command.raw.split("\n")[0] ?? input.messageId,
           requirementText: input.command.raw
+        }, {
+          onProgress: async (update) => {
+            progressEntries.push(toProgressEntry(update));
+            await this.updateProgress(progressMessageId, agentDisplayName, "running", progressEntries);
+          }
         });
-        await this.updateProgress(progressMessageId, agentDisplayName, "running", [
-          { kind: "thinking", text: "Agent 已返回结果，正在整理并发送回复。" }
-        ]);
+        progressEntries.push({ kind: "thinking", text: "Agent 已返回结果，正在整理并发送回复。" });
+        await this.updateProgress(progressMessageId, agentDisplayName, "running", progressEntries);
         const reply = await buildAgentReply(plan);
         if (reply.text) {
           await this.client.replyText(input.messageId, reply.text);
@@ -110,6 +114,14 @@ function createProgressSnapshot(
     truncated: false,
     entries
   };
+}
+
+function toProgressEntry(update: {
+  kind: "thinking" | "tool_use" | "tool_result" | "error" | "info";
+  text: string;
+  tool?: string;
+}): PlatformProgressEntry {
+  return update;
 }
 
 function buildReplyText(command: FeishuCommand): string {

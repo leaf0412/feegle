@@ -1,34 +1,37 @@
-import type { AgentCli, AgentRepositoryContext, AgentRequirementContext } from "./agent-cli.js";
+import type { AgentCli, AgentRepositoryContext, AgentRequirementContext, AgentRunOptions } from "./agent-cli.js";
 
-export type PromptRunner = (prompt: string) => Promise<string>;
+export type PromptRunner = (prompt: string, options?: AgentRunOptions) => Promise<string>;
 
 export class PromptAgentAdapter implements AgentCli {
   constructor(private readonly runner: PromptRunner) {}
 
-  generatePrototype(context: AgentRequirementContext): Promise<string> {
+  generatePrototype(context: AgentRequirementContext, options?: AgentRunOptions): Promise<string> {
     return this.runner(
       buildPrompt("Generate an offline Vite prototype.", [
         ["requirement_id", context.requirementId],
         ["title", context.title],
         ["requirement_text", context.requirementText]
-      ])
+      ]),
+      options
     );
   }
 
-  generatePlan(context: AgentRequirementContext): Promise<string> {
+  generatePlan(context: AgentRequirementContext, options?: AgentRunOptions): Promise<string> {
     return this.runner(
       buildPrompt("Generate a TDD development plan.", [
         ["requirement_id", context.requirementId],
         ["title", context.title],
         ["requirement_text", context.requirementText]
-      ])
+      ]),
+      options
     );
   }
 
   runDevelopmentTask(
     context: AgentRequirementContext,
     repository: AgentRepositoryContext,
-    task: string
+    task: string,
+    options?: AgentRunOptions
   ): Promise<string> {
     return this.runner(
       buildPrompt("Run one TDD feature slice.", [
@@ -39,7 +42,8 @@ export class PromptAgentAdapter implements AgentCli {
         ["repository_path", repository.localPath],
         ["branch", repository.branchName],
         ["task", task]
-      ])
+      ]),
+      options
     );
   }
 }
