@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCardActionCommand,
-  extractTextMessageCommand
+  extractTextMessageCommand,
+  explainTextMessageCommand
 } from "../../src/feishu/feishu-event-adapter.js";
 
 describe("feishu event adapter", () => {
@@ -19,6 +20,7 @@ describe("feishu event adapter", () => {
     expect(parsed).toEqual({
       chatId: "oc_1",
       messageId: "om_1",
+      shouldRespond: true,
       command: { type: "repo_select", repositoryIds: ["repo_1", "repo_2"] }
     });
   });
@@ -54,6 +56,21 @@ describe("feishu event adapter", () => {
     ).toBeNull();
   });
 
+  it("explains why a text message event was ignored", () => {
+    expect(
+      explainTextMessageCommand({
+        sender: { sender_type: "app" },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      })
+    ).toEqual({ ok: false, drop: { reason: "app_sender" } });
+  });
+
   it("extracts push card action commands from card.action.trigger events", () => {
     const parsed = extractCardActionCommand({
       action: {
@@ -72,7 +89,299 @@ describe("feishu event adapter", () => {
     expect(parsed).toEqual({
       chatId: "oc_1",
       messageId: "om_1",
+      shouldRespond: true,
       command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" }
     });
+  });
+
+  it("keeps unmentioned group messages for recording while marking them as non-responsive", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.shouldRespond).toBe(false);
+  });
+
+  it("keeps group messages without bot open id for recording but does not allow responses", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.shouldRespond).toBe(false);
+  });
+
+  it("allows direct messages to respond without bot open id", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_p2p",
+          chat_id: "ou_1",
+          chat_type: "p2p",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("does not let groupReplyAll bypass the group mention requirement", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_group",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: true,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.shouldRespond).toBe(false);
+  });
+
+  it("normalizes mentioned group text into a platform message", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_2",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 做一个需求" }),
+          mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("做一个需求");
+    expect(parsed?.message.sessionKey).toBe("feishu:oc_1:channel");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "做一个需求" });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("recognizes bot mentions by user id when open id is unavailable", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_user_id_mention",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 做一个需求" }),
+          mentions: [{ id: { user_id: "bot_user_id" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "bot_user_id",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("做一个需求");
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("treats a single leading mention as bot-directed when configured bot id differs from Feishu payload", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_single_leading_mention",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 /help" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("/help");
+    expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("responds to mentioned slash commands when Feishu content has already removed the mention token", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_mentioned_help",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "/help" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("/help");
+    expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("responds to mentioned natural language messages when Feishu content has already removed the mention token", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_mentioned_text",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "test" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("test");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "test" });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("drops messages blocked by allow lists", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_3",
+          chat_id: "oc_1",
+          chat_type: "p2p",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "ou_2",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed).toBeNull();
   });
 });

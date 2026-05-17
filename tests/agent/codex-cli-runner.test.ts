@@ -76,4 +76,43 @@ describe("createCodexCliPromptRunner", () => {
 
     await expect(runner("hello agent")).resolves.toBe("line one\nline two");
   });
+
+  it("emits progress updates from completed tool and message events", async () => {
+    const runner = createCodexCliPromptRunner(
+      { command: "codex", cwd: "/tmp/workspace" },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "tool_call", name: "Bash", arguments: "npm test" }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "tool_result", name: "Bash", output: "passed" }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "done" }
+          }),
+          JSON.stringify({ type: "turn.completed" })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const updates: unknown[] = [];
+
+    await expect(
+      runner("hello agent", {
+        onProgress(update) {
+          updates.push(update);
+        }
+      })
+    ).resolves.toBe("done");
+
+    expect(updates).toEqual([
+      { kind: "tool_use", tool: "Bash", text: "npm test" },
+      { kind: "tool_result", tool: "Bash", text: "passed" },
+      { kind: "thinking", text: "done" }
+    ]);
+  });
 });

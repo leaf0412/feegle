@@ -1,4 +1,5 @@
 import { execa } from "execa";
+import type { AgentRunOptions } from "./agent-cli.js";
 import type { PromptRunner } from "./prompt-agent-adapter.js";
 
 export interface ClaudeCodeCliRunnerOptions {
@@ -31,18 +32,18 @@ export function createClaudeCodeCliPromptRunner(
   options: ClaudeCodeCliRunnerOptions,
   runner: ClaudeCodeCliCommandRunner = defaultRunner
 ): PromptRunner {
-  return async (prompt) => {
+  return async (prompt, runOptions) => {
     try {
       const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(), {
         cwd: options.cwd,
         input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
         timeout: options.timeoutMs ?? 300_000
       });
-      return parseSuccessfulResult(result.stdout);
+      return parseSuccessfulResult(result.stdout, runOptions);
     } catch (error) {
       const stdout = readErrorStdout(error);
       if (stdout) {
-        throw new Error(parseFinalResult(stdout).text);
+        throw new Error(parseFinalResult(stdout, runOptions).text);
       }
       throw error;
     }
@@ -70,21 +71,25 @@ function buildUserMessage(prompt: string): unknown {
   };
 }
 
-function parseSuccessfulResult(stdout: string): string {
-  const result = parseFinalResult(stdout);
+function parseSuccessfulResult(stdout: string, options?: AgentRunOptions): string {
+  const result = parseFinalResult(stdout, options);
   if (result.isError) {
     throw new Error(result.text);
   }
   return result.text;
 }
 
-function parseFinalResult(stdout: string): { text: string; isError: boolean } {
+function parseFinalResult(stdout: string, options?: AgentRunOptions): { text: string; isError: boolean } {
   for (const line of stdout.trim().split("\n").reverse()) {
     if (!line.trim()) {
       continue;
     }
     const event = JSON.parse(line) as unknown;
     if (isRecord(event) && event.type === "result" && typeof event.result === "string") {
+      emitClaudeProgress(stdout, options);
+      if (event.is_error === true) {
+        options?.onProgress?.({ kind: "error", text: event.result });
+      }
       return {
         text: event.result.trim(),
         isError: event.is_error === true
@@ -92,6 +97,53 @@ function parseFinalResult(stdout: string): { text: string; isError: boolean } {
     }
   }
   throw new Error("Claude Code did not emit a result event");
+}
+
+function emitClaudeProgress(stdout: string, options?: AgentRunOptions): void {
+  if (!options?.onProgress) {
+    return;
+  }
+
+  for (const line of stdout.trim().split("\n")) {
+    if (!line.trim()) {
+      continue;
+    }
+    const event = JSON.parse(line) as unknown;
+    if (!isRecord(event) || event.type === "result") {
+      continue;
+    }
+    const message = event.message;
+    if (!isRecord(message) || !Array.isArray(message.content)) {
+      continue;
+    }
+    for (const part of message.content) {
+      emitClaudeContentPart(part, options);
+    }
+  }
+}
+
+function emitClaudeContentPart(part: unknown, options: AgentRunOptions): void {
+  if (!isRecord(part)) {
+    return;
+  }
+  if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
+    options.onProgress?.({ kind: "thinking", text: part.text.trim() });
+    return;
+  }
+  if (part.type === "tool_use") {
+    options.onProgress?.({
+      kind: "tool_use",
+      tool: typeof part.name === "string" ? part.name : "Tool",
+      text: stringifyUnknown(part.input)
+    });
+    return;
+  }
+  if (part.type === "tool_result") {
+    options.onProgress?.({
+      kind: "tool_result",
+      text: stringifyUnknown(part.content)
+    });
+  }
 }
 
 function readErrorStdout(error: unknown): string {
@@ -103,4 +155,15 @@ function readErrorStdout(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringifyUnknown(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }

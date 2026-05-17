@@ -1,17 +1,14 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
+import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "./feishu-platform-config.js";
 import {
   extractCardActionCommand,
-  extractTextMessageCommand,
+  explainTextMessageCommand,
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent
 } from "./feishu-event-adapter.js";
+import { FeishuMessageDedup } from "./feishu-dedup.js";
 
-export interface FeishuLongConnectionConfig {
-  appId: string;
-  appSecret: string;
-  verificationToken?: string;
-  encryptKey?: string;
-}
+export interface FeishuLongConnectionConfig extends FeishuPlatformConfigInput {}
 
 export interface FeishuCommandHandler {
   handleCommand(input: {
@@ -19,6 +16,7 @@ export interface FeishuCommandHandler {
     chatId: string;
     messageId: string;
     command: FeishuCommand;
+    shouldRespond?: boolean;
   }): Promise<void>;
 }
 
@@ -45,13 +43,16 @@ export interface FeishuWsClient {
 }
 
 export class FeishuLongConnectionRuntime {
-  private readonly handledEventIds = new Set<string>();
+  private readonly dedup = new FeishuMessageDedup();
+  private readonly platformConfig;
 
   constructor(
     private readonly config: FeishuLongConnectionConfig,
     private readonly sdk: FeishuLongConnectionSdk,
     private readonly handler: FeishuCommandHandler
-  ) {}
+  ) {
+    this.platformConfig = parseFeishuPlatformConfig(config);
+  }
 
   async start(): Promise<void> {
     const eventDispatcher = new this.sdk.EventDispatcher({
@@ -59,15 +60,56 @@ export class FeishuLongConnectionRuntime {
       encryptKey: this.config.encryptKey
     }).register({
       "im.message.receive_v1": async (event) => {
-        const envelope = extractTextMessageCommand(event);
+        console.info("Feishu message event received", summarizeMessageEvent(event));
+        const extraction = explainTextMessageCommand(event, {
+          platform: "feishu",
+          botOpenId: this.platformConfig.botOpenId,
+          allowFrom: this.platformConfig.allowFrom,
+          allowChat: this.platformConfig.allowChat,
+          groupOnly: this.platformConfig.groupOnly,
+          groupReplyAll: this.platformConfig.groupReplyAll,
+          shareSessionInChannel: this.platformConfig.shareSessionInChannel,
+          threadIsolation: this.platformConfig.threadIsolation
+        });
+        if (!extraction.ok) {
+          console.warn("Feishu message event ignored", {
+            ...summarizeMessageEvent(event),
+            reason: extraction.drop.reason
+          });
+          return;
+        }
+        const envelope = extraction.envelope;
+        console.info("Feishu message routed", {
+          source: "message",
+          chatId: envelope.chatId,
+          messageId: envelope.messageId,
+          commandType: envelope.command.type,
+          shouldRespond: envelope.shouldRespond
+        });
         if (envelope && this.markUnhandled("message", envelope.messageId)) {
           void this.handler
-            .handleCommand({ source: "message", ...envelope })
+            .handleCommand({
+              source: "message",
+              chatId: envelope.chatId,
+              messageId: envelope.messageId,
+              command: envelope.command,
+              shouldRespond: envelope.shouldRespond
+            })
             .catch((error) => console.error("Feishu message handler failed", error));
         }
       },
       "card.action.trigger": async (event) => {
+        console.info("Feishu card action received", summarizeCardActionEvent(event));
         const envelope = extractCardActionCommand(event);
+        if (!envelope) {
+          console.warn("Feishu card action ignored", summarizeCardActionEvent(event));
+          return;
+        }
+        console.info("Feishu card action routed", {
+          chatId: envelope.chatId,
+          messageId: envelope.messageId,
+          commandType: envelope.command.type
+        });
         if (envelope && this.markUnhandled("card", envelope.messageId)) {
           void this.handler
             .handleCommand({ source: "card", ...envelope })
@@ -85,11 +127,24 @@ export class FeishuLongConnectionRuntime {
   }
 
   private markUnhandled(source: "message" | "card", messageId: string): boolean {
-    const key = `${source}:${messageId}`;
-    if (this.handledEventIds.has(key)) {
-      return false;
-    }
-    this.handledEventIds.add(key);
-    return true;
+    return this.dedup.mark(`${source}:${messageId}`);
   }
+}
+
+function summarizeMessageEvent(event: FeishuMessageReceiveEvent): Record<string, unknown> {
+  return {
+    messageId: event.message?.message_id,
+    chatId: event.message?.chat_id,
+    chatType: event.message?.chat_type,
+    messageType: event.message?.message_type,
+    senderType: event.sender?.sender_type,
+    mentionCount: event.message?.mentions?.length ?? 0
+  };
+}
+
+function summarizeCardActionEvent(event: FeishuCardActionTriggerEvent): Record<string, unknown> {
+  return {
+    messageId: event.context?.open_message_id ?? event.open_message_id,
+    chatId: event.context?.open_chat_id ?? event.open_chat_id
+  };
 }

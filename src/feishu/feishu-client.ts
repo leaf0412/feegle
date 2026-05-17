@@ -1,6 +1,8 @@
 import { createReadStream } from "node:fs";
 import type { ReadStream } from "node:fs";
 import { basename } from "node:path";
+import type { PlatformProgressSnapshot } from "../platform/progress.js";
+import { renderFeishuProgressCard } from "./feishu-progress-card.js";
 
 export interface FeishuOpenApiClient {
   im: {
@@ -29,6 +31,22 @@ export interface FeishuOpenApiClient {
             content: string;
           };
         }): Promise<unknown>;
+        reply?(input: {
+          path: { message_id: string };
+          data: {
+            msg_type: "text" | "interactive" | "file";
+            content: string;
+          };
+        }): Promise<{ data?: { message_id?: string } }>;
+      };
+      messageReaction?: {
+        create(input: {
+          path: { message_id: string };
+          data: { reaction_type: { emoji_type: string } };
+        }): Promise<{ data?: { reaction_id?: string } }>;
+        delete(input: {
+          path: { message_id: string; reaction_id: string };
+        }): Promise<unknown>;
       };
     };
   };
@@ -38,7 +56,12 @@ export interface FeishuClientPort {
   sendText(chatId: string, text: string): Promise<string | undefined>;
   sendInteractiveCard(chatId: string, card: unknown): Promise<string | undefined>;
   sendFile(chatId: string, filePath: string): Promise<string | undefined>;
+  replyText(messageId: string, text: string): Promise<string | undefined>;
+  replyInteractiveCard(messageId: string, card: unknown): Promise<string | undefined>;
   updateInteractiveCard(messageId: string, card: unknown): Promise<void>;
+  updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void>;
+  addReaction(messageId: string, emojiType: string): Promise<string | undefined>;
+  removeReaction(messageId: string, reactionId: string): Promise<void>;
 }
 
 export class LarkFeishuClient implements FeishuClientPort {
@@ -67,6 +90,16 @@ export class LarkFeishuClient implements FeishuClientPort {
       }
     });
 
+    return response.data?.message_id;
+  }
+
+  async replyText(messageId: string, text: string): Promise<string | undefined> {
+    const response = await this.reply(messageId, "text", JSON.stringify({ text }));
+    return response.data?.message_id;
+  }
+
+  async replyInteractiveCard(messageId: string, card: unknown): Promise<string | undefined> {
+    const response = await this.reply(messageId, "interactive", JSON.stringify(card));
     return response.data?.message_id;
   }
 
@@ -105,6 +138,44 @@ export class LarkFeishuClient implements FeishuClientPort {
       data: {
         content: JSON.stringify(card)
       }
+    });
+  }
+
+  async updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void> {
+    await this.updateInteractiveCard(messageId, renderFeishuProgressCard(progress));
+  }
+
+  async addReaction(messageId: string, emojiType: string): Promise<string | undefined> {
+    if (!this.client.im.v1.messageReaction) {
+      return undefined;
+    }
+    const response = await this.client.im.v1.messageReaction.create({
+      path: { message_id: messageId },
+      data: { reaction_type: { emoji_type: emojiType } }
+    });
+    return response.data?.reaction_id;
+  }
+
+  async removeReaction(messageId: string, reactionId: string): Promise<void> {
+    if (!this.client.im.v1.messageReaction) {
+      return;
+    }
+    await this.client.im.v1.messageReaction.delete({
+      path: { message_id: messageId, reaction_id: reactionId }
+    });
+  }
+
+  private async reply(
+    messageId: string,
+    msgType: "text" | "interactive" | "file",
+    content: string
+  ): Promise<{ data?: { message_id?: string } }> {
+    if (!this.client.im.v1.message.reply) {
+      throw new Error("Feishu reply API client is not configured");
+    }
+    return this.client.im.v1.message.reply({
+      path: { message_id: messageId },
+      data: { msg_type: msgType, content }
     });
   }
 }

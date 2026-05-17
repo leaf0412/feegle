@@ -74,4 +74,55 @@ describe("createClaudeCodeCliPromptRunner", () => {
 
     await expect(runner("hello claude")).rejects.toThrow("Not logged in · Please run /login");
   });
+
+  it("emits progress updates from assistant and tool events", async () => {
+    const runner = createClaudeCodeCliPromptRunner(
+      {
+        command: "claude",
+        cwd: "/tmp/workspace"
+      },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              content: [{ type: "text", text: "我先看一下代码。" }]
+            }
+          }),
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              content: [{ type: "tool_use", name: "Bash", input: { command: "npm test" } }]
+            }
+          }),
+          JSON.stringify({
+            type: "user",
+            message: {
+              content: [{ type: "tool_result", tool_use_id: "tool_1", content: "passed" }]
+            }
+          }),
+          JSON.stringify({
+            type: "result",
+            result: "Claude 完成了处理"
+          })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const updates: unknown[] = [];
+
+    await expect(
+      runner("hello claude", {
+        onProgress(update) {
+          updates.push(update);
+        }
+      })
+    ).resolves.toBe("Claude 完成了处理");
+
+    expect(updates).toEqual([
+      { kind: "thinking", text: "我先看一下代码。" },
+      { kind: "tool_use", tool: "Bash", text: "{\"command\":\"npm test\"}" },
+      { kind: "tool_result", text: "passed" }
+    ]);
+  });
 });

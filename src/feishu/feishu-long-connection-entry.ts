@@ -3,13 +3,26 @@ import { createFeegleAgent, type FeegleAgentKind } from "../agent/agent-factory.
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { FeishuCommandResponder } from "./feishu-command-responder.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
+import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
 
-const config = {
+const config = parseFeishuPlatformConfig({
   appId: readRequiredEnv("FEISHU_APP_ID"),
   appSecret: readRequiredEnv("FEISHU_APP_SECRET"),
   verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
-  encryptKey: process.env.FEISHU_ENCRYPT_KEY
-};
+  encryptKey: process.env.FEISHU_ENCRYPT_KEY,
+  botOpenId: process.env.FEISHU_BOT_OPEN_ID,
+  enableInteractiveCards: readBooleanEnv("FEISHU_ENABLE_INTERACTIVE_CARDS"),
+  allowFrom: process.env.FEISHU_ALLOW_FROM,
+  allowChat: process.env.FEISHU_ALLOW_CHAT,
+  groupOnly: readBooleanEnv("FEISHU_GROUP_ONLY"),
+  groupReplyAll: readBooleanEnv("FEISHU_GROUP_REPLY_ALL"),
+  shareSessionInChannel: readBooleanEnv("FEISHU_SHARE_SESSION_IN_CHANNEL"),
+  threadIsolation: readBooleanEnv("FEISHU_THREAD_ISOLATION"),
+  replyToTrigger: readBooleanEnv("FEISHU_REPLY_TO_TRIGGER"),
+  progressStyle: process.env.FEISHU_PROGRESS_STYLE,
+  reactionEmoji: process.env.FEISHU_REACTION_EMOJI,
+  doneEmoji: process.env.FEISHU_DONE_EMOJI
+});
 const feishuClient: FeishuClientPort = new LarkFeishuClient(
   new lark.Client({
     appId: config.appId,
@@ -26,7 +39,9 @@ const configuredAgent = createFeegleAgent({
   timeoutMs: readTimeoutMsEnv()
 });
 const handler = new FeishuCommandResponder(feishuClient, configuredAgent.agent, {
-  agentDisplayName: configuredAgent.displayName
+  agentDisplayName: configuredAgent.displayName,
+  reactionEmoji: config.reactionEmoji,
+  doneEmoji: config.doneEmoji
 });
 
 const runtime = new FeishuLongConnectionRuntime(
@@ -95,4 +110,18 @@ function readTimeoutMsEnv(): number {
     throw new Error(`Invalid FEEGLE_AGENT_TIMEOUT_MS: ${value}`);
   }
   return parsed;
+}
+
+function readBooleanEnv(name: string): boolean | undefined {
+  const value = process.env[name];
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (value === "true" || value === "1") {
+    return true;
+  }
+  if (value === "false" || value === "0") {
+    return false;
+  }
+  throw new Error(`Invalid ${name}: ${value}`);
 }

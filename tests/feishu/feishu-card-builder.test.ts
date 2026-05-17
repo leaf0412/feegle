@@ -41,10 +41,63 @@ describe("buildRequirementStatusCard", () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]?.text.content).toBe("推送 web-app");
     expect(parseFeishuCardActionValue(actions[0]?.value)).toEqual({
-      type: "push_repository",
-      requirementId: "req_1",
-      repositoryId: "web"
+      type: "platform_action",
+      action: {
+        kind: "act",
+        command: "/push",
+        args: "repo web",
+        raw: "act:/push repo web"
+      },
+      sessionKey: undefined
     });
+  });
+
+  it("renders prototype approval and cancel actions", () => {
+    const card = buildRequirementStatusCard({
+      title: "原型确认",
+      requirementId: "req_3",
+      status: "prototype_reviewing",
+      repositories: []
+    });
+
+    const actions = findButtons(card);
+    expect(actions.map((action) => action.text.content)).toEqual(["确认原型", "取消需求"]);
+    expect(actions.map((action) => parseFeishuCardActionValue(action.value))).toEqual([
+      {
+        type: "platform_action",
+        action: {
+          kind: "act",
+          command: "/prototype",
+          args: "approve req_3",
+          raw: "act:/prototype approve req_3"
+        },
+        sessionKey: undefined
+      },
+      {
+        type: "platform_action",
+        action: {
+          kind: "act",
+          command: "/requirement",
+          args: "cancel req_3",
+          raw: "act:/requirement cancel req_3"
+        },
+        sessionKey: undefined
+      }
+    ]);
+  });
+
+  it("renders plan confirmation and cancel actions", () => {
+    const card = buildRequirementStatusCard({
+      title: "计划确认",
+      requirementId: "req_4",
+      status: "plan_generated",
+      repositories: []
+    });
+
+    const actions = findButtons(card);
+    expect(actions.map((action) => action.text.content)).toEqual(["确认计划", "取消需求"]);
+    expect(actions[0]?.value).toMatchObject({ action: "act:/plan confirm req_4" });
+    expect(actions[1]?.value).toMatchObject({ action: "act:/requirement cancel req_4" });
   });
 
   it("does not render push buttons before repositories are ready", () => {
@@ -98,10 +151,30 @@ function findButtons(card: FeishuInteractiveCard): Array<{
   value: unknown;
 }> {
   const bodyElements = card.body?.elements ?? card.elements ?? [];
-  return bodyElements.flatMap((element) => {
-    if (element.tag !== "action") {
-      return [];
-    }
-    return element.actions.filter((action) => action.tag === "button");
-  });
+  return bodyElements.flatMap(findButtonsInElement);
+}
+
+function findButtonsInElement(element: unknown): Array<{ text: { content: string }; value: unknown }> {
+  if (!isRecord(element)) {
+    return [];
+  }
+  if (element.tag === "button" && isRecord(element.text) && "value" in element) {
+    return [{ text: element.text as { content: string }, value: element.value }];
+  }
+  if (element.tag === "action" && Array.isArray(element.actions)) {
+    return element.actions.flatMap(findButtonsInElement);
+  }
+  if (element.tag === "column_set" && Array.isArray(element.columns)) {
+    return element.columns.flatMap((column) => {
+      if (!isRecord(column) || !Array.isArray(column.elements)) {
+        return [];
+      }
+      return column.elements.flatMap(findButtonsInElement);
+    });
+  }
+  return [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -50,6 +50,8 @@ export {
   type WorkflowProgressCardInput,
   type WorkflowProgressStep
 } from "./feishu/feishu-card-builder.js";
+export { renderFeishuCard } from "./feishu/feishu-card-renderer.js";
+export { renderFeishuProgressCard } from "./feishu/feishu-progress-card.js";
 export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
 export {
   FeishuLongConnectionRuntime,
@@ -57,3 +59,59 @@ export {
   type FeishuLongConnectionConfig,
   type FeishuLongConnectionSdk
 } from "./feishu/feishu-long-connection-runtime.js";
+export {
+  parseFeishuPlatformConfig,
+  type FeishuPlatformConfig,
+  type FeishuPlatformConfigInput,
+  type FeishuProgressStyle
+} from "./feishu/feishu-platform-config.js";
+export { FeishuMessageDedup, isAllowedByList, isOldMessage } from "./feishu/feishu-dedup.js";
+export {
+  normalizeFeishuTextMessage,
+  type FeishuMessageExtractOptions
+} from "./feishu/feishu-message-normalizer.js";
+export {
+  createPlatformCard,
+  type PlatformCard,
+  type PlatformCardActionLayout,
+  type PlatformCardButton,
+  type PlatformCardColor,
+  type PlatformCardElement,
+  type PlatformCardHeader,
+  type PlatformCardSelectOption
+} from "./platform/platform-card.js";
+export {
+  parsePlatformAction,
+  type PlatformAction,
+  type PlatformAskQuestionAction,
+  type PlatformCommandAction,
+  type PlatformPermissionAction,
+  type PlatformUnknownAction
+} from "./platform/platform-action.js";
+export {
+  createPlatformSessionKey,
+  type PlatformSessionKeyInput
+} from "./platform/platform-session.js";
+export type {
+  PlatformIncomingMessage,
+  PlatformKind,
+  PlatformReplyContext,
+  PlatformSendResult
+} from "./platform/platform-message.js";
+export type { PlatformPort } from "./platform/platform-port.js";
+export type { PlatformMessageHandler } from "./platform/platform-port.js";
+export { createPlatformCommandHandler } from "./platform/platform-command-handler.js";
+export {
+  createProgressEvent,
+  type PlatformProgressEntry,
+  type PlatformProgressEvent,
+  type PlatformProgressInput,
+  type PlatformProgressSnapshot,
+  type PlatformProgressSnapshotState,
+  type PlatformProgressStatus
+} from "./platform/progress.js";
+export {
+  PlatformActionRouter,
+  type PlatformActionContext,
+  type PlatformActionHandler
+} from "./platform/action-router.js";

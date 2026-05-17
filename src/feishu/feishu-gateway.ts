@@ -1,6 +1,12 @@
+import { parsePlatformAction, type PlatformAction } from "../platform/platform-action.js";
+import { findSlashCommandByInput, type SlashCommandDefinition } from "../platform/slash-command-catalog.js";
+
 export type FeishuCommand =
+  | { type: "help"; groupKey?: string }
+  | { type: "slash_command"; definition: SlashCommandDefinition; raw: string }
   | { type: "repo_select"; repositoryIds: string[] }
   | { type: "push_repository"; requirementId: string; repositoryId: string }
+  | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
 export function parseFeishuCommand(raw: string): FeishuCommand {
@@ -9,6 +15,17 @@ export function parseFeishuCommand(raw: string): FeishuCommand {
 
   if (parts[0] === "/repo" && parts[1] === "select" && parts.length > 2) {
     return { type: "repo_select", repositoryIds: parts.slice(2) };
+  }
+
+  if (parts[0] === "/help") {
+    return { type: "help", groupKey: parts[1] };
+  }
+
+  if (trimmed.startsWith("/")) {
+    const definition = findSlashCommandByInput(trimmed);
+    if (definition) {
+      return { type: "slash_command", definition, raw };
+    }
   }
 
   const cardParts = trimmed.split(":");
@@ -29,6 +46,17 @@ function stripLeadingMentions(raw: string): string {
 export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
   if (!isRecord(value)) {
     return { type: "unknown", raw: stringifyUnknown(value) };
+  }
+
+  if (typeof value.action === "string") {
+    const action = parsePlatformAction(value.action);
+    if (action.kind !== "unknown") {
+      return {
+        type: "platform_action",
+        action,
+        sessionKey: typeof value.session_key === "string" ? value.session_key : undefined
+      };
+    }
   }
 
   if (value.action === "push_repository") {
