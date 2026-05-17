@@ -19,6 +19,7 @@ export interface FeishuCommandHandler {
     source: "message" | "card";
     chatId: string;
     messageId: string;
+    sessionKey?: string;
     command: FeishuCommand;
     shouldRespond?: boolean;
   }): Promise<void>;
@@ -99,6 +100,7 @@ export class FeishuLongConnectionRuntime {
               source: "message",
               chatId: envelope.chatId,
               messageId: envelope.messageId,
+              sessionKey: envelope.message?.sessionKey,
               command: envelope.command,
               shouldRespond: envelope.shouldRespond
             })

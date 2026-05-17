@@ -201,7 +201,7 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("replies conversationally for chat text without invoking orchestration", async () => {
+  it("replies with a configuration prompt for chat when no chat handler is wired", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];
     const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), { registry: testRegistry() });
@@ -216,10 +216,44 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([
       {
         messageId: "om_3",
-        text: "我在，继续说。"
+        text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
       }
     ]);
     expect(progress).toEqual([]);
+  });
+
+  it("delegates chat type to the chat handler when configured", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: Array<{ chatId: string; sessionKey: string; userText: string; triggerMessageId: string }> = [];
+    const chatHandler = {
+      handle: async (request: { chatId: string; sessionKey: string; userText: string; triggerMessageId: string }) => {
+        calls.push(request);
+        return { status: "delivered" as const };
+      }
+    } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(),
+      chatHandler
+    });
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_chat",
+      sessionKey: "feishu:oc_1:ou_alice",
+      command: { type: "chat", raw: "what's your model?" }
+    });
+
+    expect(calls).toEqual([
+      {
+        chatId: "oc_1",
+        sessionKey: "feishu:oc_1:ou_alice",
+        userText: "what's your model?",
+        triggerMessageId: "om_chat"
+      }
+    ]);
+    expect(replies).toEqual([]);
   });
 
   it("replies with placeholder text for unknown commands", async () => {
@@ -294,7 +328,7 @@ describe("FeishuCommandResponder", () => {
       expect(replies).toEqual([
         {
           messageId: "om_trace_throws",
-          text: "我在，继续说。"
+          text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
         }
       ]);
       expect(consoleWarn).toHaveBeenCalledWith("Feishu command trace hook failed", "trace sink failed");

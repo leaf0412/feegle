@@ -8,6 +8,7 @@ import type {
   SlashCommandReply,
   SlashCommandRegistry
 } from "../platform/slash-command-handler.js";
+import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -28,6 +29,7 @@ export function logFeishuCommandTrace(event: FeishuCommandTraceEvent): void {
 
 export interface FeishuCommandResponderOptions {
   registry: SlashCommandRegistry;
+  chatHandler?: FeishuChatHandler;
   trace?: FeishuCommandTraceSink;
 }
 
@@ -35,6 +37,7 @@ interface DispatchInput {
   source: "message" | "card";
   chatId: string;
   messageId: string;
+  sessionKey?: string;
   command: FeishuCommand;
 }
 
@@ -51,6 +54,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       return;
     }
 
+    if (input.command.type === "chat") {
+      await this.dispatchChat(input, input.command.raw);
+      this.trace("completed", input);
+      return;
+    }
+
     const reply = await this.computeReply(input);
     if (!reply) {
       this.trace("ignored", input);
@@ -59,6 +68,24 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
 
     await this.deliver(input, reply);
     this.trace("completed", input);
+  }
+
+  private async dispatchChat(input: DispatchInput, userText: string): Promise<void> {
+    if (!this.options.chatHandler) {
+      await this.traceAsync("reply_text", input, () =>
+        this.client.replyText(input.messageId, "尚未配置 agent。请在管理模型提供方里启用并选择一个。")
+      );
+      return;
+    }
+    const sessionKey = input.sessionKey ?? `feishu:${input.chatId}:${input.chatId}`;
+    await this.traceAsync("chat", input, () =>
+      this.options.chatHandler!.handle({
+        chatId: input.chatId,
+        triggerMessageId: input.messageId,
+        sessionKey,
+        userText
+      })
+    );
   }
 
   private async computeReply(input: DispatchInput): Promise<SlashCommandReply | undefined> {
@@ -71,7 +98,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
       case "chat":
-        return { kind: "text", text: "我在，继续说。" };
+        return undefined;
       case "repo_select":
         return {
           kind: "text",
