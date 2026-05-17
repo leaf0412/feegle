@@ -4,7 +4,7 @@ export type FeishuCommand =
   | { type: "unknown"; raw: string };
 
 export function parseFeishuCommand(raw: string): FeishuCommand {
-  const trimmed = raw.trim();
+  const trimmed = stripLeadingMentions(raw).trim();
   const parts = trimmed.split(/\s+/);
 
   if (parts[0] === "/repo" && parts[1] === "select" && parts.length > 2) {
@@ -20,6 +20,10 @@ export function parseFeishuCommand(raw: string): FeishuCommand {
   }
 
   return { type: "unknown", raw };
+}
+
+function stripLeadingMentions(raw: string): string {
+  return raw.replace(/^(\s*@\S+\s+)+/, "");
 }
 
 export function parseFeishuCardActionValue(value: unknown): FeishuCommand {

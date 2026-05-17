@@ -16,6 +16,13 @@ describe("parseFeishuCommand", () => {
     });
   });
 
+  it("ignores leading Feishu mention text before commands", () => {
+    expect(parseFeishuCommand("@_user_1 /repo select web api")).toEqual({
+      type: "repo_select",
+      repositoryIds: ["web", "api"]
+    });
+  });
+
   it("parses push card actions per repository", () => {
     expect(parseFeishuCommand("card:push:req_1:repo_1")).toEqual({
       type: "push_repository",
