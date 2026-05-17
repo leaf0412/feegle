@@ -72,7 +72,7 @@ export function canRespondToFeishuTextMessage(
   if (event.message?.chat_type !== "group") {
     return true;
   }
-  return isBotMentioned(event, options.botOpenId) || isMentionedSlashCommand(event, text);
+  return isBotMentioned(event, options.botOpenId) || hasMentions(event, text);
 }
 
 function getSenderId(event: FeishuMessageReceiveEvent): string {
@@ -106,8 +106,8 @@ function mentionMatchesBot(mention: FeishuMessageMention, botId: string): boolea
   return mention.id?.open_id === botId || mention.id?.user_id === botId || mention.id?.union_id === botId;
 }
 
-function isMentionedSlashCommand(event: FeishuMessageReceiveEvent, text: string | undefined): boolean {
-  return (event.message?.mentions?.length ?? 0) > 0 && text?.trim().startsWith("/") === true;
+function hasMentions(event: FeishuMessageReceiveEvent, text: string | undefined): boolean {
+  return (event.message?.mentions?.length ?? 0) > 0 && text?.trim() !== "";
 }
 
 function isOnlyLeadingMention(

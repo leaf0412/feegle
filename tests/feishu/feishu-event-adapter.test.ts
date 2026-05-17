@@ -329,6 +329,36 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(true);
   });
 
+  it("responds to mentioned natural language messages when Feishu content has already removed the mention token", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_mentioned_text",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "test" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("test");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "test" });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
   it("drops messages blocked by allow lists", () => {
     const parsed = extractTextMessageCommand(
       {
