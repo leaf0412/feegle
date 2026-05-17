@@ -1,7 +1,7 @@
 import type { PlatformIncomingMessage, PlatformKind } from "../platform/platform-message.js";
 import { createPlatformSessionKey } from "../platform/platform-session.js";
 import { isAllowedByList, isOldMessage } from "./feishu-dedup.js";
-import type { FeishuMessageReceiveEvent } from "./feishu-event-adapter.js";
+import type { FeishuMessageMention, FeishuMessageReceiveEvent } from "./feishu-event-adapter.js";
 
 export interface FeishuMessageExtractOptions {
   platform: Extract<PlatformKind, "feishu" | "lark">;
@@ -83,7 +83,7 @@ function isBotMentioned(event: FeishuMessageReceiveEvent, botOpenId: string | un
   if (!botOpenId) {
     return false;
   }
-  return event.message?.mentions?.some((mention) => mention.id?.open_id === botOpenId) ?? false;
+  return event.message?.mentions?.some((mention) => mentionMatchesBot(mention, botOpenId)) ?? false;
 }
 
 function stripBotMentions(
@@ -96,9 +96,13 @@ function stripBotMentions(
   }
 
   return (event.message?.mentions ?? [])
-    .filter((mention) => mention.id?.open_id === botOpenId && mention.key)
+    .filter((mention) => mentionMatchesBot(mention, botOpenId) && mention.key)
     .reduce((current, mention) => current.replaceAll(mention.key ?? "", ""), text)
     .trim();
+}
+
+function mentionMatchesBot(mention: FeishuMessageMention, botId: string): boolean {
+  return mention.id?.open_id === botId || mention.id?.user_id === botId || mention.id?.union_id === botId;
 }
 
 function createTimestamp(createTimeMs: string | undefined): Date {

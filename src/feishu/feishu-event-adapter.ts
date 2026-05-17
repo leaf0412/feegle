@@ -48,6 +48,8 @@ export interface FeishuMessageReceiveEvent {
 export interface FeishuMessageMention {
   id?: {
     open_id?: string;
+    union_id?: string;
+    user_id?: string;
   };
   name?: string;
   key?: string;

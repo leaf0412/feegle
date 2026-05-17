@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -310,6 +310,45 @@ describe("FeishuCommandResponder", () => {
       { kind: "remove", messageId: "om_8", reactionId: "reaction_OnIt" },
       { kind: "add", messageId: "om_8", emojiType: "DONE" }
     ]);
+  });
+
+  it("still replies when Feishu reactions are unavailable", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const responder = new FeishuCommandResponder(
+      {
+        ...fakeClient(replies, [], progress),
+        async addReaction() {
+          throw new Error("reaction permission denied");
+        },
+        async removeReaction() {}
+      },
+      fakeAgent([], "完成"),
+      { reactionEmoji: "OnIt", doneEmoji: "DONE" }
+    );
+
+    try {
+      await expect(
+        responder.handleCommand({
+          source: "message",
+          chatId: "oc_1",
+          messageId: "om_reaction_denied",
+          command: { type: "unknown", raw: "处理这个需求" }
+        })
+      ).resolves.toBeUndefined();
+
+      expect(replies).toEqual([
+        {
+          messageId: "om_reaction_denied",
+          text: "完成"
+        }
+      ]);
+      expect(JSON.stringify(progress)).toContain("\"state\":\"completed\"");
+      expect(consoleWarn).toHaveBeenCalledWith("Feishu reaction add failed", "reaction permission denied");
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 });
 

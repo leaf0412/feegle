@@ -224,6 +224,35 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(true);
   });
 
+  it("recognizes bot mentions by user id when open id is unavailable", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_user_id_mention",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 做一个需求" }),
+          mentions: [{ id: { user_id: "bot_user_id" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "bot_user_id",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("做一个需求");
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
   it("drops messages blocked by allow lists", () => {
     const parsed = extractTextMessageCommand(
       {

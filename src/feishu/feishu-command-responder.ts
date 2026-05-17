@@ -118,15 +118,28 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     if (!this.options.reactionEmoji) {
       return undefined;
     }
-    return this.client.addReaction(messageId, this.options.reactionEmoji);
+    try {
+      return await this.client.addReaction(messageId, this.options.reactionEmoji);
+    } catch (error) {
+      console.warn("Feishu reaction add failed", errorMessage(error));
+      return undefined;
+    }
   }
 
   private async finishReactions(messageId: string, reactionId: string | undefined): Promise<void> {
     if (reactionId) {
-      await this.client.removeReaction(messageId, reactionId);
+      try {
+        await this.client.removeReaction(messageId, reactionId);
+      } catch (error) {
+        console.warn("Feishu reaction remove failed", errorMessage(error));
+      }
     }
     if (this.options.doneEmoji) {
-      await this.client.addReaction(messageId, this.options.doneEmoji);
+      try {
+        await this.client.addReaction(messageId, this.options.doneEmoji);
+      } catch (error) {
+        console.warn("Feishu reaction done add failed", errorMessage(error));
+      }
     }
   }
 
