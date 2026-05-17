@@ -169,6 +169,76 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(handled).toHaveLength(2);
   });
 
+  it("handles repeated card navigation actions from the same card message", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["card.action.trigger"]?.({
+      action: { value: { action: "nav:/help agent" } },
+      context: { open_chat_id: "oc_1", open_message_id: "om_help_card" }
+    });
+    await registered["card.action.trigger"]?.({
+      action: { value: { action: "nav:/help repo" } },
+      context: { open_chat_id: "oc_1", open_message_id: "om_help_card" }
+    });
+
+    expect(handled).toEqual([
+      {
+        source: "card",
+        chatId: "oc_1",
+        messageId: "om_help_card",
+        command: {
+          type: "platform_action",
+          action: { kind: "nav", command: "/help", args: "agent", raw: "nav:/help agent" },
+          sessionKey: undefined
+        },
+        shouldRespond: true
+      },
+      {
+        source: "card",
+        chatId: "oc_1",
+        messageId: "om_help_card",
+        command: {
+          type: "platform_action",
+          action: { kind: "nav", command: "/help", args: "repo", raw: "nav:/help repo" },
+          sessionKey: undefined
+        },
+        shouldRespond: true
+      }
+    ]);
+  });
+
   it("uses platform allow-list config before invoking handlers", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;

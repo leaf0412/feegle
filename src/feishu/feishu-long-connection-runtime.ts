@@ -110,7 +110,7 @@ export class FeishuLongConnectionRuntime {
           messageId: envelope.messageId,
           commandType: envelope.command.type
         });
-        if (envelope && this.markUnhandled("card", envelope.messageId)) {
+        if (envelope) {
           void this.handler
             .handleCommand({ source: "card", ...envelope })
             .catch((error) => console.error("Feishu card handler failed", error));
