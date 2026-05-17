@@ -104,6 +104,33 @@ describe("feishu event adapter", () => {
     expect(parsed).toBeNull();
   });
 
+  it("drops group messages when bot open id is missing because the bot mention cannot be verified", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed).toBeNull();
+  });
+
   it("normalizes mentioned group text into a platform message", () => {
     const parsed = extractTextMessageCommand(
       {

@@ -75,7 +75,7 @@ function getSenderId(event: FeishuMessageReceiveEvent): string {
 
 function isBotMentioned(event: FeishuMessageReceiveEvent, botOpenId: string | undefined): boolean {
   if (!botOpenId) {
-    return true;
+    return false;
   }
   return event.message?.mentions?.some((mention) => mention.id?.open_id === botOpenId) ?? false;
 }

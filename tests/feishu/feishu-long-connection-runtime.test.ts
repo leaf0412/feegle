@@ -37,7 +37,8 @@ describe("FeishuLongConnectionRuntime", () => {
         appId: "cli_xxx",
         appSecret: "secret_xxx",
         verificationToken: "token",
-        encryptKey: "encrypt"
+        encryptKey: "encrypt",
+        botOpenId: "ou_bot"
       },
       {
         EventDispatcher: FakeEventDispatcher,
@@ -57,7 +58,8 @@ describe("FeishuLongConnectionRuntime", () => {
         chat_id: "oc_1",
         chat_type: "group",
         message_type: "text",
-        content: JSON.stringify({ text: "/repo select repo_1" })
+        content: JSON.stringify({ text: "@_user_1 /repo select repo_1" }),
+        mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
       }
     });
     await registered["card.action.trigger"]?.({
@@ -111,7 +113,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -130,7 +132,8 @@ describe("FeishuLongConnectionRuntime", () => {
         chat_id: "oc_1",
         chat_type: "group",
         message_type: "text",
-        content: JSON.stringify({ text: "hello" })
+        content: JSON.stringify({ text: "@_user_1 hello" }),
+        mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
       }
     };
     await registered["im.message.receive_v1"]?.(event);
@@ -220,7 +223,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -241,7 +244,8 @@ describe("FeishuLongConnectionRuntime", () => {
             chat_id: "oc_1",
             chat_type: "group",
             message_type: "text",
-            content: JSON.stringify({ text: "/repo select web" })
+            content: JSON.stringify({ text: "@_user_1 /repo select web" }),
+            mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
           }
         })
       ).resolves.toBeUndefined();
