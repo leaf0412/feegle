@@ -53,4 +53,35 @@ describe("parseFeishuCommand", () => {
     expect(parseFeishuCardActionValue(undefined)).toEqual({ type: "unknown", raw: "undefined" });
     expect(parseFeishuCardActionValue(1n)).toEqual({ type: "unknown", raw: "1" });
   });
+
+  it("parses platform action card values", () => {
+    expect(parseFeishuCardActionValue({ action: "act:/push repo web" })).toEqual({
+      type: "platform_action",
+      action: {
+        kind: "act",
+        command: "/push",
+        args: "repo web",
+        raw: "act:/push repo web"
+      },
+      sessionKey: undefined
+    });
+  });
+
+  it("preserves session key from card values", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "nav:/status req_1",
+        session_key: "feishu:oc_1:channel"
+      })
+    ).toEqual({
+      type: "platform_action",
+      action: {
+        kind: "nav",
+        command: "/status",
+        args: "req_1",
+        raw: "nav:/status req_1"
+      },
+      sessionKey: "feishu:oc_1:channel"
+    });
+  });
 });

@@ -52,6 +52,10 @@ function buildReplyText(command: FeishuCommand): string {
     return `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`;
   }
 
+  if (command.type === "platform_action") {
+    return `已收到卡片动作：${command.action.raw}。\n当前入口还没有接入动作路由器。`;
+  }
+
   return `我收到了消息，但还不认识这个指令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
 }
 

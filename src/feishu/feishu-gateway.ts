@@ -1,6 +1,9 @@
+import { parsePlatformAction, type PlatformAction } from "../platform/platform-action.js";
+
 export type FeishuCommand =
   | { type: "repo_select"; repositoryIds: string[] }
   | { type: "push_repository"; requirementId: string; repositoryId: string }
+  | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
 export function parseFeishuCommand(raw: string): FeishuCommand {
@@ -29,6 +32,17 @@ function stripLeadingMentions(raw: string): string {
 export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
   if (!isRecord(value)) {
     return { type: "unknown", raw: stringifyUnknown(value) };
+  }
+
+  if (typeof value.action === "string") {
+    const action = parsePlatformAction(value.action);
+    if (action.kind !== "unknown") {
+      return {
+        type: "platform_action",
+        action,
+        sessionKey: typeof value.session_key === "string" ? value.session_key : undefined
+      };
+    }
   }
 
   if (value.action === "push_repository") {

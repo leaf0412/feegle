@@ -45,6 +45,29 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
+  it("surfaces platform actions until the action router is connected", async () => {
+    const replies: Array<{ chatId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies));
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_2",
+      command: {
+        type: "platform_action",
+        action: { kind: "act", command: "/push", args: "repo web", raw: "act:/push repo web" },
+        sessionKey: "feishu:oc_1:channel"
+      }
+    });
+
+    expect(replies).toEqual([
+      {
+        chatId: "oc_1",
+        text: "已收到卡片动作：act:/push repo web。\n当前入口还没有接入动作路由器。"
+      }
+    ]);
+  });
+
   it("replies with help text for unknown commands", async () => {
     const replies: Array<{ chatId: string; text: string }> = [];
     const agentCalls: unknown[] = [];

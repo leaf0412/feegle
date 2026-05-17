@@ -1,4 +1,6 @@
 import type { RequirementStatus } from "../domain/status.js";
+import { createPlatformCard, type PlatformCardButton } from "../platform/platform-card.js";
+import { renderFeishuCard } from "./feishu-card-renderer.js";
 
 export interface FeishuInteractiveCard {
   schema?: "2.0";
@@ -84,10 +86,10 @@ const statusLabels: Record<RequirementStatus, string> = {
 };
 
 export function buildRequirementStatusCard(input: RequirementStatusCardInput): FeishuInteractiveCard {
-  const elements: FeishuCardElement[] = [
-    {
-      tag: "markdown",
-      content: [
+  const card = createPlatformCard()
+    .title(`${input.title} · ${statusLabels[input.status]}`, requirementStatusColor(input.status))
+    .markdown(
+      [
         `**需求 ID**：${input.requirementId}`,
         `**当前状态**：${statusLabels[input.status]}`,
         input.prototypeFileName ? `**离线原型**：${input.prototypeFileName}` : undefined,
@@ -95,47 +97,32 @@ export function buildRequirementStatusCard(input: RequirementStatusCardInput): F
       ]
         .filter(isDefined)
         .join("\n")
-    },
-    { tag: "hr" },
-    {
-      tag: "markdown",
-      content: renderRepositoryLines(input.repositories)
-    }
-  ];
+    )
+    .divider()
+    .markdown(renderRepositoryLines(input.repositories));
+
+  const reviewButtons = buildReviewButtons(input.requirementId, input.status);
+  if (reviewButtons.length > 0) {
+    card.buttonRow(reviewButtons, "equal_columns");
+  }
 
   const pushButtons = input.repositories
     .filter((repository) => repository.pushStatus === "ready")
-    .map((repository): FeishuButtonElement => {
-      return {
-        tag: "button",
-        text: plainText(`推送 ${repository.name}`),
-        type: "primary",
-        value: {
-          action: "push_repository",
-          requirementId: input.requirementId,
-          repositoryId: repository.id
-        }
-      };
-    });
+    .map((repository): PlatformCardButton => ({
+      text: `推送 ${repository.name}`,
+      type: "primary",
+      action: `act:/push repo ${repository.id}`,
+      extra: {
+        requirementId: input.requirementId,
+        repositoryId: repository.id
+      }
+    }));
 
   if (pushButtons.length > 0) {
-    elements.push({
-      tag: "action",
-      actions: pushButtons
-    });
+    card.buttonRow(pushButtons);
   }
 
-  return {
-    config: {
-      wide_screen_mode: true,
-      update_multi: true
-    },
-    header: {
-      template: requirementStatusColor(input.status),
-      title: plainText(`${input.title} · ${statusLabels[input.status]}`)
-    },
-    elements
-  };
+  return renderFeishuCard(card.build()) as unknown as FeishuInteractiveCard;
 }
 
 export function buildWorkflowProgressCard(input: WorkflowProgressCardInput): FeishuInteractiveCard {
@@ -230,6 +217,40 @@ function workflowStatusColor(status: WorkflowProgressCardInput["status"]): Feish
     return "red";
   }
   return "blue";
+}
+
+function buildReviewButtons(requirementId: string, status: RequirementStatus): PlatformCardButton[] {
+  if (status === "prototype_reviewing") {
+    return [
+      {
+        text: "确认原型",
+        type: "primary",
+        action: `act:/prototype approve ${requirementId}`
+      },
+      buildCancelButton(requirementId)
+    ];
+  }
+
+  if (status === "plan_generated") {
+    return [
+      {
+        text: "确认计划",
+        type: "primary",
+        action: `act:/plan confirm ${requirementId}`
+      },
+      buildCancelButton(requirementId)
+    ];
+  }
+
+  return [];
+}
+
+function buildCancelButton(requirementId: string): PlatformCardButton {
+  return {
+    text: "取消需求",
+    type: "danger",
+    action: `act:/requirement cancel ${requirementId}`
+  };
 }
 
 function plainText(content: string): FeishuPlainText {
