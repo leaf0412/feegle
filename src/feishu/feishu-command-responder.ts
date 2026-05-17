@@ -1,9 +1,13 @@
+import type { AgentCli } from "../agent/agent-cli.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 
 export class FeishuCommandResponder implements FeishuCommandHandler {
-  constructor(private readonly client: FeishuClientPort) {}
+  constructor(
+    private readonly client: FeishuClientPort,
+    private readonly agent?: AgentCli
+  ) {}
 
   async handleCommand(input: {
     source: "message" | "card";
@@ -11,6 +15,17 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     messageId: string;
     command: FeishuCommand;
   }): Promise<void> {
+    if (input.command.type === "unknown" && this.agent) {
+      await this.client.sendText(input.chatId, "收到需求，正在交给 Codex 分析...");
+      const plan = await this.agent.generatePlan({
+        requirementId: input.messageId,
+        title: input.command.raw.split("\n")[0] ?? input.messageId,
+        requirementText: input.command.raw
+      });
+      await this.client.sendText(input.chatId, plan);
+      return;
+    }
+
     await this.client.sendText(input.chatId, buildReplyText(input.command));
   }
 }

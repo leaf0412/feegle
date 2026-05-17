@@ -58,6 +58,11 @@ Optional values:
 ```bash
 export FEISHU_VERIFICATION_TOKEN="xxx"
 export FEISHU_ENCRYPT_KEY="xxx"
+export FEEGLE_AGENT_COMMAND="codex"
+export FEEGLE_AGENT_CWD="/path/to/workspace"
+export FEEGLE_AGENT_SANDBOX="workspace-write"
+export FEEGLE_AGENT_APPROVAL_POLICY="never"
+export FEEGLE_AGENT_TIMEOUT_MS="300000"
 ```
 
 Do not commit real secrets. Keep them in your shell, local process manager, or a local `.env` file that is not committed.
@@ -76,7 +81,13 @@ Start the long-connection process:
 npm run start:feishu
 ```
 
-When the connection is active, send a message in the Feishu group. The current adapter prints parsed command envelopes to stdout.
+When the connection is active, send a message in the Feishu group. Deterministic commands are handled by code. Natural-language requirement messages are sent to the configured Agent CLI, and the agent result is sent back to the same Feishu chat.
+
+By default, the agent command is:
+
+```bash
+codex exec --cd "$FEEGLE_AGENT_CWD" --sandbox workspace-write --ask-for-approval never -
+```
 
 Example command:
 
@@ -84,7 +95,7 @@ Example command:
 /repo select web api
 ```
 
-Expected terminal output shape:
+Expected behavior: the bot replies in Feishu that it received the selected repositories.
 
 ```json
 {"source":"message","chatId":"oc_xxx","messageId":"om_xxx","command":{"type":"repo_select","repositoryIds":["web","api"]}}
@@ -125,11 +136,11 @@ The runnable Feishu entrypoint does not yet execute the full product workflow. I
 - Clone repositories from a received Feishu command
 - Create branches from suggested branch names
 - Generate and upload prototype zip files to Feishu
-- Drive TDD development through the Agent CLI
+- Drive the full TDD development workflow through the Agent CLI
 - Push Git branches when the Feishu card button is clicked
 - Report CI/browser verification back into Feishu
 
-Those pieces exist as separate domain/service boundaries or planned workflow steps, but the Feishu entrypoint currently stops at command parsing.
+Those pieces exist as separate domain/service boundaries or planned workflow steps. The Feishu entrypoint currently sends natural-language requirements to the Agent CLI for planning, but it does not yet persist and advance the full multi-step workflow.
 
 ## Useful Commands
 

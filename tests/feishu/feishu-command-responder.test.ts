@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
+import type { AgentCli } from "../../src/agent/agent-cli.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 
 describe("FeishuCommandResponder", () => {
@@ -43,7 +44,11 @@ describe("FeishuCommandResponder", () => {
 
   it("replies with help text for unknown commands", async () => {
     const replies: Array<{ chatId: string; text: string }> = [];
-    const responder = new FeishuCommandResponder(fakeClient(replies));
+    const agentCalls: unknown[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent(agentCalls, "Codex 计划：先绑定仓库，再创建分支。")
+    );
 
     await responder.handleCommand({
       source: "message",
@@ -55,7 +60,18 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([
       {
         chatId: "oc_1",
-        text: "我收到了消息，但还不认识这个指令：hello\n当前支持：/repo select <仓库ID1> <仓库ID2>"
+        text: "收到需求，正在交给 Codex 分析..."
+      },
+      {
+        chatId: "oc_1",
+        text: "Codex 计划：先绑定仓库，再创建分支。"
+      }
+    ]);
+    expect(agentCalls).toEqual([
+      {
+        requirementId: "om_3",
+        title: "hello",
+        requirementText: "hello"
       }
     ]);
   });
@@ -71,5 +87,20 @@ function fakeClient(replies: Array<{ chatId: string; text: string }>): FeishuCli
       return "om_card";
     },
     async updateInteractiveCard() {}
+  };
+}
+
+function fakeAgent(calls: unknown[], plan: string): AgentCli {
+  return {
+    async generatePrototype() {
+      throw new Error("generatePrototype should not be called");
+    },
+    async generatePlan(context) {
+      calls.push(context);
+      return plan;
+    },
+    async runDevelopmentTask() {
+      throw new Error("runDevelopmentTask should not be called");
+    }
   };
 }

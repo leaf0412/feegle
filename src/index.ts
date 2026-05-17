@@ -11,6 +11,7 @@ export type {
 export type { RequirementStatus } from "./domain/status.js";
 export { PrototypeGenerator } from "./prototype/prototype-generator.js";
 export type { WritePrototypeSourceInput } from "./prototype/prototype-generator.js";
+export { createCodexCliPromptRunner, type CodexCliRunnerOptions } from "./agent/codex-cli-runner.js";
 export {
   parseFeishuCardActionValue,
   parseFeishuCommand,
