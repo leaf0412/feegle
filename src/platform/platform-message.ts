@@ -9,6 +9,7 @@ export interface PlatformIncomingMessage {
   timestamp: Date;
   threadId?: string;
   rootMessageId?: string;
+  sessionKey?: string;
   raw: unknown;
 }
 

@@ -5,6 +5,7 @@ import {
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent
 } from "./feishu-event-adapter.js";
+import { FeishuMessageDedup } from "./feishu-dedup.js";
 
 export interface FeishuLongConnectionConfig {
   appId: string;
@@ -45,7 +46,7 @@ export interface FeishuWsClient {
 }
 
 export class FeishuLongConnectionRuntime {
-  private readonly handledEventIds = new Set<string>();
+  private readonly dedup = new FeishuMessageDedup();
 
   constructor(
     private readonly config: FeishuLongConnectionConfig,
@@ -85,11 +86,6 @@ export class FeishuLongConnectionRuntime {
   }
 
   private markUnhandled(source: "message" | "card", messageId: string): boolean {
-    const key = `${source}:${messageId}`;
-    if (this.handledEventIds.has(key)) {
-      return false;
-    }
-    this.handledEventIds.add(key);
-    return true;
+    return this.dedup.mark(`${source}:${messageId}`);
   }
 }

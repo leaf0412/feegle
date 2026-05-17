@@ -58,6 +58,17 @@ export {
   type FeishuLongConnectionSdk
 } from "./feishu/feishu-long-connection-runtime.js";
 export {
+  parseFeishuPlatformConfig,
+  type FeishuPlatformConfig,
+  type FeishuPlatformConfigInput,
+  type FeishuProgressStyle
+} from "./feishu/feishu-platform-config.js";
+export { FeishuMessageDedup, isAllowedByList, isOldMessage } from "./feishu/feishu-dedup.js";
+export {
+  normalizeFeishuTextMessage,
+  type FeishuMessageExtractOptions
+} from "./feishu/feishu-message-normalizer.js";
+export {
   createPlatformCard,
   type PlatformCard,
   type PlatformCardActionLayout,

@@ -1,15 +1,32 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
 import { parseFeishuCardActionValue, parseFeishuCommand } from "./feishu-gateway.js";
+import {
+  normalizeFeishuTextMessage,
+  type FeishuMessageExtractOptions
+} from "./feishu-message-normalizer.js";
+import type { PlatformIncomingMessage } from "../platform/platform-message.js";
+
+export type { FeishuMessageExtractOptions } from "./feishu-message-normalizer.js";
 
 export interface FeishuCommandEnvelope {
   chatId: string;
   messageId: string;
   command: FeishuCommand;
+  message?: PlatformIncomingMessage;
+}
+
+export interface FeishuPlatformMessageEnvelope extends FeishuCommandEnvelope {
+  message: PlatformIncomingMessage;
 }
 
 export interface FeishuMessageReceiveEvent {
   sender?: {
     sender_type?: string;
+    sender_id?: {
+      open_id?: string;
+      union_id?: string;
+      user_id?: string;
+    };
   };
   message?: {
     message_id?: string;
@@ -17,7 +34,20 @@ export interface FeishuMessageReceiveEvent {
     chat_type?: string;
     message_type?: string;
     content?: string;
+    create_time?: string;
+    mentions?: FeishuMessageMention[];
+    thread_id?: string;
+    root_id?: string;
+    parent_id?: string;
   };
+}
+
+export interface FeishuMessageMention {
+  id?: {
+    open_id?: string;
+  };
+  name?: string;
+  key?: string;
 }
 
 export interface FeishuCardActionTriggerEvent {
@@ -32,7 +62,15 @@ export interface FeishuCardActionTriggerEvent {
   };
 }
 
-export function extractTextMessageCommand(event: FeishuMessageReceiveEvent): FeishuCommandEnvelope | null {
+export function extractTextMessageCommand(event: FeishuMessageReceiveEvent): FeishuCommandEnvelope | null;
+export function extractTextMessageCommand(
+  event: FeishuMessageReceiveEvent,
+  options: FeishuMessageExtractOptions
+): FeishuPlatformMessageEnvelope | null;
+export function extractTextMessageCommand(
+  event: FeishuMessageReceiveEvent,
+  options?: FeishuMessageExtractOptions
+): FeishuCommandEnvelope | null {
   const message = event.message;
   if (
     event.sender?.sender_type === "app" ||
@@ -49,10 +87,17 @@ export function extractTextMessageCommand(event: FeishuMessageReceiveEvent): Fei
     return null;
   }
 
+  const platformMessage = options ? normalizeFeishuTextMessage(event, options, text) : null;
+  if (options && platformMessage === null) {
+    return null;
+  }
+
+  const commandText = platformMessage?.text ?? text;
   return {
     chatId: message.chat_id,
     messageId: message.message_id,
-    command: parseFeishuCommand(text)
+    command: parseFeishuCommand(commandText),
+    message: platformMessage ?? undefined
   };
 }
 

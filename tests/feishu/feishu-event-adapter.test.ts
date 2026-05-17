@@ -75,4 +75,88 @@ describe("feishu event adapter", () => {
       command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" }
     });
   });
+
+  it("drops group messages without bot mention when groupReplyAll is false", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed).toBeNull();
+  });
+
+  it("normalizes mentioned group text into a platform message", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_2",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 做一个需求" }),
+          mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("做一个需求");
+    expect(parsed?.message.sessionKey).toBe("feishu:oc_1:channel");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "做一个需求" });
+  });
+
+  it("drops messages blocked by allow lists", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_3",
+          chat_id: "oc_1",
+          chat_type: "p2p",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "ou_2",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed).toBeNull();
+  });
 });

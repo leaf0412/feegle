@@ -89,7 +89,7 @@ describe("FeishuLongConnectionRuntime", () => {
     ]);
   });
 
-  it("does not handle the same message id twice", async () => {
+  it("does not handle the same source and message id twice", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
@@ -135,7 +135,17 @@ describe("FeishuLongConnectionRuntime", () => {
     };
     await registered["im.message.receive_v1"]?.(event);
     await registered["im.message.receive_v1"]?.(event);
+    await registered["card.action.trigger"]?.({
+      action: {
+        value: {
+          action: "push_repository",
+          requirementId: "req_1",
+          repositoryId: "repo_1"
+        }
+      },
+      context: { open_chat_id: "oc_1", open_message_id: "om_1" }
+    });
 
-    expect(handled).toHaveLength(1);
+    expect(handled).toHaveLength(2);
   });
 });
