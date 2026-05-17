@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { LarkFeishuClient, type FeishuClientPort } from "../../src/feishu/feishu-client.js";
 
 describe("LarkFeishuClient", () => {
@@ -240,6 +241,120 @@ describe("LarkFeishuClient", () => {
       }
     });
     await expect(client.fetchBotOpenId()).rejects.toThrow(/missing open_id/);
+  });
+
+  it("uploads an image buffer and sends an image message", async () => {
+    const calls: unknown[] = [];
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          image: {
+            create: async (input) => {
+              calls.push(input);
+              return { data: { image_key: "img_v3_1" } };
+            }
+          },
+          message: {
+            create: async (input) => {
+              calls.push(input);
+              return { data: { message_id: "om_image" } };
+            },
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+
+    await expect(client.sendImage("oc_1", image)).resolves.toBe("om_image");
+    expect(calls).toEqual([
+      { data: { image_type: "message", image } },
+      {
+        params: { receive_id_type: "chat_id" },
+        data: {
+          receive_id: "oc_1",
+          msg_type: "image",
+          content: JSON.stringify({ image_key: "img_v3_1" })
+        }
+      }
+    ]);
+  });
+
+  it("uploads an opus audio buffer and sends an audio message", async () => {
+    const calls: unknown[] = [];
+    const audio = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          file: {
+            create: async (input) => {
+              calls.push(input);
+              return { data: { file_key: "file_audio_1" } };
+            }
+          },
+          message: {
+            create: async (input) => {
+              calls.push(input);
+              return { data: { message_id: "om_audio" } };
+            },
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+
+    await expect(client.sendAudio("oc_1", audio)).resolves.toBe("om_audio");
+    expect(calls[0]).toEqual({
+      data: { file_name: "tts_audio.opus", file_type: "opus", file: audio }
+    });
+    expect(calls[1]).toEqual({
+      params: { receive_id_type: "chat_id" },
+      data: {
+        receive_id: "oc_1",
+        msg_type: "audio",
+        content: JSON.stringify({ file_key: "file_audio_1" })
+      }
+    });
+  });
+
+  it("refuses non-opus audio so callers convert before sending", async () => {
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          file: { create: async () => ({ data: { file_key: "ignored" } }) },
+          message: {
+            create: async () => ({ data: { message_id: "ignored" } }),
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+    await expect(
+      client.sendAudio("oc_1", Buffer.from([]), { format: "wav" as unknown as "opus" })
+    ).rejects.toThrow(/only accepts opus/);
+  });
+
+  it("downloads message resources via the readable stream API and sniffs MIME for images", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          messageResource: {
+            get: async () => ({ getReadableStream: () => Readable.from([png]) })
+          },
+          message: {
+            create: async () => ({ data: { message_id: "ignored" } }),
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+
+    await expect(client.downloadResource("om_1", "img_key", "image")).resolves.toEqual(png);
+    await expect(client.downloadImage("om_1", "img_key")).resolves.toEqual({
+      data: png,
+      mimeType: "image/png"
+    });
   });
 
   it("uploads a local file and sends it to chat ids", async () => {

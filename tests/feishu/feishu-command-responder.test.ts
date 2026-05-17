@@ -362,6 +362,18 @@ function fakeClient(
     },
     async fetchMessage() {
       return undefined;
+    },
+    async sendImage() {
+      return undefined;
+    },
+    async sendAudio() {
+      return undefined;
+    },
+    async downloadResource() {
+      return undefined;
+    },
+    async downloadImage() {
+      return undefined;
     }
   };
 }

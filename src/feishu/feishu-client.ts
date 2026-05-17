@@ -1,7 +1,10 @@
 import { createReadStream } from "node:fs";
 import type { ReadStream } from "node:fs";
 import { basename } from "node:path";
+import { Readable } from "node:stream";
 import type { PlatformProgressSnapshot } from "../platform/progress.js";
+import { detectMimeType } from "./feishu-mime.js";
+import type { FeishuFileType } from "./feishu-mime.js";
 import { renderFeishuProgressCard } from "./feishu-progress-card.js";
 
 export interface FeishuRawRequest {
@@ -20,10 +23,28 @@ export interface FeishuOpenApiClient {
         create(input: {
           data: {
             file_name: string;
-            file_type: "stream";
-            file: ReadStream;
+            file_type: FeishuFileType;
+            file: ReadStream | Buffer;
           };
         }): Promise<{ data?: { file_key?: string } } | { file_key?: string } | null>;
+      };
+      image?: {
+        create(input: {
+          data: {
+            image_type: "message" | "avatar";
+            image: Buffer | ReadStream;
+          };
+        }): Promise<{ data?: { image_key?: string } } | { image_key?: string } | null>;
+      };
+      messageResource?: {
+        get(input: {
+          params: { type: string };
+          path: { message_id: string; file_key: string };
+        }): Promise<{
+          writeFile?: (filePath: string) => Promise<unknown>;
+          getReadableStream?: () => Readable;
+          headers?: Record<string, string | string[]>;
+        }>;
       };
       message: {
         create(input: {
@@ -104,6 +125,14 @@ export interface FeishuClientPort {
   fetchChatName(chatId: string): Promise<string | undefined>;
   fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>>;
   fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined>;
+  sendImage(chatId: string, image: Buffer): Promise<string | undefined>;
+  sendAudio(chatId: string, audio: Buffer, options?: { format?: "opus"; fileName?: string }): Promise<string | undefined>;
+  downloadResource(
+    messageId: string,
+    fileKey: string,
+    type: "image" | "file"
+  ): Promise<Buffer | undefined>;
+  downloadImage(messageId: string, imageKey: string): Promise<{ data: Buffer; mimeType?: string } | undefined>;
 }
 
 export interface FeishuFetchedMessageMention {
@@ -279,6 +308,93 @@ export class LarkFeishuClient implements FeishuClientPort {
     return [];
   }
 
+  async sendImage(chatId: string, image: Buffer): Promise<string | undefined> {
+    if (!this.client.im.v1.image) {
+      throw new Error("Feishu image API client is not configured");
+    }
+    const uploadResponse = await this.client.im.v1.image.create({
+      data: { image_type: "message", image }
+    });
+    const imageKey = extractImageKey(uploadResponse);
+    if (!imageKey) {
+      throw new Error("Feishu image upload did not return image_key");
+    }
+    const messageResponse = await this.client.im.v1.message.create({
+      params: { receive_id_type: "chat_id" },
+      data: {
+        receive_id: chatId,
+        msg_type: "image" as unknown as "text",
+        content: JSON.stringify({ image_key: imageKey })
+      }
+    });
+    return messageResponse.data?.message_id;
+  }
+
+  async sendAudio(
+    chatId: string,
+    audio: Buffer,
+    options: { format?: "opus"; fileName?: string } = {}
+  ): Promise<string | undefined> {
+    const format = options.format ?? "opus";
+    if (format !== "opus") {
+      throw new Error(`Feishu audio upload only accepts opus (got ${format}); convert before sending`);
+    }
+    if (!this.client.im.v1.file) {
+      throw new Error("Feishu file API client is not configured");
+    }
+    const uploadResponse = await this.client.im.v1.file.create({
+      data: {
+        file_name: options.fileName ?? "tts_audio.opus",
+        file_type: "opus",
+        file: audio
+      }
+    });
+    const fileKey = extractFileKey(uploadResponse);
+    if (!fileKey) {
+      throw new Error("Feishu audio upload did not return file_key");
+    }
+    const messageResponse = await this.client.im.v1.message.create({
+      params: { receive_id_type: "chat_id" },
+      data: {
+        receive_id: chatId,
+        msg_type: "audio" as unknown as "text",
+        content: JSON.stringify({ file_key: fileKey })
+      }
+    });
+    return messageResponse.data?.message_id;
+  }
+
+  async downloadResource(
+    messageId: string,
+    fileKey: string,
+    type: "image" | "file"
+  ): Promise<Buffer | undefined> {
+    if (!this.client.im.v1.messageResource) {
+      return undefined;
+    }
+    const response = await this.client.im.v1.messageResource.get({
+      params: { type },
+      path: { message_id: messageId, file_key: fileKey }
+    });
+    if (!response.getReadableStream) {
+      return undefined;
+    }
+    const stream = response.getReadableStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  async downloadImage(messageId: string, imageKey: string): Promise<{ data: Buffer; mimeType?: string } | undefined> {
+    const data = await this.downloadResource(messageId, imageKey, "image");
+    if (!data) {
+      return undefined;
+    }
+    return { data, mimeType: detectMimeType(data) };
+  }
+
   async fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined> {
     if (!this.client.request) {
       return undefined;
@@ -334,6 +450,18 @@ function extractFileKey(
     return (response as { data?: { file_key?: string } }).data?.file_key;
   }
   return (response as { file_key?: string }).file_key;
+}
+
+function extractImageKey(
+  response: { data?: { image_key?: string } } | { image_key?: string } | null
+): string | undefined {
+  if (response === null) {
+    return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(response, "data")) {
+    return (response as { data?: { image_key?: string } }).data?.image_key;
+  }
+  return (response as { image_key?: string }).image_key;
 }
 
 function readNestedString(value: unknown, path: ReadonlyArray<string>): string | undefined {
