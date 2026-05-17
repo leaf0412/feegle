@@ -1,9 +1,13 @@
-import type { RepositoryRecord } from "../domain/models.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
-import { buildSlashCommandDetailCard, buildSlashCommandHelpCard } from "../platform/slash-command-help-card.js";
+import { findSlashCommandById } from "../platform/slash-command-catalog.js";
+import type {
+  SlashCommandHandler,
+  SlashCommandReply,
+  SlashCommandRegistry
+} from "../platform/slash-command-handler.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -22,62 +26,150 @@ export function logFeishuCommandTrace(event: FeishuCommandTraceEvent): void {
   log("Feishu command responder", event);
 }
 
-interface FeishuCommandResponderOptions {
-  repositories?: { list(): RepositoryRecord[] };
+export interface FeishuCommandResponderOptions {
+  registry: SlashCommandRegistry;
   trace?: FeishuCommandTraceSink;
+}
+
+interface DispatchInput {
+  source: "message" | "card";
+  chatId: string;
+  messageId: string;
+  command: FeishuCommand;
 }
 
 export class FeishuCommandResponder implements FeishuCommandHandler {
   constructor(
     private readonly client: FeishuClientPort,
-    private readonly options: FeishuCommandResponderOptions = {}
+    private readonly options: FeishuCommandResponderOptions
   ) {}
 
-  async handleCommand(input: {
-    source: "message" | "card";
-    chatId: string;
-    messageId: string;
-    command: FeishuCommand;
-    shouldRespond?: boolean;
-  }): Promise<void> {
+  async handleCommand(input: DispatchInput & { shouldRespond?: boolean }): Promise<void> {
     this.trace("received", input);
     if (input.shouldRespond === false) {
       this.trace("skipped_record_only", input);
       return;
     }
 
-    if (input.command.type === "help") {
-      const groupKey = input.command.groupKey;
-      await this.traceAsync("progress_reply", input, () =>
-        this.client.replyInteractiveCard(input.messageId, renderFeishuCard(buildSlashCommandHelpCard(groupKey)))
-      );
-      this.trace("completed", input);
+    const reply = await this.computeReply(input);
+    if (!reply) {
+      this.trace("ignored", input);
       return;
     }
 
-    if (input.command.type === "platform_action") {
-      const handled = await this.handlePlatformAction(input.messageId, input.command);
-      if (handled) {
-        return;
-      }
-    }
-
-    await this.traceAsync("reply_text", input, () =>
-      this.client.replyText(input.messageId, buildReplyText(input.command, this.options.repositories))
-    );
+    await this.deliver(input, reply);
     this.trace("completed", input);
   }
 
-  private trace(
-    stage: string,
-    input: {
-      source: "message" | "card";
-      chatId: string;
-      messageId: string;
-      command: FeishuCommand;
-    },
-    detail?: Record<string, unknown>
-  ): void {
+  private async computeReply(input: DispatchInput): Promise<SlashCommandReply | undefined> {
+    const command = input.command;
+    switch (command.type) {
+      case "help":
+        return this.dispatchSlashCommand(input, "help", command.groupKey ?? "");
+      case "slash_command":
+        return this.dispatchSlashCommand(input, command.definition.id, extractArgs(command.raw, command.definition.command));
+      case "platform_action":
+        return this.dispatchPlatformAction(input, command);
+      case "chat":
+        return { kind: "text", text: "我在，继续说。" };
+      case "repo_select":
+        return {
+          kind: "text",
+          text: `已收到仓库选择：${command.repositoryIds.join("、")}。\n下一步我会基于这些仓库建议需求分支名称。`
+        };
+      case "push_repository":
+        return {
+          kind: "text",
+          text: `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`
+        };
+      case "unknown":
+        return { kind: "text", text: `未知命令：${command.raw}` };
+      default: {
+        const _exhaustive: never = command;
+        return _exhaustive;
+      }
+    }
+  }
+
+  private async dispatchSlashCommand(
+    input: DispatchInput,
+    commandId: string,
+    args: string
+  ): Promise<SlashCommandReply> {
+    const definition = findSlashCommandById(commandId);
+    const handler = this.options.registry.resolve(commandId);
+    if (!handler || !definition) {
+      return {
+        kind: "text",
+        text: definition
+          ? `${definition.command} 仍在规划中，暂未接入执行器。`
+          : `未注册的命令：${commandId}`
+      };
+    }
+    return handler.execute({
+      source: input.source,
+      chatId: input.chatId,
+      messageId: input.messageId,
+      definition,
+      raw: definition.command,
+      args
+    });
+  }
+
+  private async dispatchPlatformAction(
+    input: DispatchInput,
+    command: Extract<FeishuCommand, { type: "platform_action" }>
+  ): Promise<SlashCommandReply | undefined> {
+    if (command.action.kind !== "nav") {
+      return undefined;
+    }
+    if (command.action.command === "/help") {
+      return this.dispatchSlashCommand(input, "help", command.action.args);
+    }
+    if (command.action.command === "/command") {
+      return this.runDetailHandler(input, command.action.args);
+    }
+    return undefined;
+  }
+
+  private async runDetailHandler(input: DispatchInput, args: string): Promise<SlashCommandReply | undefined> {
+    const handler: SlashCommandHandler | undefined = this.options.registry.resolve("__command_detail");
+    if (!handler) {
+      return undefined;
+    }
+    return handler.execute({
+      source: input.source,
+      chatId: input.chatId,
+      messageId: input.messageId,
+      definition: {
+        id: "__command_detail",
+        command: "/command",
+        description: "命令详情",
+        groupKey: "system",
+        action: "nav:/command"
+      },
+      raw: "/command",
+      args
+    });
+  }
+
+  private async deliver(input: DispatchInput, reply: SlashCommandReply): Promise<void> {
+    if (reply.kind === "text") {
+      await this.traceAsync("reply_text", input, () => this.client.replyText(input.messageId, reply.text));
+      return;
+    }
+    if (reply.kind === "card") {
+      await this.traceAsync("reply_card", input, () =>
+        this.client.replyInteractiveCard(input.messageId, renderFeishuCard(reply.card))
+      );
+      return;
+    }
+    await this.traceAsync("update_card", input, () =>
+      this.client.updateInteractiveCard(input.messageId, renderFeishuCard(reply.card))
+    );
+  }
+
+  private trace(stage: string, input: DispatchInput, detail?: Record<string, unknown>): void {
     this.emitTrace({
       stage,
       source: input.source,
@@ -101,17 +193,11 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
 
   private async traceAsync<T>(
     stage: string,
-    input: {
-      source: "message" | "card";
-      chatId: string;
-      messageId: string;
-      command: FeishuCommand;
-    },
-    action: () => Promise<T>,
-    detail?: Record<string, unknown>
+    input: DispatchInput,
+    action: () => Promise<T>
   ): Promise<T> {
     const startedAt = Date.now();
-    this.trace(`${stage}_start`, input, detail);
+    this.trace(`${stage}_start`, input);
     try {
       const result = await action();
       this.emitTrace({
@@ -120,85 +206,25 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         chatId: input.chatId,
         messageId: input.messageId,
         commandType: input.command.type,
-        durationMs: Date.now() - startedAt,
-        detail
+        durationMs: Date.now() - startedAt
       });
       return result;
     } catch (error) {
       this.trace(`${stage}_failed`, input, {
-        ...detail,
         durationMs: Date.now() - startedAt,
         error: errorMessage(error)
       });
       throw error;
     }
   }
-
-  private async handlePlatformAction(
-    messageId: string,
-    command: Extract<FeishuCommand, { type: "platform_action" }>
-  ): Promise<boolean> {
-    if (command.action.kind !== "nav") {
-      return false;
-    }
-
-    if (command.action.command === "/help") {
-      await this.client.updateInteractiveCard(messageId, renderFeishuCard(buildSlashCommandHelpCard(command.action.args)));
-      return true;
-    }
-
-    if (command.action.command === "/command") {
-      await this.client.updateInteractiveCard(messageId, renderFeishuCard(buildSlashCommandDetailCard(command.action.args)));
-      return true;
-    }
-
-    return false;
-  }
-
 }
 
-function buildReplyText(command: FeishuCommand, repositories?: { list(): RepositoryRecord[] }): string {
-  if (command.type === "repo_select") {
-    return `已收到仓库选择：${command.repositoryIds.join("、")}。\n下一步我会基于这些仓库建议需求分支名称。`;
+function extractArgs(raw: string, command: string): string {
+  const literalPrefix = command.split(/[<\[|]/, 1)[0]?.trim() ?? "";
+  if (literalPrefix !== "" && raw.startsWith(literalPrefix)) {
+    return raw.slice(literalPrefix.length).trim();
   }
-
-  if (command.type === "push_repository") {
-    return `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`;
-  }
-
-  if (command.type === "platform_action") {
-    return `已收到卡片动作：${command.action.raw}。\n当前入口还没有接入动作路由器。`;
-  }
-
-  if (command.type === "help") {
-    return "正在打开命令面板。";
-  }
-
-  if (command.type === "chat") {
-    return "我在，继续说。";
-  }
-
-  if (command.type === "slash_command") {
-    if (command.definition.id === "repo_list") {
-      return renderRepositoryList(repositories?.list() ?? []);
-    }
-    return `已登记命令：${command.definition.command}\n${command.definition.description}\n当前入口已能识别该命令，具体执行器会在后续切片接入。`;
-  }
-
-  return `未知命令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
-}
-
-function renderRepositoryList(repositories: RepositoryRecord[]): string {
-  if (repositories.length === 0) {
-    return "暂无已注册仓库。";
-  }
-
-  return [
-    "已注册仓库：",
-    ...repositories.map((repository, index) =>
-      `${index + 1}. ${repository.name} (${repository.id}) · ${repository.defaultBaseBranch} · ${repository.remoteUrl}`
-    )
-  ].join("\n");
+  return raw.trim();
 }
 
 function errorMessage(error: unknown): string {

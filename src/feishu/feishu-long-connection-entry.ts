@@ -3,6 +3,8 @@ import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "./feishu-command-responder.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
+import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
+import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 
 const config = parseFeishuPlatformConfig({
   appId: readRequiredEnv("FEISHU_APP_ID"),
@@ -26,7 +28,10 @@ const feishuClient: FeishuClientPort = new LarkFeishuClient(
     appSecret: config.appSecret
   })
 );
+const repositories = new InMemoryRepositoryRegistry();
+const registry = buildSlashCommandRegistry({ repositories });
 const handler = new FeishuCommandResponder(feishuClient, {
+  registry,
   trace: logFeishuCommandTrace
 });
 
