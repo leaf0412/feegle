@@ -82,5 +82,22 @@ function renderEntry(entry: PlatformProgressEntry): unknown {
       content: `<text_tag color='red'>错误</text_tag>\n${entry.text}`
     };
   }
+  if (entry.kind === "tool_step") {
+    return {
+      tag: "markdown",
+      content: renderToolStepFallback(entry)
+    };
+  }
   return { tag: "markdown", content: entry.text };
+}
+
+function renderToolStepFallback(entry: PlatformProgressEntry & { kind: "tool_step" }): string {
+  const lines: string[] = [`<text_tag color='blue'>工具</text_tag> \`${entry.name}\``];
+  if (entry.summary) {
+    lines.push(entry.summary);
+  }
+  if (entry.result) {
+    lines.push(entry.result);
+  }
+  return lines.join("\n");
 }

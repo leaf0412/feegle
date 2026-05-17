@@ -21,6 +21,21 @@ export interface PlatformProgressSnapshot {
   state: PlatformProgressSnapshotState;
   truncated: boolean;
   entries: PlatformProgressEntry[];
+  streaming?: boolean;
+  elapsedMs?: number;
+}
+
+export type PlatformProgressToolStatus = "running" | "ok" | "failed";
+
+export interface PlatformProgressToolStep {
+  kind: "tool_step";
+  name: string;
+  summary?: string;
+  status?: PlatformProgressToolStatus;
+  exitCode?: number;
+  input?: string;
+  result?: string;
+  elapsedMs?: number;
 }
 
 export type PlatformProgressEntry =
@@ -28,7 +43,8 @@ export type PlatformProgressEntry =
   | { kind: "tool_use"; tool?: string; text: string }
   | { kind: "tool_result"; tool?: string; text: string }
   | { kind: "error"; text: string }
-  | { kind: "info"; text: string };
+  | { kind: "info"; text: string }
+  | PlatformProgressToolStep;
 
 export function createProgressEvent(input: PlatformProgressInput): PlatformProgressEvent {
   return {
