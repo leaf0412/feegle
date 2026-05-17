@@ -57,3 +57,38 @@ export {
   type FeishuLongConnectionConfig,
   type FeishuLongConnectionSdk
 } from "./feishu/feishu-long-connection-runtime.js";
+export {
+  createPlatformCard,
+  type PlatformCard,
+  type PlatformCardActionLayout,
+  type PlatformCardButton,
+  type PlatformCardColor,
+  type PlatformCardElement,
+  type PlatformCardHeader,
+  type PlatformCardSelectOption
+} from "./platform/platform-card.js";
+export {
+  parsePlatformAction,
+  type PlatformAction,
+  type PlatformAskQuestionAction,
+  type PlatformCommandAction,
+  type PlatformPermissionAction,
+  type PlatformUnknownAction
+} from "./platform/platform-action.js";
+export {
+  createPlatformSessionKey,
+  type PlatformSessionKeyInput
+} from "./platform/platform-session.js";
+export type {
+  PlatformIncomingMessage,
+  PlatformKind,
+  PlatformReplyContext,
+  PlatformSendResult
+} from "./platform/platform-message.js";
+export type { PlatformPort } from "./platform/platform-port.js";
+export {
+  createProgressEvent,
+  type PlatformProgressEvent,
+  type PlatformProgressInput,
+  type PlatformProgressStatus
+} from "./platform/progress.js";
