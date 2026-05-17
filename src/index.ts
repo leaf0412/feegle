@@ -37,6 +37,7 @@ export {
   type WorkflowProgressCardInput,
   type WorkflowProgressStep
 } from "./feishu/feishu-card-builder.js";
+export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
 export {
   FeishuLongConnectionRuntime,
   type FeishuCommandHandler,
