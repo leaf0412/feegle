@@ -6,9 +6,11 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "start:feishu": "node dist/src/feishu/feishu-long-connection-entry.js"
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.64.0",
     "archiver": "^7.0.1",
     "execa": "^9.6.0",
     "fs-extra": "^11.3.0",

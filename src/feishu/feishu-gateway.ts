@@ -21,3 +21,31 @@ export function parseFeishuCommand(raw: string): FeishuCommand {
 
   return { type: "unknown", raw };
 }
+
+export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
+  if (!isRecord(value)) {
+    return { type: "unknown", raw: stringifyUnknown(value) };
+  }
+
+  if (value.action === "push_repository") {
+    const requirementId = value.requirementId;
+    const repositoryId = value.repositoryId;
+    if (typeof requirementId === "string" && typeof repositoryId === "string") {
+      return { type: "push_repository", requirementId, repositoryId };
+    }
+  }
+
+  return { type: "unknown", raw: stringifyUnknown(value) };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringifyUnknown(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFeishuCommand } from "../../src/feishu/feishu-gateway.js";
+import { parseFeishuCardActionValue, parseFeishuCommand } from "../../src/feishu/feishu-gateway.js";
 
 describe("parseFeishuCommand", () => {
   it("parses repo selection with multiple repository ids", () => {
@@ -40,5 +40,10 @@ describe("parseFeishuCommand", () => {
       type: "unknown",
       raw
     });
+  });
+
+  it("does not throw on unsupported card action values", () => {
+    expect(parseFeishuCardActionValue(undefined)).toEqual({ type: "unknown", raw: "undefined" });
+    expect(parseFeishuCardActionValue(1n)).toEqual({ type: "unknown", raw: "1" });
   });
 });
