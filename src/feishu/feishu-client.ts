@@ -4,7 +4,15 @@ import { basename } from "node:path";
 import type { PlatformProgressSnapshot } from "../platform/progress.js";
 import { renderFeishuProgressCard } from "./feishu-progress-card.js";
 
+export interface FeishuRawRequest {
+  url: string;
+  method: string;
+  data?: unknown;
+  params?: Record<string, string | number | undefined>;
+}
+
 export interface FeishuOpenApiClient {
+  request?(payload: FeishuRawRequest): Promise<unknown>;
   im: {
     v1: {
       file?: {
@@ -62,6 +70,7 @@ export interface FeishuClientPort {
   updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void>;
   addReaction(messageId: string, emojiType: string): Promise<string | undefined>;
   removeReaction(messageId: string, reactionId: string): Promise<void>;
+  fetchBotOpenId(): Promise<string | undefined>;
 }
 
 export class LarkFeishuClient implements FeishuClientPort {
@@ -165,6 +174,24 @@ export class LarkFeishuClient implements FeishuClientPort {
     });
   }
 
+  private cachedBotOpenId: string | undefined;
+
+  async fetchBotOpenId(): Promise<string | undefined> {
+    if (this.cachedBotOpenId !== undefined) {
+      return this.cachedBotOpenId;
+    }
+    if (!this.client.request) {
+      throw new Error("Feishu client does not expose a raw request method; cannot resolve bot open_id");
+    }
+    const response = await this.client.request({ url: "/open-apis/bot/v3/info", method: "GET" });
+    const openId = extractBotOpenId(response);
+    if (openId === undefined) {
+      throw new Error("Feishu bot info response missing open_id");
+    }
+    this.cachedBotOpenId = openId;
+    return openId;
+  }
+
   private async reply(
     messageId: string,
     msgType: "text" | "interactive" | "file",
@@ -190,4 +217,19 @@ function extractFileKey(
     return (response as { data?: { file_key?: string } }).data?.file_key;
   }
   return (response as { file_key?: string }).file_key;
+}
+
+function extractBotOpenId(response: unknown): string | undefined {
+  if (!response || typeof response !== "object") {
+    return undefined;
+  }
+  const direct = (response as { bot?: { open_id?: unknown } }).bot;
+  if (direct && typeof direct === "object" && typeof direct.open_id === "string" && direct.open_id !== "") {
+    return direct.open_id;
+  }
+  const nested = (response as { data?: { bot?: { open_id?: unknown } } }).data?.bot;
+  if (nested && typeof nested === "object" && typeof nested.open_id === "string" && nested.open_id !== "") {
+    return nested.open_id;
+  }
+  return undefined;
 }

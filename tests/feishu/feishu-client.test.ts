@@ -205,6 +205,43 @@ describe("LarkFeishuClient", () => {
     expect(JSON.stringify(calls[0])).toContain("Codex · 已完成");
   });
 
+  it("resolves the bot open_id via the bot info endpoint and caches the result", async () => {
+    const calls: unknown[] = [];
+    const client: FeishuClientPort = new LarkFeishuClient({
+      request: async (payload) => {
+        calls.push(payload);
+        return { code: 0, bot: { open_id: "ou_bot" } };
+      },
+      im: {
+        v1: {
+          message: {
+            create: async () => ({ data: { message_id: "x" } }),
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+
+    await expect(client.fetchBotOpenId()).resolves.toBe("ou_bot");
+    await expect(client.fetchBotOpenId()).resolves.toBe("ou_bot");
+    expect(calls).toEqual([{ url: "/open-apis/bot/v3/info", method: "GET" }]);
+  });
+
+  it("throws when the bot info response has no open_id", async () => {
+    const client = new LarkFeishuClient({
+      request: async () => ({ code: 0, bot: {} }),
+      im: {
+        v1: {
+          message: {
+            create: async () => ({ data: { message_id: "x" } }),
+            patch: async () => ({})
+          }
+        }
+      }
+    });
+    await expect(client.fetchBotOpenId()).rejects.toThrow(/missing open_id/);
+  });
+
   it("uploads a local file and sends it to chat ids", async () => {
     const calls: unknown[] = [];
     const directory = await mkdtemp(join(tmpdir(), "feegle-feishu-file-"));

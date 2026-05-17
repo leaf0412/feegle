@@ -347,6 +347,9 @@ function fakeClient(
     },
     async removeReaction(messageId, reactionId) {
       reactions.push({ kind: "remove", messageId, reactionId });
+    },
+    async fetchBotOpenId() {
+      return undefined;
     }
   };
 }
