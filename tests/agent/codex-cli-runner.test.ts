@@ -14,6 +14,12 @@ describe("createCodexCliPromptRunner", () => {
       },
       async (command, args, options) => {
         calls.push({ command, args, options });
+        const outputFlagIndex = args.indexOf("--output-last-message");
+        const outputPath = args[outputFlagIndex + 1];
+        if (!outputPath) {
+          throw new Error("missing output path");
+        }
+        await import("node:fs/promises").then((fs) => fs.writeFile(outputPath, "agent result\n"));
         return { stdout: " agent result \n", stderr: "" };
       }
     );
@@ -23,13 +29,15 @@ describe("createCodexCliPromptRunner", () => {
       {
         command: "codex",
         args: [
+          "--ask-for-approval",
+          "never",
           "exec",
           "--cd",
           "/tmp/workspace",
           "--sandbox",
           "workspace-write",
-          "--ask-for-approval",
-          "never",
+          "--output-last-message",
+          expect.any(String),
           "-"
         ],
         options: {

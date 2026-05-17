@@ -1,4 +1,7 @@
 import { execa } from "execa";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { PromptRunner } from "./codex-agent-adapter.js";
 
 export interface CodexCliRunnerOptions {
@@ -33,24 +36,32 @@ export function createCodexCliPromptRunner(
   runner: CodexCliCommandRunner = defaultRunner
 ): PromptRunner {
   return async (prompt) => {
-    const result = await runner(options.command ?? "codex", buildCodexArgs(options), {
-      input: prompt,
-      timeout: options.timeoutMs ?? 300_000
-    });
+    const outputDirectory = await mkdtemp(join(tmpdir(), "feegle-codex-"));
+    const outputPath = join(outputDirectory, "last-message.txt");
+    try {
+      await runner(options.command ?? "codex", buildCodexArgs(options, outputPath), {
+        input: prompt,
+        timeout: options.timeoutMs ?? 300_000
+      });
 
-    return result.stdout.trim();
+      return (await readFile(outputPath, "utf8")).trim();
+    } finally {
+      await rm(outputDirectory, { force: true, recursive: true });
+    }
   };
 }
 
-function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
+function buildCodexArgs(options: CodexCliRunnerOptions, outputPath: string): string[] {
   return [
+    "--ask-for-approval",
+    options.approvalPolicy ?? "never",
     "exec",
     "--cd",
     options.cwd,
     "--sandbox",
     options.sandbox ?? "workspace-write",
-    "--ask-for-approval",
-    options.approvalPolicy ?? "never",
+    "--output-last-message",
+    outputPath,
     "-"
   ];
 }

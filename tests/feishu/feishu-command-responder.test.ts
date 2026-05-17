@@ -75,6 +75,31 @@ describe("FeishuCommandResponder", () => {
       }
     ]);
   });
+
+  it("reports agent failures back to Feishu instead of throwing", async () => {
+    const replies: Array<{ chatId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), failingAgent("codex exec failed"));
+
+    await expect(
+      responder.handleCommand({
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_4",
+        command: { type: "unknown", raw: "做一个登录失败重试需求" }
+      })
+    ).resolves.toBeUndefined();
+
+    expect(replies).toEqual([
+      {
+        chatId: "oc_1",
+        text: "收到需求，正在交给 Codex 分析..."
+      },
+      {
+        chatId: "oc_1",
+        text: "Codex 分析失败：codex exec failed"
+      }
+    ]);
+  });
 });
 
 function fakeClient(replies: Array<{ chatId: string; text: string }>): FeishuClientPort {
@@ -98,6 +123,20 @@ function fakeAgent(calls: unknown[], plan: string): AgentCli {
     async generatePlan(context) {
       calls.push(context);
       return plan;
+    },
+    async runDevelopmentTask() {
+      throw new Error("runDevelopmentTask should not be called");
+    }
+  };
+}
+
+function failingAgent(message: string): AgentCli {
+  return {
+    async generatePrototype() {
+      throw new Error("generatePrototype should not be called");
+    },
+    async generatePlan() {
+      throw new Error(message);
     },
     async runDevelopmentTask() {
       throw new Error("runDevelopmentTask should not be called");

@@ -17,12 +17,16 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   }): Promise<void> {
     if (input.command.type === "unknown" && this.agent) {
       await this.client.sendText(input.chatId, "收到需求，正在交给 Codex 分析...");
-      const plan = await this.agent.generatePlan({
-        requirementId: input.messageId,
-        title: input.command.raw.split("\n")[0] ?? input.messageId,
-        requirementText: input.command.raw
-      });
-      await this.client.sendText(input.chatId, plan);
+      try {
+        const plan = await this.agent.generatePlan({
+          requirementId: input.messageId,
+          title: input.command.raw.split("\n")[0] ?? input.messageId,
+          requirementText: input.command.raw
+        });
+        await this.client.sendText(input.chatId, plan);
+      } catch (error) {
+        await this.client.sendText(input.chatId, `Codex 分析失败：${errorMessage(error)}`);
+      }
       return;
     }
 
@@ -40,4 +44,11 @@ function buildReplyText(command: FeishuCommand): string {
   }
 
   return `我收到了消息，但还不认识这个指令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

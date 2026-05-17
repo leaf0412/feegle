@@ -86,7 +86,7 @@ When the connection is active, send a message in the Feishu group. Deterministic
 By default, the agent command is:
 
 ```bash
-codex exec --cd "$FEEGLE_AGENT_CWD" --sandbox workspace-write --ask-for-approval never -
+codex --ask-for-approval never exec --cd "$FEEGLE_AGENT_CWD" --sandbox workspace-write --output-last-message /tmp/feegle-last-message.txt -
 ```
 
 Example command:
