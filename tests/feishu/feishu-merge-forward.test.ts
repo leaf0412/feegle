@@ -146,6 +146,7 @@ function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
     sendAudio: fallback,
     downloadResource: fallback,
     downloadImage: fallback,
+    deleteMessage: async () => {},
     ...overrides
   };
 }

@@ -377,6 +377,7 @@ function fakeClient(
     },
     async downloadImage() {
       return undefined;
-    }
+    },
+    async deleteMessage() {}
   };
 }

@@ -68,6 +68,7 @@ export interface FeishuOpenApiClient {
             content: string;
           };
         }): Promise<{ data?: { message_id?: string } }>;
+        delete?(input: { path: { message_id: string } }): Promise<unknown>;
       };
       messageReaction?: {
         create(input: {
@@ -120,6 +121,7 @@ export interface FeishuClientPort {
   updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void>;
   addReaction(messageId: string, emojiType: string): Promise<string | undefined>;
   removeReaction(messageId: string, reactionId: string): Promise<void>;
+  deleteMessage(messageId: string): Promise<void>;
   fetchBotOpenId(): Promise<string | undefined>;
   fetchUserName(openId: string): Promise<string | undefined>;
   fetchChatName(chatId: string): Promise<string | undefined>;
@@ -260,6 +262,13 @@ export class LarkFeishuClient implements FeishuClientPort {
     await this.client.im.v1.messageReaction.delete({
       path: { message_id: messageId, reaction_id: reactionId }
     });
+  }
+
+  async deleteMessage(messageId: string): Promise<void> {
+    if (!this.client.im.v1.message.delete) {
+      throw new Error("Feishu message delete API client is not configured");
+    }
+    await this.client.im.v1.message.delete({ path: { message_id: messageId } });
   }
 
   async fetchUserName(openId: string): Promise<string | undefined> {
