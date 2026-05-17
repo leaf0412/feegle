@@ -13,6 +13,7 @@ export interface FeishuRawRequest {
 
 export interface FeishuOpenApiClient {
   request?(payload: FeishuRawRequest): Promise<unknown>;
+  contact?: unknown;
   im: {
     v1: {
       file?: {
@@ -56,8 +57,36 @@ export interface FeishuOpenApiClient {
           path: { message_id: string; reaction_id: string };
         }): Promise<unknown>;
       };
+      chat?: unknown;
+      chatMembers?: unknown;
     };
   };
+}
+
+interface ContactUserGetApi {
+  v3: {
+    user: {
+      get(input: {
+        path: { user_id: string };
+        params: { user_id_type: "open_id" | "user_id" | "union_id" };
+      }): Promise<unknown>;
+    };
+  };
+}
+
+interface ChatGetApi {
+  get(input: { path: { chat_id: string } }): Promise<unknown>;
+}
+
+interface ChatMembersApi {
+  getByIterator?(input: {
+    path: { chat_id: string };
+    params: { member_id_type: "open_id"; page_size: number };
+  }): Promise<AsyncIterable<unknown>> | AsyncIterable<unknown>;
+  list?(input: {
+    path: { chat_id: string };
+    params: { member_id_type: "open_id"; page_size: number; page_token?: string };
+  }): Promise<unknown>;
 }
 
 export interface FeishuClientPort {
@@ -71,6 +100,9 @@ export interface FeishuClientPort {
   addReaction(messageId: string, emojiType: string): Promise<string | undefined>;
   removeReaction(messageId: string, reactionId: string): Promise<void>;
   fetchBotOpenId(): Promise<string | undefined>;
+  fetchUserName(openId: string): Promise<string | undefined>;
+  fetchChatName(chatId: string): Promise<string | undefined>;
+  fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>>;
 }
 
 export class LarkFeishuClient implements FeishuClientPort {
@@ -174,6 +206,64 @@ export class LarkFeishuClient implements FeishuClientPort {
     });
   }
 
+  async fetchUserName(openId: string): Promise<string | undefined> {
+    const contact = this.client.contact as ContactUserGetApi | undefined;
+    if (!contact?.v3?.user?.get) {
+      return undefined;
+    }
+    const response = await contact.v3.user.get({
+      path: { user_id: openId },
+      params: { user_id_type: "open_id" }
+    });
+    return readNestedString(response, ["data", "user", "name"]) ?? readNestedString(response, ["user", "name"]);
+  }
+
+  async fetchChatName(chatId: string): Promise<string | undefined> {
+    const chat = this.client.im.v1.chat as ChatGetApi | undefined;
+    if (!chat?.get) {
+      return undefined;
+    }
+    const response = await chat.get({ path: { chat_id: chatId } });
+    return readNestedString(response, ["data", "name"]) ?? readNestedString(response, ["name"]);
+  }
+
+  async fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>> {
+    const api = this.client.im.v1.chatMembers as ChatMembersApi | undefined;
+    if (!api) {
+      return [];
+    }
+    const params = { member_id_type: "open_id" as const, page_size: 100 };
+    if (api.getByIterator) {
+      const iter = await api.getByIterator({ path: { chat_id: chatId }, params });
+      const members: Array<{ memberId: string; name: string }> = [];
+      for await (const raw of iter) {
+        const entry = extractChatMember(raw);
+        if (entry) {
+          members.push(entry);
+        }
+      }
+      return members;
+    }
+    if (api.list) {
+      const members: Array<{ memberId: string; name: string }> = [];
+      let pageToken: string | undefined;
+      do {
+        const response = (await api.list({ path: { chat_id: chatId }, params: { ...params, page_token: pageToken } })) as Record<string, unknown>;
+        const items = readNestedArray(response, ["data", "items"]) ?? readNestedArray(response, ["items"]) ?? [];
+        for (const item of items) {
+          const entry = extractChatMember(item);
+          if (entry) {
+            members.push(entry);
+          }
+        }
+        const next = readNestedString(response, ["data", "page_token"]) ?? readNestedString(response, ["page_token"]);
+        pageToken = next === undefined || next === "" ? undefined : next;
+      } while (pageToken);
+      return members;
+    }
+    return [];
+  }
+
   private cachedBotOpenId: string | undefined;
 
   async fetchBotOpenId(): Promise<string | undefined> {
@@ -217,6 +307,41 @@ function extractFileKey(
     return (response as { data?: { file_key?: string } }).data?.file_key;
   }
   return (response as { file_key?: string }).file_key;
+}
+
+function readNestedString(value: unknown, path: ReadonlyArray<string>): string | undefined {
+  let current: unknown = value;
+  for (const key of path) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+  return typeof current === "string" && current !== "" ? current : undefined;
+}
+
+function readNestedArray(value: unknown, path: ReadonlyArray<string>): unknown[] | undefined {
+  let current: unknown = value;
+  for (const key of path) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+  return Array.isArray(current) ? current : undefined;
+}
+
+function extractChatMember(raw: unknown): { memberId: string; name: string } | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const memberId = typeof record.member_id === "string" && record.member_id !== "" ? record.member_id : "";
+  const name = typeof record.name === "string" && record.name !== "" ? record.name : "";
+  if (memberId === "" || name === "") {
+    return null;
+  }
+  return { memberId, name };
 }
 
 function extractBotOpenId(response: unknown): string | undefined {

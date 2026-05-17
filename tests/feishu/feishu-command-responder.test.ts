@@ -350,6 +350,15 @@ function fakeClient(
     },
     async fetchBotOpenId() {
       return undefined;
+    },
+    async fetchUserName() {
+      return undefined;
+    },
+    async fetchChatName() {
+      return undefined;
+    },
+    async fetchChatMembers() {
+      return [];
     }
   };
 }
