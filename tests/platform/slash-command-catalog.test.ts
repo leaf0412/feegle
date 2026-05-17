@@ -9,10 +9,18 @@ describe("slash command catalog", () => {
     expect(sessionCommands.map((command) => command.command)).toContain("/sessions");
   });
 
+  it("keeps the shared catalog aligned with CC Connect groups without role shortcuts", () => {
+    const allCommands = listSlashCommands();
+
+    expect(allCommands.map((command) => command.command)).toContain("/repo list");
+    expect(allCommands.map((command) => command.command)).not.toContain("/role list");
+    expect(allCommands.map((command) => command.command)).not.toContain("/fork <群名> [@用户...]");
+  });
+
   it("matches nested commands before generic roots", () => {
     expect(findSlashCommandByInput("/repo scan")?.id).toBe("repo_scan");
     expect(findSlashCommandByInput("/repo show")?.id).toBe("repo_show");
-    expect(findSlashCommandByInput("/role list")?.id).toBe("role_list");
+    expect(findSlashCommandByInput("/repo list")?.id).toBe("repo_list");
   });
 
   it("matches aliases", () => {

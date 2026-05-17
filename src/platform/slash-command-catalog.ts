@@ -22,7 +22,6 @@ export const slashCommandGroups: SlashCommandGroup[] = [
   { key: "session", title: "会话" },
   { key: "agent", title: "Agent" },
   { key: "repo", title: "仓库" },
-  { key: "roles", title: "宗门" },
   { key: "setup", title: "配置" },
   { key: "knowledge", title: "知识" },
   { key: "system", title: "系统" }
@@ -63,11 +62,6 @@ export const slashCommands: SlashCommandDefinition[] = [
   feegle("shifu", "/shifu bind|show|unbind|sync", "shifu 同步管理", "repo", "nav:/command shifu"),
   cc("workspace", "/workspace", "工作区绑定与初始化", "repo", "cmd:/workspace"),
   cc("dir", "/dir", "选择工作目录", "repo", "nav:/dir"),
-
-  feegle("role_add", "/role add admin|developer|pm <用户名>", "收徒入门，写入宗门名册", "roles", "nav:/command role_add"),
-  feegle("role_remove", "/role remove admin|developer|pm <用户名>", "逐出宗门，收回门内身份", "roles", "nav:/command role_remove"),
-  feegle("role_list", "/role list", "查看当前宗门名册", "roles", "nav:/command role_list"),
-  feegle("fork", "/fork <群名> [@用户...]", "创建群聊并拉人", "roles", "nav:/command fork"),
 
   feegle("setup", "/setup", "开始项目配置", "setup", "nav:/command setup"),
   feegle("confirm", "/confirm", "确认配置", "setup", "nav:/command confirm"),

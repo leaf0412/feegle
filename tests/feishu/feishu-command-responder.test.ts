@@ -118,7 +118,7 @@ describe("FeishuCommandResponder", () => {
       messageId: "om_card",
       command: {
         type: "platform_action",
-        action: { kind: "nav", command: "/command", args: "role_add", raw: "nav:/command role_add" }
+        action: { kind: "nav", command: "/command", args: "repo_list", raw: "nav:/command repo_list" }
       }
     });
 
@@ -129,11 +129,11 @@ describe("FeishuCommandResponder", () => {
         messageId: "om_card"
       })
     ]);
-    expect(JSON.stringify(progress)).toContain("/role add admin|developer|pm");
-    expect(JSON.stringify(progress)).toContain("nav:/help roles");
+    expect(JSON.stringify(progress)).toContain("/repo list");
+    expect(JSON.stringify(progress)).toContain("nav:/help repo");
   });
 
-  it("acknowledges registered slash commands without invoking the agent", async () => {
+  it("acknowledges registered but unimplemented slash commands without invoking the agent", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const agentCalls: unknown[] = [];
     const responder = new FeishuCommandResponder(
@@ -148,19 +148,80 @@ describe("FeishuCommandResponder", () => {
       command: {
         type: "slash_command",
         definition: {
-          id: "role_list",
-          command: "/role list",
-          description: "查看当前宗门名册",
-          groupKey: "roles",
+          id: "repo_show",
+          command: "/repo show",
+          description: "显示当前绑定",
+          groupKey: "repo",
           source: "feegle",
-          action: "nav:/command role_list"
+          action: "nav:/command repo_show"
         },
-        raw: "/role list"
+        raw: "/repo show"
       }
     });
 
     expect(agentCalls).toEqual([]);
-    expect(replies.at(-1)?.text).toContain("已登记命令：/role list");
+    expect(replies.at(-1)?.text).toContain("已登记命令：/repo show");
+  });
+
+  it("lists registered repositories for /repo list without invoking the agent", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const agentCalls: unknown[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent(agentCalls, "should not be called"),
+      {
+        repositories: {
+          list: () => [
+            {
+              id: "repo_1",
+              name: "web",
+              remoteUrl: "git@example.com:team/web.git",
+              defaultBaseBranch: "main",
+              createdAt: new Date("2026-05-17T00:00:00.000Z"),
+              updatedAt: new Date("2026-05-17T00:00:00.000Z")
+            },
+            {
+              id: "repo_2",
+              name: "api",
+              remoteUrl: "git@example.com:team/api.git",
+              defaultBaseBranch: "develop",
+              createdAt: new Date("2026-05-17T00:00:00.000Z"),
+              updatedAt: new Date("2026-05-17T00:00:00.000Z")
+            }
+          ]
+        }
+      }
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_repo_list",
+      command: {
+        type: "slash_command",
+        definition: {
+          id: "repo_list",
+          command: "/repo list",
+          description: "列出已注册仓库",
+          groupKey: "repo",
+          source: "feegle",
+          action: "cmd:/repo list"
+        },
+        raw: "/repo list"
+      }
+    });
+
+    expect(agentCalls).toEqual([]);
+    expect(replies).toEqual([
+      {
+        messageId: "om_repo_list",
+        text: [
+          "已注册仓库：",
+          "1. web (repo_1) · main · git@example.com:team/web.git",
+          "2. api (repo_2) · develop · git@example.com:team/api.git"
+        ].join("\n")
+      }
+    ]);
   });
 
   it("replies with help text for unknown commands", async () => {

@@ -39,11 +39,11 @@ describe("parseFeishuCommand", () => {
   });
 
   it("recognizes registered slash commands without sending them to the agent", () => {
-    const parsed = parseFeishuCommand("/role list");
+    const parsed = parseFeishuCommand("/repo list");
 
     expect(parsed.type).toBe("slash_command");
     if (parsed.type === "slash_command") {
-      expect(parsed.definition.id).toBe("role_list");
+      expect(parsed.definition.id).toBe("repo_list");
     }
   });
 

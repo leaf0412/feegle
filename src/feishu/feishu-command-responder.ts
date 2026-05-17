@@ -1,5 +1,6 @@
 import { access } from "node:fs/promises";
 import type { AgentCli } from "../agent/agent-cli.js";
+import type { RepositoryRecord } from "../domain/models.js";
 import type { PlatformProgressEntry, PlatformProgressSnapshot } from "../platform/progress.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
@@ -12,7 +13,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   constructor(
     private readonly client: FeishuClientPort,
     private readonly agent?: AgentCli,
-    private readonly options: { agentDisplayName?: string; reactionEmoji?: string; doneEmoji?: string } = {}
+    private readonly options: {
+      agentDisplayName?: string;
+      reactionEmoji?: string;
+      doneEmoji?: string;
+      repositories?: { list(): RepositoryRecord[] };
+    } = {}
   ) {}
 
   async handleCommand(input: {
@@ -90,7 +96,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       return;
     }
 
-    await this.client.replyText(input.messageId, buildReplyText(input.command));
+    await this.client.replyText(input.messageId, buildReplyText(input.command, this.options.repositories));
   }
 
   private async handlePlatformAction(
@@ -177,7 +183,7 @@ function toProgressEntry(update: {
   return update;
 }
 
-function buildReplyText(command: FeishuCommand): string {
+function buildReplyText(command: FeishuCommand, repositories?: { list(): RepositoryRecord[] }): string {
   if (command.type === "repo_select") {
     return `已收到仓库选择：${command.repositoryIds.join("、")}。\n下一步我会基于这些仓库建议需求分支名称。`;
   }
@@ -195,10 +201,26 @@ function buildReplyText(command: FeishuCommand): string {
   }
 
   if (command.type === "slash_command") {
+    if (command.definition.id === "repo_list") {
+      return renderRepositoryList(repositories?.list() ?? []);
+    }
     return `已登记命令：${command.definition.command}\n${command.definition.description}\n当前入口已能识别该命令，具体执行器会在后续切片接入。`;
   }
 
   return `我收到了消息，但还不认识这个指令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
+}
+
+function renderRepositoryList(repositories: RepositoryRecord[]): string {
+  if (repositories.length === 0) {
+    return "暂无已注册仓库。";
+  }
+
+  return [
+    "已注册仓库：",
+    ...repositories.map((repository, index) =>
+      `${index + 1}. ${repository.name} (${repository.id}) · ${repository.defaultBaseBranch} · ${repository.remoteUrl}`
+    )
+  ].join("\n");
 }
 
 function errorMessage(error: unknown): string {
