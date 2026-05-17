@@ -14,6 +14,22 @@ export interface PlatformProgressEvent extends PlatformProgressInput {
   percent?: number;
 }
 
+export type PlatformProgressSnapshotState = "running" | "completed" | "failed";
+
+export interface PlatformProgressSnapshot {
+  title: string;
+  state: PlatformProgressSnapshotState;
+  truncated: boolean;
+  entries: PlatformProgressEntry[];
+}
+
+export type PlatformProgressEntry =
+  | { kind: "thinking"; text: string }
+  | { kind: "tool_use"; tool?: string; text: string }
+  | { kind: "tool_result"; tool?: string; text: string }
+  | { kind: "error"; text: string }
+  | { kind: "info"; text: string };
+
 export function createProgressEvent(input: PlatformProgressInput): PlatformProgressEvent {
   return {
     kind: "progress",

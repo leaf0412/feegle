@@ -102,6 +102,34 @@ describe("LarkFeishuClient", () => {
     ]);
   });
 
+  it("updates progress cards in place", async () => {
+    const calls: unknown[] = [];
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          message: {
+            create: async () => {
+              throw new Error("create should not be called");
+            },
+            patch: async (input: unknown) => {
+              calls.push(input);
+              return {};
+            }
+          }
+        }
+      }
+    });
+
+    await client.updateProgress("om_1", {
+      title: "Codex",
+      state: "completed",
+      truncated: false,
+      entries: [{ kind: "info", text: "完成" }]
+    });
+
+    expect(JSON.stringify(calls[0])).toContain("Codex · 已完成");
+  });
+
   it("uploads a local file and sends it to chat ids", async () => {
     const calls: unknown[] = [];
     const directory = await mkdtemp(join(tmpdir(), "feegle-feishu-file-"));

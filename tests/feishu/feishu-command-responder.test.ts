@@ -158,6 +158,23 @@ describe("FeishuCommandResponder", () => {
     expect(files).toEqual([{ chatId: "oc_1", filePath }]);
   });
 
+  it("reports missing files referenced by agent output", async () => {
+    const replies: Array<{ chatId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies),
+      fakeAgent([], "结果已生成。\nfeegle:file:/tmp/does-not-exist.zip")
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_7",
+      command: { type: "unknown", raw: "生成原型" }
+    });
+
+    expect(replies.at(-1)?.text).toBe("文件发送失败：/tmp/does-not-exist.zip 不存在或不可读取。");
+  });
+
   it("uses the configured agent display name in progress and failure replies", async () => {
     const replies: Array<{ chatId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(
@@ -202,7 +219,8 @@ function fakeClient(
       files.push({ chatId, filePath });
       return "om_file";
     },
-    async updateInteractiveCard() {}
+    async updateInteractiveCard() {},
+    async updateProgress() {}
   };
 }
 

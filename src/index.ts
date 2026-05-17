@@ -51,6 +51,7 @@ export {
   type WorkflowProgressStep
 } from "./feishu/feishu-card-builder.js";
 export { renderFeishuCard } from "./feishu/feishu-card-renderer.js";
+export { renderFeishuProgressCard } from "./feishu/feishu-progress-card.js";
 export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
 export {
   FeishuLongConnectionRuntime,
@@ -100,8 +101,11 @@ export type {
 export type { PlatformPort } from "./platform/platform-port.js";
 export {
   createProgressEvent,
+  type PlatformProgressEntry,
   type PlatformProgressEvent,
   type PlatformProgressInput,
+  type PlatformProgressSnapshot,
+  type PlatformProgressSnapshotState,
   type PlatformProgressStatus
 } from "./platform/progress.js";
 export {

@@ -1,6 +1,8 @@
 import { createReadStream } from "node:fs";
 import type { ReadStream } from "node:fs";
 import { basename } from "node:path";
+import type { PlatformProgressSnapshot } from "../platform/progress.js";
+import { renderFeishuProgressCard } from "./feishu-progress-card.js";
 
 export interface FeishuOpenApiClient {
   im: {
@@ -39,6 +41,7 @@ export interface FeishuClientPort {
   sendInteractiveCard(chatId: string, card: unknown): Promise<string | undefined>;
   sendFile(chatId: string, filePath: string): Promise<string | undefined>;
   updateInteractiveCard(messageId: string, card: unknown): Promise<void>;
+  updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void>;
 }
 
 export class LarkFeishuClient implements FeishuClientPort {
@@ -106,6 +109,10 @@ export class LarkFeishuClient implements FeishuClientPort {
         content: JSON.stringify(card)
       }
     });
+  }
+
+  async updateProgress(messageId: string, progress: PlatformProgressSnapshot): Promise<void> {
+    await this.updateInteractiveCard(messageId, renderFeishuProgressCard(progress));
   }
 }
 

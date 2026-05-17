@@ -33,6 +33,9 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         for (const filePath of reply.filePaths) {
           await this.client.sendFile(input.chatId, filePath);
         }
+        for (const filePath of reply.missingFilePaths) {
+          await this.client.sendText(input.chatId, `文件发送失败：${filePath} 不存在或不可读取。`);
+        }
       } catch (error) {
         await this.client.sendText(input.chatId, `${agentDisplayName} 分析失败：${errorMessage(error)}`);
       }
@@ -69,11 +72,13 @@ function errorMessage(error: unknown): string {
 interface AgentReply {
   text: string;
   filePaths: string[];
+  missingFilePaths: string[];
 }
 
 async function buildAgentReply(output: string): Promise<AgentReply> {
   const textLines: string[] = [];
   const filePaths: string[] = [];
+  const missingFilePaths: string[] = [];
 
   for (const line of output.split("\n")) {
     const filePath = parseFileMarker(line);
@@ -82,14 +87,27 @@ async function buildAgentReply(output: string): Promise<AgentReply> {
       continue;
     }
 
-    await access(filePath);
-    filePaths.push(filePath);
+    if (await isReadable(filePath)) {
+      filePaths.push(filePath);
+    } else {
+      missingFilePaths.push(filePath);
+    }
   }
 
   return {
     text: textLines.join("\n").trim(),
-    filePaths
+    filePaths,
+    missingFilePaths
   };
+}
+
+async function isReadable(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function parseFileMarker(line: string): string | null {
