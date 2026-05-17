@@ -84,7 +84,8 @@ Feishu routing options:
 
 - `FEISHU_ALLOW_FROM` and `FEISHU_ALLOW_CHAT` accept `*` or comma-separated open ids/chat ids.
 - `FEISHU_GROUP_ONLY=true` ignores p2p messages.
-- `FEISHU_GROUP_REPLY_ALL=true` lets the bot answer every group text message. When it is `false`, group messages are still forwarded to handlers for recording, but the bot only responds when the message mentions the bot open id configured by `FEISHU_BOT_OPEN_ID`.
+- Group messages are still forwarded to handlers for recording, but the bot only responds when the message mentions the bot open id configured by `FEISHU_BOT_OPEN_ID`.
+- `FEISHU_GROUP_REPLY_ALL` is kept for compatibility with older deployments, but group replies still require a bot mention.
 - `FEISHU_SHARE_SESSION_IN_CHANNEL=true` uses one shared session key per group chat.
 - `FEISHU_THREAD_ISOLATION=true` isolates sessions by root/thread message id.
 - `FEISHU_PROGRESS_STYLE` accepts `legacy`, `compact`, or `card`.

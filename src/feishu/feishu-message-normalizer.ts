@@ -71,7 +71,7 @@ export function canRespondToFeishuTextMessage(
   if (event.message?.chat_type !== "group") {
     return true;
   }
-  return options.groupReplyAll || isBotMentioned(event, options.botOpenId);
+  return isBotMentioned(event, options.botOpenId);
 }
 
 function getSenderId(event: FeishuMessageReceiveEvent): string {

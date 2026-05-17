@@ -137,6 +137,62 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(false);
   });
 
+  it("allows direct messages to respond without bot open id", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_p2p",
+          chat_id: "ou_1",
+          chat_type: "p2p",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" })
+        }
+      },
+      {
+        platform: "feishu",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("does not let groupReplyAll bypass the group mention requirement", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_group",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "hello" }),
+          mentions: []
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: true,
+        shareSessionInChannel: false,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.shouldRespond).toBe(false);
+  });
+
   it("normalizes mentioned group text into a platform message", () => {
     const parsed = extractTextMessageCommand(
       {
