@@ -26,7 +26,7 @@ export class GitService {
 
   async commit(localPath: string, files: string[], message: string): Promise<string> {
     await this.runner("git", ["-C", localPath, "add", "--", ...files]);
-    await this.runner("git", ["-C", localPath, "commit", "-m", message]);
+    await this.runner("git", ["-C", localPath, "commit", "-m", message, "--only", "--", ...files]);
     const result = await this.runner("git", ["-C", localPath, "rev-parse", "HEAD"]);
     return result.stdout.trim();
   }

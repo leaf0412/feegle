@@ -12,7 +12,7 @@ describe("PrototypeGenerator", () => {
 
     const input: WritePrototypeSourceInput = {
       outputDirectory: root,
-      title: "Retry <failed> task & confirm `${status}`",
+      title: "Retry <failed> task & confirm \\${alert(1)} `",
       requirementText: "Failed tasks need a retry confirmation flow.\n<img src=x onerror=alert(1)>"
     };
 
@@ -23,11 +23,16 @@ describe("PrototypeGenerator", () => {
     const app = await fs.readFile(path.join(root, "src", "main.ts"), "utf8");
 
     expect(viteConfig).toContain("base: './'");
-    expect(html).toContain("<title>Retry &lt;failed&gt; task &amp; confirm `${status}`</title>");
+    expect(html).toContain("<title>Retry &lt;failed&gt; task &amp; confirm \\${alert(1)} `</title>");
     expect(html).toContain('<script type="module" src="/src/main.ts"></script>');
     expect(app).toContain("Failed tasks need a retry confirmation flow.");
     expect(app).toContain("\\n<img src=x onerror=alert(1)>");
     expect(app).toContain("此页面仅用于需求确认，不代表最终 UI 设计");
+    expect(app).toContain('const prototypeTitle = "Retry <failed> task & confirm \\\\${alert(1)} `";');
+    expect(app).toContain('id="prototype-title"');
+    expect(app).toContain(
+      'document.querySelector<HTMLHeadingElement>("#prototype-title")!.textContent = prototypeTitle;'
+    );
     expect(app).toContain('id="requirement-text"');
     expect(app).toContain(
       'document.querySelector<HTMLPreElement>("#requirement-text")!.textContent = requirementText;'
@@ -40,7 +45,7 @@ describe("PrototypeGenerator", () => {
     expect(app).toContain('window.confirm("确认重新执行该任务？")');
     expect(app).toContain('document.querySelector<HTMLParagraphElement>("#status-text")!.textContent');
     expect(app).toContain("当前状态：重试中");
-    expect(app).toContain("Retry &lt;failed&gt; task &amp; confirm \\`\\${status}\\`");
+    expect(app).not.toContain("<h1>Retry");
     expect(app).not.toContain("fetch(");
     expect(app).not.toContain("XMLHttpRequest");
     expect(app).not.toMatch(/https?:\/\//);

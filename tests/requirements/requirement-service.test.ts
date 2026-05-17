@@ -114,4 +114,16 @@ describe("RequirementService", () => {
       "Repository selected more than once: repo_1"
     );
   });
+
+  it("rejects empty repository selections", () => {
+    const service = new RequirementService(
+      new InMemoryRepositoryRegistry(),
+      new WorkspaceManager("/tmp/feegle")
+    );
+    const requirement = service.startRequirement("chat-1", "Retry failed training task");
+
+    expect(() => service.selectRepositories(requirement.id, [])).toThrow(
+      "At least one repository must be selected"
+    );
+  });
 });

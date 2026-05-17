@@ -46,6 +46,7 @@ export class RequirementService {
   } {
     const context = this.getContext(requirementId);
     assertTransition(context.status, "repo_selected");
+    assertRepositoryIdsNotEmpty(repositoryIds);
     assertUniqueRepositoryIds(repositoryIds);
 
     const now = new Date();
@@ -87,6 +88,12 @@ export class RequirementService {
     }
 
     return context;
+  }
+}
+
+function assertRepositoryIdsNotEmpty(repositoryIds: string[]): void {
+  if (repositoryIds.length === 0) {
+    throw new Error("At least one repository must be selected");
   }
 }
 

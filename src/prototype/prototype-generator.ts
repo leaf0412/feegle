@@ -41,14 +41,15 @@ export default defineConfig({
   }
 
   private mainTs(input: WritePrototypeSourceInput): string {
-    return `const requirementText = ${JSON.stringify(input.requirementText)};
+    return `const prototypeTitle = ${JSON.stringify(input.title)};
+const requirementText = ${JSON.stringify(input.requirementText)};
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = \`
   <main style="font-family: system-ui, sans-serif; max-width: 960px; margin: 32px auto; line-height: 1.6;">
     <p style="padding: 8px 12px; background: #fff7ed; border: 1px solid #fed7aa;">
       此页面仅用于需求确认，不代表最终 UI 设计
     </p>
-    <h1>${this.escapeTemplate(input.title)}</h1>
+    <h1 id="prototype-title"></h1>
     <section>
       <h2>需求说明</h2>
       <pre id="requirement-text" style="white-space: pre-wrap;"></pre>
@@ -61,6 +62,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = \`
   </main>
 \`;
 
+document.querySelector<HTMLHeadingElement>("#prototype-title")!.textContent = prototypeTitle;
 document.querySelector<HTMLPreElement>("#requirement-text")!.textContent = requirementText;
 
 document.querySelector<HTMLButtonElement>("#retry-button")!.addEventListener("click", () => {
@@ -74,9 +76,5 @@ document.querySelector<HTMLButtonElement>("#retry-button")!.addEventListener("cl
 
   private escapeHtml(value: string): string {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  }
-
-  private escapeTemplate(value: string): string {
-    return this.escapeHtml(value).replaceAll("`", "\\`").replaceAll("${", "\\${");
   }
 }

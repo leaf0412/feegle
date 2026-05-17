@@ -49,7 +49,18 @@ describe("GitService", () => {
     expect(commitHash).toBe("abc123");
     expect(calls).toEqual([
       ["git", "-C", "/tmp/work/web", "add", "--", "src/index.ts", "tests/index.test.ts"],
-      ["git", "-C", "/tmp/work/web", "commit", "-m", "feat: implement index"],
+      [
+        "git",
+        "-C",
+        "/tmp/work/web",
+        "commit",
+        "-m",
+        "feat: implement index",
+        "--only",
+        "--",
+        "src/index.ts",
+        "tests/index.test.ts"
+      ],
       ["git", "-C", "/tmp/work/web", "rev-parse", "HEAD"]
     ]);
   });
@@ -66,6 +77,17 @@ describe("GitService", () => {
     await service.commit("/tmp/work/web", ["--all"], "feat: commit option-like file");
 
     expect(calls[0]).toEqual(["git", "-C", "/tmp/work/web", "add", "--", "--all"]);
+    expect(calls[1]).toEqual([
+      "git",
+      "-C",
+      "/tmp/work/web",
+      "commit",
+      "-m",
+      "feat: commit option-like file",
+      "--only",
+      "--",
+      "--all"
+    ]);
   });
 
   it("surfaces commit command failures and stops later git commands", async () => {
