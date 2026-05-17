@@ -6,15 +6,19 @@ describe("LarkFeishuClient", () => {
     const calls: unknown[] = [];
     const client: FeishuClientPort = new LarkFeishuClient({
       im: {
-        message: {
-          create: async (input: unknown) => {
-            calls.push(input);
+        v1: {
+          message: {
+            create: async (input: unknown) => {
+              calls.push(input);
+              return { data: { message_id: "om_1" } };
+            },
+            patch: async () => ({})
           }
         }
       }
     });
 
-    await client.sendText("oc_1", "hello");
+    await expect(client.sendText("oc_1", "hello")).resolves.toBe("om_1");
 
     expect(calls).toEqual([
       {
@@ -32,16 +36,20 @@ describe("LarkFeishuClient", () => {
     const calls: unknown[] = [];
     const client = new LarkFeishuClient({
       im: {
-        message: {
-          create: async (input: unknown) => {
-            calls.push(input);
+        v1: {
+          message: {
+            create: async (input: unknown) => {
+              calls.push(input);
+              return { data: { message_id: "om_card" } };
+            },
+            patch: async () => ({})
           }
         }
       }
     });
     const card = { elements: [], header: { title: { tag: "plain_text", content: "Push" } } };
 
-    await client.sendInteractiveCard("oc_1", card);
+    await expect(client.sendInteractiveCard("oc_1", card)).resolves.toBe("om_card");
 
     expect(calls).toEqual([
       {
@@ -49,6 +57,42 @@ describe("LarkFeishuClient", () => {
         data: {
           receive_id: "oc_1",
           msg_type: "interactive",
+          content: JSON.stringify(card)
+        }
+      }
+    ]);
+  });
+
+  it("updates interactive cards in place", async () => {
+    const calls: unknown[] = [];
+    const client = new LarkFeishuClient({
+      im: {
+        v1: {
+          message: {
+            create: async (input: unknown) => {
+              calls.push(input);
+              return { data: { message_id: "unused" } };
+            },
+            patch: async (input: unknown) => {
+              calls.push(input);
+              return {};
+            }
+          }
+        }
+      }
+    });
+    const card = {
+      config: { update_multi: true },
+      header: { title: { tag: "plain_text", content: "Running" } },
+      elements: []
+    };
+
+    await client.updateInteractiveCard("om_1", card);
+
+    expect(calls).toEqual([
+      {
+        path: { message_id: "om_1" },
+        data: {
           content: JSON.stringify(card)
         }
       }

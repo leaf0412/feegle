@@ -29,6 +29,15 @@ export {
   type FeishuOpenApiClient
 } from "./feishu/feishu-client.js";
 export {
+  buildRequirementStatusCard,
+  buildWorkflowProgressCard,
+  type FeishuInteractiveCard,
+  type RequirementStatusCardInput,
+  type RequirementStatusCardRepository,
+  type WorkflowProgressCardInput,
+  type WorkflowProgressStep
+} from "./feishu/feishu-card-builder.js";
+export {
   FeishuLongConnectionRuntime,
   type FeishuCommandHandler,
   type FeishuLongConnectionConfig,
