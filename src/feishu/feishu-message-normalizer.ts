@@ -33,10 +33,6 @@ export function normalizeFeishuTextMessage(
     return null;
   }
 
-  if (message.chat_type === "group" && !options.groupReplyAll && !isBotMentioned(event, options.botOpenId)) {
-    return null;
-  }
-
   if (isOldMessage(message.create_time)) {
     return null;
   }
@@ -66,6 +62,16 @@ export function normalizeFeishuTextMessage(
     sessionKey,
     raw: event
   };
+}
+
+export function canRespondToFeishuTextMessage(
+  event: FeishuMessageReceiveEvent,
+  options: FeishuMessageExtractOptions
+): boolean {
+  if (event.message?.chat_type !== "group") {
+    return true;
+  }
+  return options.groupReplyAll || isBotMentioned(event, options.botOpenId);
 }
 
 function getSenderId(event: FeishuMessageReceiveEvent): string {

@@ -80,13 +80,15 @@ describe("FeishuLongConnectionRuntime", () => {
         source: "message",
         chatId: "oc_1",
         messageId: "om_1",
-        command: { type: "repo_select", repositoryIds: ["repo_1"] }
+        command: { type: "repo_select", repositoryIds: ["repo_1"] },
+        shouldRespond: true
       },
       {
         source: "card",
         chatId: "oc_1",
         messageId: "om_2",
-        command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" }
+        command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" },
+        shouldRespond: true
       }
     ]);
   });
@@ -199,6 +201,64 @@ describe("FeishuLongConnectionRuntime", () => {
     });
 
     expect(handled).toEqual([]);
+  });
+
+  it("forwards unmentioned group messages for recording without allowing responses", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["im.message.receive_v1"]?.({
+      sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+      message: {
+        message_id: "om_record_only",
+        chat_id: "oc_1",
+        chat_type: "group",
+        message_type: "text",
+        content: JSON.stringify({ text: "只记录，不回复" }),
+        mentions: []
+      }
+    });
+
+    expect(handled).toEqual([
+      {
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_record_only",
+        command: { type: "unknown", raw: "只记录，不回复" },
+        shouldRespond: false
+      }
+    ]);
   });
 
   it("catches handler failures without rejecting SDK callbacks", async () => {

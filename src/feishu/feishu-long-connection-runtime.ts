@@ -16,6 +16,7 @@ export interface FeishuCommandHandler {
     chatId: string;
     messageId: string;
     command: FeishuCommand;
+    shouldRespond?: boolean;
   }): Promise<void>;
 }
 
@@ -75,7 +76,8 @@ export class FeishuLongConnectionRuntime {
               source: "message",
               chatId: envelope.chatId,
               messageId: envelope.messageId,
-              command: envelope.command
+              command: envelope.command,
+              shouldRespond: envelope.shouldRespond
             })
             .catch((error) => console.error("Feishu message handler failed", error));
         }

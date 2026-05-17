@@ -20,7 +20,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     chatId: string;
     messageId: string;
     command: FeishuCommand;
+    shouldRespond?: boolean;
   }): Promise<void> {
+    if (input.shouldRespond === false) {
+      return;
+    }
+
     if (input.command.type === "help") {
       await this.client.replyInteractiveCard(input.messageId, renderFeishuCard(buildSlashCommandHelpCard(input.command.groupKey)));
       return;

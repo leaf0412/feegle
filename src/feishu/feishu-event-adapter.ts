@@ -1,6 +1,7 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
 import { parseFeishuCardActionValue, parseFeishuCommand } from "./feishu-gateway.js";
 import {
+  canRespondToFeishuTextMessage,
   normalizeFeishuTextMessage,
   type FeishuMessageExtractOptions
 } from "./feishu-message-normalizer.js";
@@ -12,11 +13,13 @@ export interface FeishuCommandEnvelope {
   chatId: string;
   messageId: string;
   command: FeishuCommand;
+  shouldRespond?: boolean;
   message?: PlatformIncomingMessage;
 }
 
 export interface FeishuPlatformMessageEnvelope extends FeishuCommandEnvelope {
   message: PlatformIncomingMessage;
+  shouldRespond: boolean;
 }
 
 export interface FeishuMessageReceiveEvent {
@@ -97,7 +100,8 @@ export function extractTextMessageCommand(
     chatId: message.chat_id,
     messageId: message.message_id,
     command: parseFeishuCommand(commandText),
-    message: platformMessage ?? undefined
+    shouldRespond: options ? canRespondToFeishuTextMessage(event, options) : true,
+    ...(platformMessage ? { message: platformMessage } : {})
   };
 }
 
@@ -111,6 +115,7 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
   return {
     chatId,
     messageId,
+    shouldRespond: true,
     command: parseFeishuCardActionValue(event.action?.value)
   };
 }

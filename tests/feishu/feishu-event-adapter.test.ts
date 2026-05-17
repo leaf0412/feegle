@@ -19,6 +19,7 @@ describe("feishu event adapter", () => {
     expect(parsed).toEqual({
       chatId: "oc_1",
       messageId: "om_1",
+      shouldRespond: true,
       command: { type: "repo_select", repositoryIds: ["repo_1", "repo_2"] }
     });
   });
@@ -72,11 +73,12 @@ describe("feishu event adapter", () => {
     expect(parsed).toEqual({
       chatId: "oc_1",
       messageId: "om_1",
+      shouldRespond: true,
       command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" }
     });
   });
 
-  it("drops group messages without bot mention when groupReplyAll is false", () => {
+  it("keeps unmentioned group messages for recording while marking them as non-responsive", () => {
     const parsed = extractTextMessageCommand(
       {
         sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -101,10 +103,12 @@ describe("feishu event adapter", () => {
       }
     );
 
-    expect(parsed).toBeNull();
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.shouldRespond).toBe(false);
   });
 
-  it("drops group messages when bot open id is missing because the bot mention cannot be verified", () => {
+  it("keeps group messages without bot open id for recording but does not allow responses", () => {
     const parsed = extractTextMessageCommand(
       {
         sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -128,7 +132,9 @@ describe("feishu event adapter", () => {
       }
     );
 
-    expect(parsed).toBeNull();
+    expect(parsed?.message.text).toBe("hello");
+    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.shouldRespond).toBe(false);
   });
 
   it("normalizes mentioned group text into a platform message", () => {
@@ -159,6 +165,7 @@ describe("feishu event adapter", () => {
     expect(parsed?.message.text).toBe("做一个需求");
     expect(parsed?.message.sessionKey).toBe("feishu:oc_1:channel");
     expect(parsed?.command).toEqual({ type: "unknown", raw: "做一个需求" });
+    expect(parsed?.shouldRespond).toBe(true);
   });
 
   it("drops messages blocked by allow lists", () => {

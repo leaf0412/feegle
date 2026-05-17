@@ -26,6 +26,28 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
+  it("does not reply or invoke the agent when a message is record-only", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const agentCalls: unknown[] = [];
+    const responder = new FeishuCommandResponder(
+      fakeClient(replies, [], progress),
+      fakeAgent(agentCalls, "should not be called")
+    );
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_record_only",
+      command: { type: "unknown", raw: "群里普通聊天" },
+      shouldRespond: false
+    });
+
+    expect(replies).toEqual([]);
+    expect(progress).toEqual([]);
+    expect(agentCalls).toEqual([]);
+  });
+
   it("replies to push card actions", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies));
