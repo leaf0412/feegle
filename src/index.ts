@@ -9,3 +9,5 @@ export type {
 } from "./domain/models.js";
 
 export type { RequirementStatus } from "./domain/status.js";
+export { PrototypeGenerator } from "./prototype/prototype-generator.js";
+export type { WritePrototypeSourceInput } from "./prototype/prototype-generator.js";
