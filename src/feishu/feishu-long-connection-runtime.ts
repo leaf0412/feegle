@@ -45,6 +45,8 @@ export interface FeishuWsClient {
 }
 
 export class FeishuLongConnectionRuntime {
+  private readonly handledEventIds = new Set<string>();
+
   constructor(
     private readonly config: FeishuLongConnectionConfig,
     private readonly sdk: FeishuLongConnectionSdk,
@@ -58,14 +60,18 @@ export class FeishuLongConnectionRuntime {
     }).register({
       "im.message.receive_v1": async (event) => {
         const envelope = extractTextMessageCommand(event);
-        if (envelope) {
-          await this.handler.handleCommand({ source: "message", ...envelope });
+        if (envelope && this.markUnhandled("message", envelope.messageId)) {
+          void this.handler
+            .handleCommand({ source: "message", ...envelope })
+            .catch((error) => console.error("Feishu message handler failed", error));
         }
       },
       "card.action.trigger": async (event) => {
         const envelope = extractCardActionCommand(event);
-        if (envelope) {
-          await this.handler.handleCommand({ source: "card", ...envelope });
+        if (envelope && this.markUnhandled("card", envelope.messageId)) {
+          void this.handler
+            .handleCommand({ source: "card", ...envelope })
+            .catch((error) => console.error("Feishu card handler failed", error));
         }
       }
     });
@@ -76,5 +82,14 @@ export class FeishuLongConnectionRuntime {
     });
 
     await wsClient.start({ eventDispatcher });
+  }
+
+  private markUnhandled(source: "message" | "card", messageId: string): boolean {
+    const key = `${source}:${messageId}`;
+    if (this.handledEventIds.has(key)) {
+      return false;
+    }
+    this.handledEventIds.add(key);
+    return true;
   }
 }

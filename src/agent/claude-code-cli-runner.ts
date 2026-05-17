@@ -32,12 +32,20 @@ export function createClaudeCodeCliPromptRunner(
   runner: ClaudeCodeCliCommandRunner = defaultRunner
 ): PromptRunner {
   return async (prompt) => {
-    const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(), {
-      cwd: options.cwd,
-      input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
-      timeout: options.timeoutMs ?? 300_000
-    });
-    return parseFinalResult(result.stdout);
+    try {
+      const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(), {
+        cwd: options.cwd,
+        input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
+        timeout: options.timeoutMs ?? 300_000
+      });
+      return parseSuccessfulResult(result.stdout);
+    } catch (error) {
+      const stdout = readErrorStdout(error);
+      if (stdout) {
+        throw new Error(parseFinalResult(stdout).text);
+      }
+      throw error;
+    }
   };
 }
 
@@ -62,17 +70,35 @@ function buildUserMessage(prompt: string): unknown {
   };
 }
 
-function parseFinalResult(stdout: string): string {
+function parseSuccessfulResult(stdout: string): string {
+  const result = parseFinalResult(stdout);
+  if (result.isError) {
+    throw new Error(result.text);
+  }
+  return result.text;
+}
+
+function parseFinalResult(stdout: string): { text: string; isError: boolean } {
   for (const line of stdout.trim().split("\n").reverse()) {
     if (!line.trim()) {
       continue;
     }
     const event = JSON.parse(line) as unknown;
     if (isRecord(event) && event.type === "result" && typeof event.result === "string") {
-      return event.result.trim();
+      return {
+        text: event.result.trim(),
+        isError: event.is_error === true
+      };
     }
   }
   throw new Error("Claude Code did not emit a result event");
+}
+
+function readErrorStdout(error: unknown): string {
+  if (isRecord(error) && typeof error.stdout === "string") {
+    return error.stdout;
+  }
+  return "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

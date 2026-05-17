@@ -54,4 +54,24 @@ describe("createClaudeCodeCliPromptRunner", () => {
       }
     ]);
   });
+
+  it("reports Claude Code error results emitted before a non-zero exit", async () => {
+    const runner = createClaudeCodeCliPromptRunner(
+      {
+        command: "claude",
+        cwd: "/tmp/workspace"
+      },
+      async () => {
+        const error = new Error("Command failed with exit code 1") as Error & { stdout: string };
+        error.stdout = JSON.stringify({
+          type: "result",
+          is_error: true,
+          result: "Not logged in · Please run /login"
+        });
+        throw error;
+      }
+    );
+
+    await expect(runner("hello claude")).rejects.toThrow("Not logged in · Please run /login");
+  });
 });

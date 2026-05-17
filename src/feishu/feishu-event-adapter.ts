@@ -8,6 +8,9 @@ export interface FeishuCommandEnvelope {
 }
 
 export interface FeishuMessageReceiveEvent {
+  sender?: {
+    sender_type?: string;
+  };
   message?: {
     message_id?: string;
     chat_id?: string;
@@ -32,6 +35,7 @@ export interface FeishuCardActionTriggerEvent {
 export function extractTextMessageCommand(event: FeishuMessageReceiveEvent): FeishuCommandEnvelope | null {
   const message = event.message;
   if (
+    event.sender?.sender_type === "app" ||
     !message?.chat_id ||
     !message.message_id ||
     message.message_type !== "text" ||

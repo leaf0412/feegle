@@ -37,6 +37,23 @@ describe("feishu event adapter", () => {
     ).toBeNull();
   });
 
+  it("returns null for messages sent by the app itself", () => {
+    expect(
+      extractTextMessageCommand({
+        sender: {
+          sender_type: "app"
+        },
+        message: {
+          message_id: "om_1",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "收到需求，正在交给 Claude Code 分析..." })
+        }
+      })
+    ).toBeNull();
+  });
+
   it("extracts push card action commands from card.action.trigger events", () => {
     const parsed = extractCardActionCommand({
       action: {
@@ -59,4 +76,3 @@ describe("feishu event adapter", () => {
     });
   });
 });
-

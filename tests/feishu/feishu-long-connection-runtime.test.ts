@@ -88,4 +88,54 @@ describe("FeishuLongConnectionRuntime", () => {
       }
     ]);
   });
+
+  it("does not handle the same message id twice", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      }
+    );
+
+    await runtime.start();
+    const event: FeishuMessageReceiveEvent = {
+      message: {
+        message_id: "om_1",
+        chat_id: "oc_1",
+        chat_type: "group",
+        message_type: "text",
+        content: JSON.stringify({ text: "hello" })
+      }
+    };
+    await registered["im.message.receive_v1"]?.(event);
+    await registered["im.message.receive_v1"]?.(event);
+
+    expect(handled).toHaveLength(1);
+  });
 });
