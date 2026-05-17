@@ -1,7 +1,4 @@
 import { execa } from "execa";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { PromptRunner } from "./codex-agent-adapter.js";
 
 export interface CodexCliRunnerOptions {
@@ -20,11 +17,12 @@ export interface CodexCliCommandResult {
 export type CodexCliCommandRunner = (
   command: string,
   args: string[],
-  options: { input: string; timeout: number }
+  options: { cwd: string; input: string; timeout: number }
 ) => Promise<CodexCliCommandResult>;
 
 const defaultRunner: CodexCliCommandRunner = async (command, args, options) => {
   const result = await execa(command, args, {
+    cwd: options.cwd,
     input: options.input,
     timeout: options.timeout
   });
@@ -36,32 +34,111 @@ export function createCodexCliPromptRunner(
   runner: CodexCliCommandRunner = defaultRunner
 ): PromptRunner {
   return async (prompt) => {
-    const outputDirectory = await mkdtemp(join(tmpdir(), "feegle-codex-"));
-    const outputPath = join(outputDirectory, "last-message.txt");
-    try {
-      await runner(options.command ?? "codex", buildCodexArgs(options, outputPath), {
-        input: prompt,
-        timeout: options.timeoutMs ?? 300_000
-      });
+    const result = await runner(options.command ?? "codex", buildCodexArgs(options), {
+      cwd: options.cwd,
+      input: prompt,
+      timeout: options.timeoutMs ?? 300_000
+    });
 
-      return (await readFile(outputPath, "utf8")).trim();
-    } finally {
-      await rm(outputDirectory, { force: true, recursive: true });
-    }
+    return parseCodexJsonOutput(result.stdout);
   };
 }
 
-function buildCodexArgs(options: CodexCliRunnerOptions, outputPath: string): string[] {
+function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
   return [
     "--ask-for-approval",
     options.approvalPolicy ?? "never",
     "exec",
+    "--skip-git-repo-check",
     "--cd",
     options.cwd,
     "--sandbox",
     options.sandbox ?? "workspace-write",
-    "--output-last-message",
-    outputPath,
+    "--json",
     "-"
   ];
+}
+
+function parseCodexJsonOutput(stdout: string): string {
+  const messages: string[] = [];
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const event = parseCodexEvent(trimmed);
+    if (event.type === "turn.failed") {
+      throw new Error(readTurnFailureMessage(event));
+    }
+    if (event.type !== "item.completed") {
+      continue;
+    }
+    const item = readRecord(event.item);
+    const itemType = readString(item.type);
+    if (itemType !== "agent_message" && itemType !== "message") {
+      continue;
+    }
+    const text = extractItemText(item);
+    if (text) {
+      messages.push(text);
+    }
+  }
+
+  const response = messages.join("\n\n").trim();
+  if (!response) {
+    throw new Error("Codex completed without an agent message");
+  }
+  return response;
+}
+
+function parseCodexEvent(line: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(line);
+    return readRecord(parsed);
+  } catch (error) {
+    throw new Error(`Invalid Codex JSON event: ${errorMessage(error)}`);
+  }
+}
+
+function extractItemText(item: Record<string, unknown>): string {
+  const directText = readString(item.text);
+  if (directText) {
+    return directText.trim();
+  }
+
+  const content = item.content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((part) => {
+      const record = readRecord(part);
+      return readString(record.text);
+    })
+    .filter((text) => text.length > 0)
+    .join("\n")
+    .trim();
+}
+
+function readTurnFailureMessage(event: Record<string, unknown>): string {
+  const error = readRecord(event.error);
+  const message = readString(error.message).trim();
+  return message || "Codex turn failed";
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

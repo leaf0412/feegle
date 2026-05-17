@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createCodexCliPromptRunner } from "../../src/agent/codex-cli-runner.js";
 
 describe("createCodexCliPromptRunner", () => {
-  it("runs codex exec with the prompt on stdin", async () => {
+  it("runs codex exec json mode with the prompt on stdin", async () => {
     const calls: unknown[] = [];
     const runner = createCodexCliPromptRunner(
       {
@@ -14,13 +14,17 @@ describe("createCodexCliPromptRunner", () => {
       },
       async (command, args, options) => {
         calls.push({ command, args, options });
-        const outputFlagIndex = args.indexOf("--output-last-message");
-        const outputPath = args[outputFlagIndex + 1];
-        if (!outputPath) {
-          throw new Error("missing output path");
-        }
-        await import("node:fs/promises").then((fs) => fs.writeFile(outputPath, "agent result\n"));
-        return { stdout: " agent result \n", stderr: "" };
+        return {
+          stdout: [
+            JSON.stringify({ type: "thread.started", thread_id: "thread-1" }),
+            JSON.stringify({
+              type: "item.completed",
+              item: { type: "agent_message", content: [{ type: "output_text", text: "agent result" }] }
+            }),
+            JSON.stringify({ type: "turn.completed" })
+          ].join("\n"),
+          stderr: ""
+        };
       }
     );
 
@@ -32,19 +36,44 @@ describe("createCodexCliPromptRunner", () => {
           "--ask-for-approval",
           "never",
           "exec",
+          "--skip-git-repo-check",
           "--cd",
           "/tmp/workspace",
           "--sandbox",
           "workspace-write",
-          "--output-last-message",
-          expect.any(String),
+          "--json",
           "-"
         ],
         options: {
+          cwd: "/tmp/workspace",
           input: "hello agent",
           timeout: 1234
         }
       }
     ]);
+  });
+
+  it("joins multiple completed message text parts with newlines", async () => {
+    const runner = createCodexCliPromptRunner(
+      { command: "codex", cwd: "/tmp/workspace" },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "item.completed",
+            item: {
+              type: "message",
+              content: [
+                { type: "output_text", text: "line one" },
+                { type: "output_text", text: "line two" }
+              ]
+            }
+          }),
+          JSON.stringify({ type: "turn.completed" })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+
+    await expect(runner("hello agent")).resolves.toBe("line one\nline two");
   });
 });
