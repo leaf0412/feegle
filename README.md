@@ -68,14 +68,6 @@ export FEISHU_SHARE_SESSION_IN_CHANNEL="false"
 export FEISHU_THREAD_ISOLATION="false"
 export FEISHU_REPLY_TO_TRIGGER="true"
 export FEISHU_PROGRESS_STYLE="legacy"
-export FEISHU_REACTION_EMOJI="OnIt"
-export FEISHU_DONE_EMOJI="none"
-export FEEGLE_AGENT_KIND="codex"
-export FEEGLE_AGENT_COMMAND="codex"
-export FEEGLE_AGENT_CWD="/path/to/workspace"
-export FEEGLE_AGENT_SANDBOX="workspace-write"
-export FEEGLE_AGENT_APPROVAL_POLICY="never"
-export FEEGLE_AGENT_TIMEOUT_MS="300000"
 ```
 
 Do not commit real secrets. Keep them in your shell, local process manager, or a local `.env` file that is not committed.
@@ -89,7 +81,6 @@ Feishu routing options:
 - `FEISHU_SHARE_SESSION_IN_CHANNEL=true` uses one shared session key per group chat.
 - `FEISHU_THREAD_ISOLATION=true` isolates sessions by root/thread message id.
 - `FEISHU_PROGRESS_STYLE` accepts `legacy`, `compact`, or `card`.
-- Set `FEISHU_REACTION_EMOJI=none` or `FEISHU_DONE_EMOJI=none` to disable those emoji hooks when a caller wires them in.
 
 ## Run The Feishu Adapter
 
@@ -105,34 +96,7 @@ Start the long-connection process:
 npm run start:feishu
 ```
 
-When the connection is active, send a message in the Feishu group. Deterministic commands are handled by code. Natural-language requirement messages are sent to the configured Agent CLI, and the agent result is sent back to the same Feishu chat.
-
-By default, `FEEGLE_AGENT_KIND` is `codex`, and the agent command is:
-
-```bash
-codex exec --cd "$FEEGLE_AGENT_CWD" --sandbox workspace-write --output-last-message /tmp/feegle-last-message.txt -
-```
-
-To send natural-language messages to Claude Code instead:
-
-```bash
-export FEEGLE_AGENT_KIND="claude_code"
-export FEEGLE_AGENT_COMMAND="claude"
-```
-
-The Claude Code runner uses headless stream JSON mode:
-
-```bash
-claude -p --output-format stream-json --input-format stream-json --verbose
-```
-
-If an agent creates a local file that should be sent back to Feishu, it should include one marker line per file in its final response:
-
-```text
-feegle:file:/absolute/path/to/file.zip
-```
-
-Feegle removes those marker lines from the text reply, uploads each existing local file to Feishu, and sends it to the same chat as a file message.
+When the connection is active, send a message in the Feishu group. Deterministic slash commands are handled by code. Unrecognized text is acknowledged with an unknown-command reply; it is not sent to an Agent CLI.
 
 Example command:
 
@@ -208,7 +172,7 @@ The runnable Feishu entrypoint does not yet execute the full product workflow. I
 - Push Git branches when the Feishu card button is clicked
 - Report CI/browser verification back into Feishu
 
-Those pieces exist as separate domain/service boundaries or planned workflow steps. The Feishu entrypoint currently sends natural-language requirements to the Agent CLI for planning, but it does not yet persist and advance the full multi-step workflow.
+Those pieces exist as separate domain/service boundaries or planned workflow steps. The Feishu entrypoint does not send natural-language text to the Agent CLI; workflow actions need explicit slash commands before they are wired into the runtime.
 
 ## Useful Commands
 
