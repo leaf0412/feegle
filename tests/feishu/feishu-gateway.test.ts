@@ -47,7 +47,14 @@ describe("parseFeishuCommand", () => {
     }
   });
 
-  it("returns unknown for malformed commands while preserving raw text", () => {
+  it("returns chat for non-slash text while preserving raw text", () => {
+    expect(parseFeishuCommand("hello")).toEqual({
+      type: "chat",
+      raw: "hello"
+    });
+  });
+
+  it("returns unknown for malformed slash commands while preserving raw text", () => {
     const raw = "  /repo select  ";
 
     expect(parseFeishuCommand(raw)).toEqual({

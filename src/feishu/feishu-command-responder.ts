@@ -174,6 +174,10 @@ function buildReplyText(command: FeishuCommand, repositories?: { list(): Reposit
     return "正在打开命令面板。";
   }
 
+  if (command.type === "chat") {
+    return "我在，继续说。";
+  }
+
   if (command.type === "slash_command") {
     if (command.definition.id === "repo_list") {
       return renderRepositoryList(repositories?.list() ?? []);
@@ -181,7 +185,7 @@ function buildReplyText(command: FeishuCommand, repositories?: { list(): Reposit
     return `已登记命令：${command.definition.command}\n${command.definition.description}\n当前入口已能识别该命令，具体执行器会在后续切片接入。`;
   }
 
-  return `我收到了消息，但还不认识这个指令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
+  return `未知命令：${command.raw}\n当前支持：/repo select <仓库ID1> <仓库ID2>`;
 }
 
 function renderRepositoryList(repositories: RepositoryRecord[]): string {

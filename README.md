@@ -96,7 +96,7 @@ Start the long-connection process:
 npm run start:feishu
 ```
 
-When the connection is active, send a message in the Feishu group. Deterministic slash commands are handled by code. Unrecognized text is acknowledged with an unknown-command reply; it is not sent to an Agent CLI.
+When the connection is active, send a message in the Feishu group. Deterministic slash commands are handled by code. Non-slash text is treated as ordinary chat; it is not sent to a workflow Agent CLI. Unknown slash commands are acknowledged with an unknown-command reply.
 
 Example command:
 

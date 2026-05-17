@@ -4,6 +4,7 @@ import { findSlashCommandByInput, type SlashCommandDefinition } from "../platfor
 export type FeishuCommand =
   | { type: "help"; groupKey?: string }
   | { type: "slash_command"; definition: SlashCommandDefinition; raw: string }
+  | { type: "chat"; raw: string }
   | { type: "repo_select"; repositoryIds: string[] }
   | { type: "push_repository"; requirementId: string; repositoryId: string }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
@@ -26,17 +27,21 @@ export function parseFeishuCommand(raw: string): FeishuCommand {
     if (definition) {
       return { type: "slash_command", definition, raw };
     }
+    return { type: "unknown", raw };
   }
 
   const cardParts = trimmed.split(":");
-  if (cardParts[0] === "card" && cardParts[1] === "push" && cardParts.length === 4) {
-    const [, , requirementId, repositoryId] = cardParts;
-    if (requirementId && repositoryId) {
-      return { type: "push_repository", requirementId, repositoryId };
+  if (cardParts[0] === "card") {
+    if (cardParts[1] === "push" && cardParts.length === 4) {
+      const [, , requirementId, repositoryId] = cardParts;
+      if (requirementId && repositoryId) {
+        return { type: "push_repository", requirementId, repositoryId };
+      }
     }
+    return { type: "unknown", raw };
   }
 
-  return { type: "unknown", raw };
+  return { type: "chat", raw };
 }
 
 function stripLeadingMentions(raw: string): string {

@@ -279,7 +279,7 @@ describe("FeishuLongConnectionRuntime", () => {
         source: "message",
         chatId: "oc_1",
         messageId: "om_record_only",
-        command: { type: "unknown", raw: "只记录，不回复" },
+        command: { type: "chat", raw: "只记录，不回复" },
         shouldRespond: false
       }
     ]);

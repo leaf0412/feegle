@@ -31,7 +31,7 @@ describe("FeishuCommandResponder", () => {
       source: "message",
       chatId: "oc_1",
       messageId: "om_record_only",
-      command: { type: "unknown", raw: "群里普通聊天" },
+      command: { type: "chat", raw: "群里普通聊天" },
       shouldRespond: false
     });
 
@@ -207,7 +207,7 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("replies with help text for unknown commands without invoking the agent", async () => {
+  it("replies conversationally for chat text without invoking orchestration", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];
     const responder = new FeishuCommandResponder(fakeClient(replies, [], progress));
@@ -216,19 +216,19 @@ describe("FeishuCommandResponder", () => {
       source: "message",
       chatId: "oc_1",
       messageId: "om_3",
-      command: { type: "unknown", raw: "hello" }
+      command: { type: "chat", raw: "hello" }
     });
 
     expect(replies).toEqual([
       {
         messageId: "om_3",
-        text: "我收到了消息，但还不认识这个指令：hello\n当前支持：/repo select <仓库ID1> <仓库ID2>"
+        text: "我在，继续说。"
       }
     ]);
     expect(progress).toEqual([]);
   });
 
-  it("does not enter agent failure handling for unknown text", async () => {
+  it("replies with help text for unknown slash commands", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];
     const responder = new FeishuCommandResponder(fakeClient(replies, [], progress));
@@ -238,20 +238,20 @@ describe("FeishuCommandResponder", () => {
         source: "message",
         chatId: "oc_1",
         messageId: "om_4",
-        command: { type: "unknown", raw: "hello" }
+        command: { type: "unknown", raw: "/repo missing" }
       })
     ).resolves.toBeUndefined();
 
     expect(replies).toEqual([
       {
         messageId: "om_4",
-        text: "我收到了消息，但还不认识这个指令：hello\n当前支持：/repo select <仓库ID1> <仓库ID2>"
+        text: "未知命令：/repo missing\n当前支持：/repo select <仓库ID1> <仓库ID2>"
       }
     ]);
     expect(progress).toEqual([]);
   });
 
-  it("emits trace stages around unknown command replies without agent execution", async () => {
+  it("emits trace stages around chat replies without orchestration", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const stages: string[] = [];
     const responder = new FeishuCommandResponder(
@@ -265,7 +265,7 @@ describe("FeishuCommandResponder", () => {
       source: "message",
       chatId: "oc_1",
       messageId: "om_trace",
-      command: { type: "unknown", raw: "hello" }
+      command: { type: "chat", raw: "hello" }
     });
 
     expect(stages).toEqual([
@@ -293,13 +293,13 @@ describe("FeishuCommandResponder", () => {
         source: "message",
         chatId: "oc_1",
         messageId: "om_trace_throws",
-        command: { type: "unknown", raw: "hello" }
+        command: { type: "chat", raw: "hello" }
       });
 
       expect(replies).toEqual([
         {
           messageId: "om_trace_throws",
-          text: "我收到了消息，但还不认识这个指令：hello\n当前支持：/repo select <仓库ID1> <仓库ID2>"
+          text: "我在，继续说。"
         }
       ]);
       expect(consoleWarn).toHaveBeenCalledWith("Feishu command trace hook failed", "trace sink failed");

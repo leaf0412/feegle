@@ -120,7 +120,7 @@ describe("feishu event adapter", () => {
     );
 
     expect(parsed?.message.text).toBe("hello");
-    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.command).toEqual({ type: "chat", raw: "hello" });
     expect(parsed?.shouldRespond).toBe(false);
   });
 
@@ -149,7 +149,7 @@ describe("feishu event adapter", () => {
     );
 
     expect(parsed?.message.text).toBe("hello");
-    expect(parsed?.command).toEqual({ type: "unknown", raw: "hello" });
+    expect(parsed?.command).toEqual({ type: "chat", raw: "hello" });
     expect(parsed?.shouldRespond).toBe(false);
   });
 
@@ -236,7 +236,7 @@ describe("feishu event adapter", () => {
 
     expect(parsed?.message.text).toBe("做一个需求");
     expect(parsed?.message.sessionKey).toBe("feishu:oc_1:channel");
-    expect(parsed?.command).toEqual({ type: "unknown", raw: "做一个需求" });
+    expect(parsed?.command).toEqual({ type: "chat", raw: "做一个需求" });
     expect(parsed?.shouldRespond).toBe(true);
   });
 
@@ -355,7 +355,7 @@ describe("feishu event adapter", () => {
     );
 
     expect(parsed?.message.text).toBe("test");
-    expect(parsed?.command).toEqual({ type: "unknown", raw: "test" });
+    expect(parsed?.command).toEqual({ type: "chat", raw: "test" });
     expect(parsed?.shouldRespond).toBe(true);
   });
 
