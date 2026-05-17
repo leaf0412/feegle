@@ -6,3 +6,7 @@ export interface PlatformPort {
   sendCard(context: PlatformReplyContext, card: PlatformCard): Promise<PlatformSendResult>;
   updateCard(messageId: string, card: PlatformCard): Promise<PlatformSendResult>;
 }
+
+export interface PlatformMessageHandler {
+  handleMessage(message: import("./platform-message.js").PlatformIncomingMessage): Promise<void>;
+}

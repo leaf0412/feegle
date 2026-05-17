@@ -8,6 +8,7 @@ describe("parseFeishuPlatformConfig", () => {
       appSecret: "secret",
       verificationToken: undefined,
       encryptKey: undefined,
+      botOpenId: undefined,
       enableInteractiveCards: true,
       allowFrom: "*",
       allowChat: "*",

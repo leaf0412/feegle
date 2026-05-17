@@ -5,6 +5,7 @@ export interface FeishuPlatformConfig {
   appSecret: string;
   verificationToken?: string;
   encryptKey?: string;
+  botOpenId?: string;
   enableInteractiveCards: boolean;
   allowFrom: string;
   allowChat: string;
@@ -23,6 +24,7 @@ export interface FeishuPlatformConfigInput {
   appSecret: string;
   verificationToken?: string;
   encryptKey?: string;
+  botOpenId?: string;
   enableInteractiveCards?: boolean;
   allowFrom?: string;
   allowChat?: string;
@@ -42,6 +44,7 @@ export function parseFeishuPlatformConfig(input: FeishuPlatformConfigInput): Fei
     appSecret: input.appSecret,
     verificationToken: input.verificationToken,
     encryptKey: input.encryptKey,
+    botOpenId: input.botOpenId,
     enableInteractiveCards: input.enableInteractiveCards ?? true,
     allowFrom: input.allowFrom ?? "*",
     allowChat: input.allowChat ?? "*",

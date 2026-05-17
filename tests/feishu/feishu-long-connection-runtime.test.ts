@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent
@@ -147,5 +147,109 @@ describe("FeishuLongConnectionRuntime", () => {
     });
 
     expect(handled).toHaveLength(2);
+  });
+
+  it("uses platform allow-list config before invoking handlers", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx", allowFrom: "ou_allowed" },
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["im.message.receive_v1"]?.({
+      sender: { sender_type: "user", sender_id: { open_id: "ou_blocked" } },
+      message: {
+        message_id: "om_1",
+        chat_id: "oc_1",
+        chat_type: "group",
+        message_type: "text",
+        content: JSON.stringify({ text: "/repo select web" })
+      }
+    });
+
+    expect(handled).toEqual([]);
+  });
+
+  it("catches handler failures without rejecting SDK callbacks", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async () => {
+          throw new Error("handler failed");
+        }
+      }
+    );
+
+    try {
+      await runtime.start();
+      await expect(
+        registered["im.message.receive_v1"]?.({
+          message: {
+            message_id: "om_1",
+            chat_id: "oc_1",
+            chat_type: "group",
+            message_type: "text",
+            content: JSON.stringify({ text: "/repo select web" })
+          }
+        })
+      ).resolves.toBeUndefined();
+      await Promise.resolve();
+
+      expect(consoleError).toHaveBeenCalledWith("Feishu message handler failed", expect.any(Error));
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

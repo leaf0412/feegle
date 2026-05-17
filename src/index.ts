@@ -99,6 +99,8 @@ export type {
   PlatformSendResult
 } from "./platform/platform-message.js";
 export type { PlatformPort } from "./platform/platform-port.js";
+export type { PlatformMessageHandler } from "./platform/platform-port.js";
+export { createPlatformCommandHandler } from "./platform/platform-command-handler.js";
 export {
   createProgressEvent,
   type PlatformProgressEntry,
