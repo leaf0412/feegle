@@ -269,6 +269,66 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(true);
   });
 
+  it("treats a single leading mention as bot-directed when configured bot id differs from Feishu payload", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_single_leading_mention",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_1 /help" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("/help");
+    expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
+  it("responds to mentioned slash commands when Feishu content has already removed the mention token", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_mentioned_help",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "/help" }),
+          mentions: [{ id: { open_id: "ou_actual_bot" }, name: "bot", key: "@_user_1" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_configured_wrong",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("/help");
+    expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
+    expect(parsed?.shouldRespond).toBe(true);
+  });
+
   it("drops messages blocked by allow lists", () => {
     const parsed = extractTextMessageCommand(
       {

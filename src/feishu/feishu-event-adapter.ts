@@ -137,7 +137,7 @@ export function explainTextMessageCommand(
       chatId: message.chat_id,
       messageId: message.message_id,
       command: parseFeishuCommand(commandText),
-      shouldRespond: options ? canRespondToFeishuTextMessage(event, options) : true,
+      shouldRespond: options ? canRespondToFeishuTextMessage(event, options, commandText) : true,
       ...(platformMessage ? { message: platformMessage } : {})
     }
   };

@@ -66,12 +66,13 @@ export function normalizeFeishuTextMessage(
 
 export function canRespondToFeishuTextMessage(
   event: FeishuMessageReceiveEvent,
-  options: FeishuMessageExtractOptions
+  options: FeishuMessageExtractOptions,
+  text?: string
 ): boolean {
   if (event.message?.chat_type !== "group") {
     return true;
   }
-  return isBotMentioned(event, options.botOpenId);
+  return isBotMentioned(event, options.botOpenId) || isMentionedSlashCommand(event, text);
 }
 
 function getSenderId(event: FeishuMessageReceiveEvent): string {
@@ -96,13 +97,25 @@ function stripBotMentions(
   }
 
   return (event.message?.mentions ?? [])
-    .filter((mention) => mentionMatchesBot(mention, botOpenId) && mention.key)
+    .filter((mention) => (mentionMatchesBot(mention, botOpenId) || isOnlyLeadingMention(text, event, mention)) && mention.key)
     .reduce((current, mention) => current.replaceAll(mention.key ?? "", ""), text)
     .trim();
 }
 
 function mentionMatchesBot(mention: FeishuMessageMention, botId: string): boolean {
   return mention.id?.open_id === botId || mention.id?.user_id === botId || mention.id?.union_id === botId;
+}
+
+function isMentionedSlashCommand(event: FeishuMessageReceiveEvent, text: string | undefined): boolean {
+  return (event.message?.mentions?.length ?? 0) > 0 && text?.trim().startsWith("/") === true;
+}
+
+function isOnlyLeadingMention(
+  text: string,
+  event: FeishuMessageReceiveEvent,
+  mention: FeishuMessageMention
+): boolean {
+  return (event.message?.mentions?.length ?? 0) === 1 && !!mention.key && text.trimStart().startsWith(mention.key);
 }
 
 function createTimestamp(createTimeMs: string | undefined): Date {
