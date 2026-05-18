@@ -11,5 +11,6 @@ export function buildHandlerKindRegistry(options: BuildHandlerKindRegistryOption
   for (const module of [...defaultHandlerKindModules(), ...(options.modules ?? [])]) {
     module.register(registry, options);
   }
+  registry.freeze();
   return registry;
 }

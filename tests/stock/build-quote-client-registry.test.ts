@@ -18,4 +18,9 @@ describe("buildQuoteClientRegistry", () => {
 
     expect(registry.get("external")).toBe(client);
   });
+
+  it("freezes after build so runtime cannot register additional quote clients", () => {
+    const registry = buildQuoteClientRegistry();
+    expect(() => registry.register("late", { query: async () => [] })).toThrow(/frozen/);
+  });
 });

@@ -39,14 +39,17 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
   private readonly handlers = new Map<string, SlashCommandHandler>();
   private readonly canonicalIds = new Set<string>();
   private readonly definitions = new Map<string, SlashCommandDefinition>();
+  private frozen = false;
 
   declarePlanned(definition: SlashCommandDefinition): this {
+    this.guardWritable();
     this.guardIdAvailable(definition.id);
     this.definitions.set(definition.id, cloneCommand(definition));
     return this;
   }
 
   registerCommand(definition: SlashCommandDefinition, handler: SlashCommandHandler): this {
+    this.guardWritable();
     if (definition.id !== handler.id) {
       throw new Error(`definition id (${definition.id}) and handler id (${handler.id}) must match`);
     }
@@ -57,8 +60,14 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
   }
 
   registerInternalHandler(handler: SlashCommandHandler): this {
+    this.guardWritable();
     this.guardIdAvailable(handler.id);
     this.attachHandler(handler);
+    return this;
+  }
+
+  freeze(): this {
+    this.frozen = true;
     return this;
   }
 
@@ -102,6 +111,12 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
     return [...this.definitions.values()]
       .filter((command) => !groupKey || command.groupKey === groupKey)
       .map(cloneCommand);
+  }
+
+  private guardWritable(): void {
+    if (this.frozen) {
+      throw new Error("Slash command registry is frozen; register all commands before boot completes");
+    }
   }
 
   private guardIdAvailable(id: string): void {

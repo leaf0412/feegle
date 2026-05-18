@@ -11,5 +11,6 @@ export function buildQuoteClientRegistry(options: BuildQuoteClientRegistryOption
   for (const module of [...defaultQuoteClientModules(), ...(options.modules ?? [])]) {
     module.register(registry);
   }
+  registry.freeze();
   return registry;
 }

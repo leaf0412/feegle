@@ -1,15 +1,25 @@
 import type { NotificationPort, NotificationTarget } from "./notification-port.js";
 
 export class NotificationBroker implements NotificationPort {
+  private frozen = false;
+
   constructor(
     private readonly adapters: Record<string, NotificationPort> = {}
   ) {}
 
   register(platform: string, adapter: NotificationPort): this {
+    if (this.frozen) {
+      throw new Error("Notification broker is frozen; register all adapters before boot completes");
+    }
     if (this.adapters[platform]) {
       throw new Error(`Notification adapter already registered for platform: ${platform}`);
     }
     this.adapters[platform] = adapter;
+    return this;
+  }
+
+  freeze(): this {
+    this.frozen = true;
     return this;
   }
 

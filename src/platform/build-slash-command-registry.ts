@@ -19,5 +19,6 @@ export function buildSlashCommandRegistry(deps: BuildSlashCommandRegistryOptions
   for (const module of [...baseModules, ...(deps.modules ?? [])]) {
     module.register(registry, deps);
   }
+  registry.freeze();
   return registry;
 }

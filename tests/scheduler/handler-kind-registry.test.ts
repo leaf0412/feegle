@@ -21,4 +21,10 @@ describe("HandlerKindRegistry", () => {
   it("lists registered kinds for cron command discovery", () => {
     expect(new HandlerKindRegistry().register(kind).list()).toEqual([kind]);
   });
+
+  it("freeze blocks late kind registration so runtime cannot mutate the boot snapshot", () => {
+    const registry = new HandlerKindRegistry().register(kind).freeze();
+    expect(() => registry.register({ ...kind, id: "late" })).toThrow(/frozen/);
+    expect(registry.get("heartbeat")).toBe(kind);
+  });
 });

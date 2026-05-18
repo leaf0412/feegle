@@ -75,4 +75,17 @@ describe("SlashCommandRegistry", () => {
     registry.registerCommand(def("bind", ["bid"]), stubHandler("bind", ["bid"]));
     expect(() => registry.registerCommand(def("other", ["bid"]), stubHandler("other", ["bid"]))).toThrow(/alias collision/);
   });
+
+  it("freeze() blocks every write so runtime code cannot mutate the boot-time snapshot", () => {
+    const registry = new SlashCommandRegistry();
+    registry.declarePlanned(def("note_find"));
+    registry.registerCommand(def("help"), stubHandler("help"));
+    registry.freeze();
+
+    expect(() => registry.declarePlanned(def("late_planned"))).toThrow(/frozen/);
+    expect(() => registry.registerCommand(def("late_cmd"), stubHandler("late_cmd"))).toThrow(/frozen/);
+    expect(() => registry.registerInternalHandler(stubHandler("late_internal"))).toThrow(/frozen/);
+    expect(registry.findById("note_find")?.id).toBe("note_find");
+    expect(registry.resolve("help")?.id).toBe("help");
+  });
 });

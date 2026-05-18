@@ -30,4 +30,14 @@ describe("buildNotificationBroker", () => {
 
     expect(calls).toEqual(["ok"]);
   });
+
+  it("freezes after build so runtime cannot register additional notification adapters", () => {
+    const broker = buildNotificationBroker({ feishuClient: {} as FeishuClientPort });
+    expect(() =>
+      broker.register("late", {
+        sendText: async () => {},
+        sendCard: async () => {}
+      })
+    ).toThrow(/frozen/);
+  });
 });

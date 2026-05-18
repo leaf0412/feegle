@@ -15,6 +15,7 @@ export function buildNotificationBroker(options: BuildNotificationBrokerOptions)
   for (const module of [...defaultNotificationAdapterModules(), ...(options.modules ?? [])]) {
     module.register(broker, options);
   }
+  broker.freeze();
   return broker;
 }
 

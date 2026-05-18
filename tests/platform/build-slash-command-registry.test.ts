@@ -48,4 +48,19 @@ describe("buildSlashCommandRegistry", () => {
       })
     ).resolves.toEqual({ kind: "text", text: "external module reply" });
   });
+
+  it("freezes the returned registry so runtime cannot add commands after boot", () => {
+    const registry = buildSlashCommandRegistry({
+      repositories: { list: () => [] },
+      defaults: false
+    });
+    expect(() =>
+      registry.registerInternalHandler({
+        id: "late",
+        async execute() {
+          return { kind: "text", text: "late" };
+        }
+      })
+    ).toThrow(/frozen/);
+  });
 });
