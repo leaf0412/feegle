@@ -63,7 +63,7 @@ export class ConfigStore {
   async setFailureTarget(target: NotificationTarget | null): Promise<void> {
     this.data = {
       schemaVersion: 1,
-      failureTarget: target ? { ...target } : null
+      failureTarget: target ? NotificationTargetSchema.parse(target) : null
     };
     await writeJsonAtomically(this.filePath, this.data);
   }
