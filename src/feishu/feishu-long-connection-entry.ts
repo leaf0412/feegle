@@ -1,13 +1,11 @@
 import * as lark from "@larksuiteoapi/node-sdk";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
-import { FeishuCommandResponder, logFeishuCommandTrace } from "./feishu-command-responder.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
-import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
-import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
-import { ChatHistoryStore } from "../agent/chat-history-store.js";
-import { FeishuChatHandler } from "./feishu-chat-handler.js";
+import { FeegleApp } from "../app/feegle-app.js";
+import { resolveFeegleHome } from "../app/feegle-home.js";
+import { parseOwnerIdentities } from "../app/owner-identities.js";
 
 const config = parseFeishuPlatformConfig({
   appId: readRequiredEnv("FEISHU_APP_ID"),
@@ -31,28 +29,16 @@ const feishuClient: FeishuClientPort = new LarkFeishuClient(
     appSecret: config.appSecret
   })
 );
-const repositories = new InMemoryRepositoryRegistry();
-const registry = buildSlashCommandRegistry({ repositories });
 const providers = buildAgentProviderRegistry(process.env);
-const chatHistory = new ChatHistoryStore();
-const chatHandler = new FeishuChatHandler({
-  client: feishuClient,
-  providers,
-  history: chatHistory
-});
-const handler = new FeishuCommandResponder(feishuClient, {
-  registry,
-  chatHandler,
-  trace: logFeishuCommandTrace
+const app = new FeegleApp({
+  feegleHome: resolveFeegleHome(process.env),
+  ownerIdentities: parseOwnerIdentities(process.env.FEEGLE_OWNER_IDENTITIES),
+  feishuClient,
+  agentProviders: providers,
+  runtimeFactory: (handler) => new FeishuLongConnectionRuntime(config, lark, handler)
 });
 
-const runtime = new FeishuLongConnectionRuntime(
-  config,
-  lark,
-  handler
-);
-
-await runtime.start();
+await app.start();
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name];

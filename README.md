@@ -68,6 +68,8 @@ export FEISHU_SHARE_SESSION_IN_CHANNEL="false"
 export FEISHU_THREAD_ISOLATION="false"
 export FEISHU_REPLY_TO_TRIGGER="true"
 export FEISHU_PROGRESS_STYLE="legacy"
+export FEEGLE_HOME="$HOME/.feegle"
+export FEEGLE_OWNER_IDENTITIES="feishu:ou_xxx"
 ```
 
 Do not commit real secrets. Keep them in your shell, local process manager, or a local `.env` file that is not committed.
@@ -81,6 +83,62 @@ Feishu routing options:
 - `FEISHU_SHARE_SESSION_IN_CHANNEL=true` uses one shared session key per group chat.
 - `FEISHU_THREAD_ISOLATION=true` isolates sessions by root/thread message id.
 - `FEISHU_PROGRESS_STYLE` accepts `legacy`, `compact`, or `card`.
+- `FEEGLE_HOME` overrides the scheduler persistence directory; default is `~/.feegle`.
+- `FEEGLE_OWNER_IDENTITIES` is required for cron/stock commands. Values are comma-separated identities such as `feishu:ou_xxx`.
+
+## Scheduler And Stock Commands
+
+Feegle persists scheduler state under `~/.feegle` unless `FEEGLE_HOME` is set:
+
+```text
+config.json
+task-store.json
+stock-store.json
+dedup.json
+runs.log.jsonl
+.locks/feegle.lock
+```
+
+Bind the failure notification group before enabling tasks:
+
+```text
+/error_target set
+/error_target show
+/error_target clear
+```
+
+Owner-only scheduler commands:
+
+```text
+/cron list
+/cron show <id>
+/cron add <kind> <cron> [k=v...]
+/cron edit <id> [k=v...]
+/cron remove <id>
+/cron pause <id>
+/cron resume <id>
+/cron run-now <id> [--force]
+/cron set-target <id> [chatId]
+/cron history <id> [--last N]
+```
+
+Stock commands:
+
+```text
+/bind_stocks <codes>
+/unbind_stocks <codes>
+/stocks [codes]
+/portfolio set <code> cost=<price> shares=<n> [stopLoss=<price>]
+/portfolio list
+/portfolio clear <code>
+/portfolio unset <code> <stopLoss|thresholds>
+```
+
+Live quote smoke test is opt-in:
+
+```bash
+RUN_LIVE_QUOTE_TEST=1 npx vitest run tests/live
+```
 
 ## Run The Feishu Adapter
 
