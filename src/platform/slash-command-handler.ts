@@ -29,6 +29,7 @@ export interface SlashCommandHandler {
 export interface SlashCommandRegistryReadView {
   isImplemented(id: string): boolean;
   implementedIds(): ReadonlySet<string>;
+  resolve(id: string): SlashCommandHandler | undefined;
 }
 
 export class SlashCommandRegistry implements SlashCommandRegistryReadView {
