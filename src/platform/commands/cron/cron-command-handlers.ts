@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import { CronExpressionParser } from "cron-parser";
 import { ulid } from "ulid";
 import type { NotificationTarget } from "../../../app/notification-port.js";
 import type { Task } from "../../../scheduler/task.js";
@@ -248,113 +249,13 @@ function renderTaskDetail(task: Task): string {
   return lines.join("\n");
 }
 
-function nextRunDescription(expression: string, timezone: string): string {
+export function nextRunDescription(expression: string, timezone: string, now: Date = new Date()): string {
   try {
-    const next = nextCronTime(expression, timezone);
-    if (!next) return "unknown";
-    return next.toISOString();
-  } catch {
-    return "invalid-cron";
+    const iter = CronExpressionParser.parse(expression, { tz: timezone, currentDate: now });
+    return iter.next().toDate().toISOString();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[cron] next-run compute failed: cron=${expression} tz=${timezone} reason=${message}`);
+    return `ERROR(${message})`;
   }
-}
-
-function nextCronTime(expression: string, timezone: string): Date | null {
-  if (!cron.validate(expression)) return null;
-  const candidate = computeNextFromCron(expression, timezone);
-  return candidate ?? null;
-}
-
-function computeNextFromCron(expression: string, timezone: string): Date | null {
-  // node-cron does not expose a "next fire time" calculator. Approximate by
-  // probing each minute up to 31 days ahead and returning the first match.
-  const parts = expression.trim().split(/\s+/);
-  if (parts.length !== 5) return null;
-  const [minutePart, hourPart, domPart, monthPart, dowPart] = parts;
-  const matchers = {
-    minute: parseField(minutePart, 0, 59),
-    hour: parseField(hourPart, 0, 23),
-    dom: parseField(domPart, 1, 31),
-    month: parseField(monthPart, 1, 12),
-    dow: parseField(dowPart, 0, 6)
-  };
-  if (Object.values(matchers).some((m) => !m)) return null;
-  const start = new Date();
-  start.setSeconds(0, 0);
-  start.setMinutes(start.getMinutes() + 1);
-  for (let step = 0; step < 60 * 24 * 31; step += 1) {
-    const candidate = new Date(start.getTime() + step * 60_000);
-    const local = wallClock(candidate, timezone);
-    if (
-      matchers.minute!.has(local.minute) &&
-      matchers.hour!.has(local.hour) &&
-      matchers.dom!.has(local.day) &&
-      matchers.month!.has(local.month) &&
-      matchers.dow!.has(local.dow)
-    ) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function parseField(spec: string, min: number, max: number): Set<number> | null {
-  if (spec === "*") {
-    return new Set(rangeNumbers(min, max));
-  }
-  const parts = spec.split(",");
-  const values = new Set<number>();
-  for (const part of parts) {
-    const stepMatch = part.match(/^(.+)\/(\d+)$/);
-    const stride = stepMatch ? Number(stepMatch[2]) : 1;
-    const body = stepMatch ? stepMatch[1] : part;
-    let start = min;
-    let end = max;
-    if (body !== "*") {
-      const range = body.split("-");
-      if (range.length === 1) {
-        start = Number(range[0]);
-        end = stepMatch ? max : start;
-      } else if (range.length === 2) {
-        start = Number(range[0]);
-        end = Number(range[1]);
-      } else {
-        return null;
-      }
-    }
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < min || end > max) return null;
-    for (let value = start; value <= end; value += stride) {
-      values.add(value);
-    }
-  }
-  return values;
-}
-
-function rangeNumbers(min: number, max: number): number[] {
-  const out: number[] = [];
-  for (let value = min; value <= max; value += 1) out.push(value);
-  return out;
-}
-
-function wallClock(date: Date, timezone: string): { minute: number; hour: number; day: number; month: number; dow: number } {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    weekday: "short"
-  });
-  const parts = formatter.formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? "0";
-  const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  return {
-    minute: Number(get("minute")),
-    hour: Number(get("hour")),
-    day: Number(get("day")),
-    month: Number(get("month")),
-    dow: dowMap[get("weekday")] ?? 0
-  };
 }

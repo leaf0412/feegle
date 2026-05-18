@@ -12,6 +12,7 @@
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.64.0",
     "archiver": "^7.0.1",
+    "cron-parser": "^5.5.0",
     "date-fns-tz": "^3.2.0",
     "execa": "^9.6.0",
     "fs-extra": "^11.3.0",
