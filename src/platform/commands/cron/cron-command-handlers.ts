@@ -33,8 +33,15 @@ abstract class CronCommand implements SlashCommandHandler {
 export class CronListCommandHandler extends CronCommand {
   readonly id = "cron_list";
   async execute(): Promise<SlashCommandReply> {
-    const rows = this.deps.taskRegistry.list().map((task) => `${task.id.slice(0, 12)} ${task.kind} ${task.cron} ${task.enabled ? "yes" : "no"}`);
-    return { kind: "text", text: rows.length ? rows.join("\n") : "暂无定时任务。" };
+    const tasks = this.deps.taskRegistry.list();
+    if (tasks.length === 0) {
+      return { kind: "text", text: "暂无定时任务。" };
+    }
+    const rows = tasks.map((task) => {
+      const next = task.enabled ? nextRunDescription(task.cron, task.timezone) : "paused";
+      return `${task.id.slice(0, 12)}  ${task.kind.padEnd(26)} ${task.cron.padEnd(14)} ${task.enabled ? "yes" : "no "}  next: ${next}`;
+    });
+    return { kind: "text", text: rows.join("\n") };
   }
 }
 
@@ -42,7 +49,7 @@ export class CronShowCommandHandler extends CronCommand {
   readonly id = "cron_show";
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const task = this.resolveTask(context.args);
-    return { kind: "text", text: JSON.stringify(task, null, 2) };
+    return { kind: "text", text: renderTaskDetail(task) };
   }
 }
 
@@ -209,4 +216,145 @@ function targetFrom(currentChatId: string, input: unknown): NotificationTarget |
 
 function policyFrom(input: unknown): Task["errorPolicy"] {
   return input === "always" || input === "silent" ? input : "on-change";
+}
+
+function renderTaskDetail(task: Task): string {
+  const lines = [
+    `id: ${task.id}`,
+    `name: ${task.name}`,
+    `kind: ${task.kind}`,
+    `cron: ${task.cron}  (tz=${task.timezone})`,
+    `activeHours: ${task.activeHours?.join(", ") ?? "—"}`,
+    `target: ${task.target ? `${task.target.platform}:${task.target.chatId}` : "—"}`,
+    `enabled: ${task.enabled}`,
+    `source: ${task.source}`,
+    `errorPolicy: ${task.errorPolicy}`,
+    `consecutiveFailures: ${task.consecutiveFailures}`,
+    `lastErrorNotifiedAt: ${task.lastErrorNotifiedAt ?? "—"}`,
+    `createdAt: ${task.createdAt}`,
+    `updatedAt: ${task.updatedAt}`
+  ];
+  if (Object.keys(task.params).length > 0) {
+    lines.push(`params: ${JSON.stringify(task.params)}`);
+  }
+  if (task.lastRun) {
+    lines.push(
+      `lastRun: ${task.lastRun.at}  status=${task.lastRun.status}  ${task.lastRun.durationMs}ms${task.lastRun.note ? `  note=${task.lastRun.note}` : ""}`
+    );
+  } else {
+    lines.push("lastRun: —");
+  }
+  lines.push(`next: ${task.enabled ? nextRunDescription(task.cron, task.timezone) : "paused"}`);
+  return lines.join("\n");
+}
+
+function nextRunDescription(expression: string, timezone: string): string {
+  try {
+    const next = nextCronTime(expression, timezone);
+    if (!next) return "unknown";
+    return next.toISOString();
+  } catch {
+    return "invalid-cron";
+  }
+}
+
+function nextCronTime(expression: string, timezone: string): Date | null {
+  if (!cron.validate(expression)) return null;
+  const candidate = computeNextFromCron(expression, timezone);
+  return candidate ?? null;
+}
+
+function computeNextFromCron(expression: string, timezone: string): Date | null {
+  // node-cron does not expose a "next fire time" calculator. Approximate by
+  // probing each minute up to 31 days ahead and returning the first match.
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const [minutePart, hourPart, domPart, monthPart, dowPart] = parts;
+  const matchers = {
+    minute: parseField(minutePart, 0, 59),
+    hour: parseField(hourPart, 0, 23),
+    dom: parseField(domPart, 1, 31),
+    month: parseField(monthPart, 1, 12),
+    dow: parseField(dowPart, 0, 6)
+  };
+  if (Object.values(matchers).some((m) => !m)) return null;
+  const start = new Date();
+  start.setSeconds(0, 0);
+  start.setMinutes(start.getMinutes() + 1);
+  for (let step = 0; step < 60 * 24 * 31; step += 1) {
+    const candidate = new Date(start.getTime() + step * 60_000);
+    const local = wallClock(candidate, timezone);
+    if (
+      matchers.minute!.has(local.minute) &&
+      matchers.hour!.has(local.hour) &&
+      matchers.dom!.has(local.day) &&
+      matchers.month!.has(local.month) &&
+      matchers.dow!.has(local.dow)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function parseField(spec: string, min: number, max: number): Set<number> | null {
+  if (spec === "*") {
+    return new Set(rangeNumbers(min, max));
+  }
+  const parts = spec.split(",");
+  const values = new Set<number>();
+  for (const part of parts) {
+    const stepMatch = part.match(/^(.+)\/(\d+)$/);
+    const stride = stepMatch ? Number(stepMatch[2]) : 1;
+    const body = stepMatch ? stepMatch[1] : part;
+    let start = min;
+    let end = max;
+    if (body !== "*") {
+      const range = body.split("-");
+      if (range.length === 1) {
+        start = Number(range[0]);
+        end = stepMatch ? max : start;
+      } else if (range.length === 2) {
+        start = Number(range[0]);
+        end = Number(range[1]);
+      } else {
+        return null;
+      }
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < min || end > max) return null;
+    for (let value = start; value <= end; value += stride) {
+      values.add(value);
+    }
+  }
+  return values;
+}
+
+function rangeNumbers(min: number, max: number): number[] {
+  const out: number[] = [];
+  for (let value = min; value <= max; value += 1) out.push(value);
+  return out;
+}
+
+function wallClock(date: Date, timezone: string): { minute: number; hour: number; day: number; month: number; dow: number } {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    weekday: "short"
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes): string => parts.find((part) => part.type === type)?.value ?? "0";
+  const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    minute: Number(get("minute")),
+    hour: Number(get("hour")),
+    day: Number(get("day")),
+    month: Number(get("month")),
+    dow: dowMap[get("weekday")] ?? 0
+  };
 }
