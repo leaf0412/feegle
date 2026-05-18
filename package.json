@@ -12,12 +12,11 @@
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.64.0",
     "archiver": "^7.0.1",
-    "cron-parser": "^5.5.0",
+    "croner": "^10.0.1",
     "date-fns-tz": "^3.2.0",
     "execa": "^9.6.0",
     "fs-extra": "^11.3.0",
     "iconv-lite": "^0.7.2",
-    "node-cron": "^4.2.1",
     "proper-lockfile": "^4.1.2",
     "read-last-lines": "^1.8.0",
     "ulid": "^3.0.2",

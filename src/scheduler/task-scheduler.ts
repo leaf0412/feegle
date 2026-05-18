@@ -1,4 +1,4 @@
-import cron from "node-cron";
+import { Cron } from "croner";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { FeegleConfig } from "../app/config-store.js";
 import type { NotificationPort } from "../app/notification-port.js";
@@ -82,12 +82,12 @@ export class TaskScheduler implements TaskMutationObserver {
 
   private schedule(task: Task): void {
     this.unschedule(task.id);
-    const scheduled = cron.schedule(
+    const scheduled = new Cron(
       task.cron,
+      { timezone: task.timezone },
       () => {
         void this.execute(task.id, { force: false, checkActiveHours: true, rethrow: false });
-      },
-      { timezone: task.timezone }
+      }
     );
     this.activeTasks.set(task.id, scheduled);
   }

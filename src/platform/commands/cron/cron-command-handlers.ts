@@ -1,5 +1,4 @@
-import cron from "node-cron";
-import { CronExpressionParser } from "cron-parser";
+import { Cron } from "croner";
 import { ulid } from "ulid";
 import type { NotificationTarget } from "../../../app/notification-port.js";
 import type { Task } from "../../../scheduler/task.js";
@@ -61,7 +60,7 @@ export class CronAddCommandHandler extends CronCommand {
     if (!kindId || !cronExpr) {
       return commandError("/cron add", "缺少 kind 或 cron", context.definition.command);
     }
-    if (!cron.validate(cronExpr)) {
+    if (!isValidCron(cronExpr)) {
       return commandError("/cron add", `非法 cron: ${cronExpr}`, context.definition.command);
     }
     const kind = this.deps.kinds.get(kindId);
@@ -104,7 +103,7 @@ export class CronEditCommandHandler extends CronCommand {
     const patch: Partial<Task> = {};
     if (parsed.top.name) patch.name = String(parsed.top.name);
     if (parsed.top.cron) {
-      if (!cron.validate(String(parsed.top.cron))) return commandError("/cron edit", "非法 cron", context.definition.command);
+      if (!isValidCron(String(parsed.top.cron))) return commandError("/cron edit", "非法 cron", context.definition.command);
       patch.cron = String(parsed.top.cron);
     }
     if (parsed.top.tz) patch.timezone = String(parsed.top.tz);
@@ -251,11 +250,22 @@ function renderTaskDetail(task: Task): string {
 
 export function nextRunDescription(expression: string, timezone: string, now: Date = new Date()): string {
   try {
-    const iter = CronExpressionParser.parse(expression, { tz: timezone, currentDate: now });
-    return iter.next().toDate().toISOString();
+    const job = new Cron(expression, { timezone, paused: true });
+    const next = job.nextRun(now);
+    if (!next) return "ERROR(no upcoming fire time)";
+    return next.toISOString();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[cron] next-run compute failed: cron=${expression} tz=${timezone} reason=${message}`);
     return `ERROR(${message})`;
+  }
+}
+
+function isValidCron(expression: string): boolean {
+  try {
+    new Cron(expression, { paused: true });
+    return true;
+  } catch {
+    return false;
   }
 }
