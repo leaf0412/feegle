@@ -2,7 +2,10 @@ import cron from "node-cron";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { FeegleConfig } from "../app/config-store.js";
 import type { NotificationPort } from "../app/notification-port.js";
-import { createPlatformCard } from "../platform/platform-card.js";
+import { buildFailureCard } from "./build-failure-card.js";
+import { buildRecoveryCard } from "./build-recovery-card.js";
+import { decideShouldNotifyFailure } from "./failure-policy.js";
+import { UndeliveredFailureCounter } from "./undelivered-counter.js";
 import { withinActiveHours } from "./active-hours.js";
 import type { HandlerKindRegistry } from "./handler-kind-registry.js";
 import { SingleFlight } from "./single-flight.js";
@@ -26,14 +29,18 @@ export interface TaskSchedulerDeps {
   host: HostInfoProvider;
   clock: Clock;
   logger: Logger;
+  undeliveredFailures?: UndeliveredFailureCounter;
 }
 
 export class TaskScheduler implements TaskMutationObserver {
   private readonly activeTasks = new Map<string, { stop(): void }>();
   private readonly singleFlight = new SingleFlight();
+  private readonly undeliveredFailures: UndeliveredFailureCounter;
   private unsubscribe?: () => void;
 
-  constructor(private readonly deps: TaskSchedulerDeps) {}
+  constructor(private readonly deps: TaskSchedulerDeps) {
+    this.undeliveredFailures = deps.undeliveredFailures ?? new UndeliveredFailureCounter();
+  }
 
   async start(): Promise<void> {
     this.unsubscribe = this.deps.registry.subscribe(this);
@@ -154,10 +161,7 @@ export class TaskScheduler implements TaskMutationObserver {
     if (task.consecutiveFailures > 0) {
       const target = this.deps.configStore.get().failureTarget;
       if (target) {
-        await this.deps.notify.sendCard(
-          target,
-          createPlatformCard().title("任务恢复", "green").markdown(`任务 ${task.name} 已恢复。`).build()
-        );
+        await this.deps.notify.sendCard(target, buildRecoveryCard(task, now));
       }
     }
     return this.record(task, status, durationMs, note, now, {
@@ -170,22 +174,22 @@ export class TaskScheduler implements TaskMutationObserver {
     const consecutiveFailures = task.consecutiveFailures + 1;
     const note = errorMessage(error);
     const lastRun = await this.record(task, "failed", durationMs, note, now, { consecutiveFailures });
-    if (shouldNotify(task.errorPolicy, consecutiveFailures, task.lastErrorNotifiedAt, now)) {
+    if (decideShouldNotifyFailure(task.errorPolicy, consecutiveFailures, task.lastErrorNotifiedAt, now)) {
       const target = this.deps.configStore.get().failureTarget;
       if (!target) {
+        this.undeliveredFailures.increment(task.id);
         this.deps.logger.warn("failure with no failureTarget configured", {
           taskId: task.id,
           errorClass: errorClass(error)
         });
       } else {
-        await this.deps.notify.sendCard(
-          target,
-          createPlatformCard()
-            .title("任务失败", "red")
-            .markdown(`任务 ${task.name} 失败：${note}\n连续失败：${consecutiveFailures}`)
-            .build()
-        );
-        await this.deps.registry.update(task.id, { lastErrorNotifiedAt: now.toISOString() });
+        try {
+          await this.deps.notify.sendCard(target, buildFailureCard(task, error, consecutiveFailures));
+          await this.deps.registry.update(task.id, { lastErrorNotifiedAt: now.toISOString() });
+        } catch (pushError) {
+          this.undeliveredFailures.increment(task.id);
+          this.deps.logger.error("failed to deliver failure notification", { error: errorMessage(pushError) });
+        }
       }
     }
     return lastRun;
@@ -224,21 +228,6 @@ function outcomeToStatus(outcome: "sent" | "silent" | "noop"): TaskRunStatus {
     return "ok";
   }
   return outcome;
-}
-
-function shouldNotify(
-  policy: Task["errorPolicy"],
-  consecutiveFailures: number,
-  lastErrorNotifiedAt: string | null,
-  now: Date
-): boolean {
-  if (policy === "silent") {
-    return false;
-  }
-  if (policy === "always" || consecutiveFailures === 1 || !lastErrorNotifiedAt) {
-    return true;
-  }
-  return now.getTime() - new Date(lastErrorNotifiedAt).getTime() > 30 * 60 * 1000;
 }
 
 function errorMessage(error: unknown): string {
