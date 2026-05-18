@@ -22,6 +22,7 @@ describe("buildSlashCommandRegistry", () => {
 
     const registry = buildSlashCommandRegistry({
       repositories: { list: () => [] },
+      defaults: false,
       modules: [
         {
           id: "external",

@@ -5,6 +5,7 @@ import { buildSlashCommandRegistry } from "../../src/platform/build-slash-comman
 import type { RepositoryRecord } from "../../src/domain/models.js";
 import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
 import type { SlashCommandHandler, SlashCommandRegistry } from "../../src/platform/slash-command-handler.js";
+import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("FeishuCommandResponder", () => {
   it("replies with selected repositories", async () => {
@@ -164,6 +165,7 @@ describe("FeishuCommandResponder", () => {
     };
     const registry = buildSlashCommandRegistry({
       repositories: { list: () => [] },
+      defaults: false,
       modules: [
         {
           id: "external",
@@ -376,7 +378,9 @@ describe("FeishuCommandResponder", () => {
 });
 
 function testRegistry(repositories: RepositoryRecord[] = []): SlashCommandRegistry {
-  return buildSlashCommandRegistry({ repositories: { list: () => repositories.map((record) => ({ ...record })) } });
+  return buildSlashCommandRegistry(
+    stubSchedulerSlashDeps({ repositories: { list: () => repositories.map((record) => ({ ...record })) } })
+  );
 }
 
 function fakeClient(

@@ -13,12 +13,20 @@ import type { StockStore } from "../../../src/stock/stock-store.js";
 
 describe("scheduler slash commands", () => {
   it("adds concrete cron, stock, portfolio, and error_target commands to the catalog", () => {
-    const registry = buildSlashCommandRegistry({ repositories: { list: () => [] } });
+    const deps = makeDeps(new Set());
+    const registry = makeRegistry(deps);
 
     expect(registry.listCommands("cron").map((command) => command.id)).toContain("cron_run_now");
     expect(registry.listCommands("stock").map((command) => command.id)).toContain("portfolio_set");
     expect(registry.findByInput("/heartbeat")).toBeUndefined();
     expect(registry.findByInput("/cron list")?.id).toBe("cron_list");
+    expect(registry.isImplemented("cron_run_now")).toBe(true);
+  });
+
+  it("refuses to build when scheduler deps are missing instead of degrading to planned", () => {
+    expect(() => buildSlashCommandRegistry({ repositories: { list: () => [] } })).toThrow(
+      /scheduler command module requires/
+    );
   });
 
   it("silently drops owner-only commands from non-owners", async () => {

@@ -57,23 +57,11 @@ const setupDefinitions = {
   error_target_clear: defineSlashCommand("error_target_clear", "/error_target clear", "解绑故障通知群", "setup", "cmd:/error_target clear")
 } satisfies Record<string, SlashCommandDefinition>;
 
-const schedulerDefinitions = [
-  ...Object.values(cronDefinitions),
-  ...Object.values(stockDefinitions),
-  ...Object.values(setupDefinitions)
-];
-
 export function schedulerCommandModule(): SlashCommandModule {
   return {
     id: "scheduler",
     register: (registry, deps) => {
-      for (const definition of schedulerDefinitions) {
-        registry.register(definition);
-      }
-      const schedulerDeps = schedulerCommandDeps(deps);
-      if (!schedulerDeps) {
-        return;
-      }
+      const schedulerDeps = requireSchedulerDeps(deps);
       registry.register(cronDefinitions.cron_list, new CronListCommandHandler(schedulerDeps));
       registry.register(cronDefinitions.cron_show, new CronShowCommandHandler(schedulerDeps));
       registry.register(cronDefinitions.cron_add, new CronAddCommandHandler(schedulerDeps));
@@ -98,26 +86,26 @@ export function schedulerCommandModule(): SlashCommandModule {
   };
 }
 
-function schedulerCommandDeps(deps: SlashCommandRegistryDeps): SchedulerCommandDeps | undefined {
-  if (
-    !deps.ownerIdentities ||
-    !deps.taskRegistry ||
-    !deps.configStore ||
-    !deps.stockStore ||
-    !deps.quote ||
-    !deps.kinds ||
-    !deps.scheduler
-  ) {
-    return undefined;
+function requireSchedulerDeps(deps: SlashCommandRegistryDeps): SchedulerCommandDeps {
+  const missing: string[] = [];
+  if (!deps.ownerIdentities) missing.push("ownerIdentities");
+  if (!deps.taskRegistry) missing.push("taskRegistry");
+  if (!deps.configStore) missing.push("configStore");
+  if (!deps.stockStore) missing.push("stockStore");
+  if (!deps.quote) missing.push("quote");
+  if (!deps.kinds) missing.push("kinds");
+  if (!deps.scheduler) missing.push("scheduler");
+  if (missing.length > 0) {
+    throw new Error(`scheduler command module requires deps: ${missing.join(", ")}`);
   }
   return {
-    ownerIdentities: deps.ownerIdentities,
-    taskRegistry: deps.taskRegistry,
-    configStore: deps.configStore,
-    stockStore: deps.stockStore,
-    quote: deps.quote,
-    kinds: deps.kinds,
-    scheduler: deps.scheduler,
+    ownerIdentities: deps.ownerIdentities!,
+    taskRegistry: deps.taskRegistry!,
+    configStore: deps.configStore!,
+    stockStore: deps.stockStore!,
+    quote: deps.quote!,
+    kinds: deps.kinds!,
+    scheduler: deps.scheduler!,
     runsLog: deps.runsLog
   };
 }
