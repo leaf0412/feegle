@@ -16,6 +16,11 @@ export const FeegleConfigSchema = z.object({
 
 export type FeegleConfig = z.infer<typeof FeegleConfigSchema>;
 
+export interface ConfigStorePort {
+  get(): Readonly<FeegleConfig>;
+  setFailureTarget(target: NotificationTarget | null): Promise<void>;
+}
+
 const DEFAULT_CONFIG: FeegleConfig = {
   schemaVersion: 1,
   failureTarget: null

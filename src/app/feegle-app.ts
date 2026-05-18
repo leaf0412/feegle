@@ -22,7 +22,7 @@ import type { Task } from "../scheduler/task.js";
 import { RuntimeHostInfoProvider } from "../scheduler/util/host-info.js";
 import { SinaQuoteClient } from "../stock/sina-quote-client.js";
 import { StockStore } from "../stock/stock-store.js";
-import { ConfigStore } from "./config-store.js";
+import { ConfigStore, type ConfigStorePort } from "./config-store.js";
 import { acquireFeegleLock } from "./feegle-lock.js";
 import { NotificationBroker } from "./notification-broker.js";
 import { FeishuNotificationAdapter } from "../feishu/feishu-notification-adapter.js";
@@ -39,8 +39,8 @@ export interface FeegleAppDeps {
   agentProviders: AgentProviderRegistry;
   runtimeFactory: (handler: FeishuCommandHandler) => Startable;
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
-  loadConfigStore?: (feegleHome: string) => Promise<unknown>;
-  createScheduler?: (deps: { notify: NotificationBroker; configStore: unknown }) => Startable;
+  loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
+  createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort }) => Startable;
 }
 
 export class FeegleApp {
@@ -71,10 +71,10 @@ export class FeegleApp {
       .register(new StockAdvisorKind({ stockStore, quote, agents: this.deps.agentProviders }))
       .register(new AgentPromptKind({ agents: this.deps.agentProviders }));
 
-    warnStartupGaps(configStore as ConfigStore, taskRegistry, this.deps.ownerIdentities);
+    warnStartupGaps(configStore, taskRegistry, this.deps.ownerIdentities);
     this.scheduler = this.deps.createScheduler?.({ notify, configStore }) ?? new TaskScheduler({
       registry: taskRegistry,
-      configStore: configStore as ConfigStore,
+      configStore,
       kinds,
       dedup: dedupStore,
       runsLog,
@@ -91,7 +91,7 @@ export class FeegleApp {
       repositories,
       ownerIdentities: this.deps.ownerIdentities,
       taskRegistry,
-      configStore: configStore as ConfigStore,
+      configStore,
       stockStore,
       quote,
       kinds,
@@ -107,7 +107,7 @@ export class FeegleApp {
       registry,
       chatHandler,
       trace: logFeishuCommandTrace,
-      configStore: configStore as ConfigStore,
+      configStore,
       taskRegistry
     });
     this.runtime = this.deps.runtimeFactory(responder);
@@ -145,7 +145,7 @@ function defaultSeedTasks(): Task[] {
   ];
 }
 
-function warnStartupGaps(configStore: ConfigStore, taskRegistry: TaskRegistry, ownerIdentities: ReadonlySet<string>): void {
+function warnStartupGaps(configStore: ConfigStorePort, taskRegistry: TaskRegistry, ownerIdentities: ReadonlySet<string>): void {
   const tasks = taskRegistry.list();
   if (configStore.get().failureTarget === null && tasks.some((task) => task.enabled)) {
     console.warn("⚠️ failureTarget not configured; enabled tasks exist. Run /error_target set in your target Feishu chat.");

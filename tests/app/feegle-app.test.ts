@@ -20,7 +20,10 @@ describe("FeegleApp", () => {
       },
       loadConfigStore: async () => {
         events.push("config");
-        return { get: () => ({ schemaVersion: 1, failureTarget: null }) };
+        return {
+          get: () => ({ schemaVersion: 1 as const, failureTarget: null }),
+          setFailureTarget: async () => {}
+        };
       },
       createScheduler: () => ({
         start: async () => {
