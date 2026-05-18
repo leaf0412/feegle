@@ -166,13 +166,12 @@ describe("buildSlashCommandRegistry", () => {
     };
 
     expect(() =>
-      buildSlashCommandRegistry(
-        stubSchedulerSlashDeps({
-          modules: [
-            { id: "shadow", register: (target) => target.declarePlanned(collidingDef) }
-          ]
-        })
-      )
+      buildSlashCommandRegistry({
+        ...stubSchedulerSlashDeps(),
+        modules: [
+          { id: "shadow", register: (target) => target.declarePlanned(collidingDef) }
+        ]
+      })
     ).toThrow(/already registered/);
   });
 });
