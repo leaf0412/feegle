@@ -5,7 +5,7 @@ import {
   type SlashCommandContext,
   type SlashCommandHandler
 } from "../../../src/platform/slash-command-handler.js";
-import { findSlashCommandById } from "../../../src/platform/slash-command-catalog.js";
+import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
 
 const owner = "ou_owner";
 const nonOwner = "ou_other";
@@ -40,8 +40,8 @@ describe("HelpCommandHandler", () => {
 
 function registryWithCronList(identities: ReadonlySet<string>): SlashCommandRegistry {
   const registry = new SlashCommandRegistry();
-  registry.register(new HelpCommandHandler(registry, { ownerIdentities: identities }));
-  registry.register(makeOwnerOnly("cron_list"));
+  registry.register(defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help"), new HelpCommandHandler(registry, { ownerIdentities: identities }));
+  registry.register(defineSlashCommand("cron_list", "/cron list", "列出所有任务", "cron", "cmd:/cron list"), makeOwnerOnly("cron_list"));
   return registry;
 }
 
@@ -61,7 +61,7 @@ async function dispatchHelp(
 ) {
   const handler = registry.resolve("help");
   if (!handler) throw new Error("help handler not registered");
-  const definition = findSlashCommandById("help");
+  const definition = registry.findById("help");
   if (!definition) throw new Error("help definition not registered");
   const context: SlashCommandContext = {
     source: "message",

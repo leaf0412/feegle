@@ -2,8 +2,16 @@ import type { NotificationPort, NotificationTarget } from "./notification-port.j
 
 export class NotificationBroker implements NotificationPort {
   constructor(
-    private readonly adapters: Partial<Record<NotificationTarget["platform"], NotificationPort>>
+    private readonly adapters: Record<string, NotificationPort> = {}
   ) {}
+
+  register(platform: string, adapter: NotificationPort): this {
+    if (this.adapters[platform]) {
+      throw new Error(`Notification adapter already registered for platform: ${platform}`);
+    }
+    this.adapters[platform] = adapter;
+    return this;
+  }
 
   async sendText(target: NotificationTarget, text: string): Promise<void> {
     await this.resolve(target).sendText(target, text);

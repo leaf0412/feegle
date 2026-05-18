@@ -2,7 +2,6 @@ import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
-import { findSlashCommandById } from "../platform/slash-command-catalog.js";
 import type {
   SlashCommandHandler,
   SlashCommandReply,
@@ -96,6 +95,13 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     switch (command.type) {
       case "help":
         return this.dispatchSlashCommand(input, "help", command.groupKey ?? "");
+      case "slash_input": {
+        const definition = this.options.registry.findByInput(command.raw);
+        if (!definition) {
+          return { kind: "text", text: `未知命令：${command.raw}` };
+        }
+        return this.dispatchSlashCommand(input, definition.id, extractArgs(command.raw, definition.command));
+      }
       case "slash_command":
         return this.dispatchSlashCommand(input, command.definition.id, extractArgs(command.raw, command.definition.command));
       case "platform_action":
@@ -126,7 +132,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     commandId: string,
     args: string
   ): Promise<SlashCommandReply | undefined> {
-    const definition = findSlashCommandById(commandId);
+    const definition = this.options.registry.findById(commandId);
     const handler = this.options.registry.resolve(commandId);
     if (!handler || !definition) {
       return {

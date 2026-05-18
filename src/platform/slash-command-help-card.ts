@@ -2,9 +2,7 @@ import { isOwner } from "./owner-access.js";
 import { createPlatformCard, type PlatformCard, type PlatformCardButton } from "./platform-card.js";
 import {
   defaultSlashCommandGroupKey,
-  findSlashCommandById,
   listSlashCommandGroups,
-  listSlashCommands,
   type SlashCommandDefinition,
   type SlashCommandGroup
 } from "./slash-command-catalog.js";
@@ -28,7 +26,7 @@ export function buildSlashCommandHelpCard(
   const groupsWithAll = [...visibleGroups, { key: ALL_COMMANDS_KEY, title: ALL_COMMANDS_TITLE }];
   const selectedGroup = groupsWithAll.find((group) => group.key === groupKey) ?? groupsWithAll[0];
   const commands = filterVisible(
-    selectedGroup.key === ALL_COMMANDS_KEY ? listSlashCommands() : listSlashCommands(selectedGroup.key),
+    selectedGroup.key === ALL_COMMANDS_KEY ? registry.listCommands() : registry.listCommands(selectedGroup.key),
     registry,
     options
   );
@@ -63,7 +61,7 @@ export function buildSlashCommandDetailCard(
   registry: SlashCommandRegistryReadView,
   options: HelpCardViewerOptions = {}
 ): PlatformCard {
-  const command = findSlashCommandById(commandId);
+  const command = registry.findById(commandId);
   if (!command || !isCommandVisibleToViewer(command, registry, options)) {
     return createPlatformCard()
       .title("命令不存在", "red")
@@ -99,7 +97,7 @@ function visibleGroupsFor(
   options: HelpCardViewerOptions
 ): SlashCommandGroup[] {
   return listSlashCommandGroups().filter((group) =>
-    filterVisible(listSlashCommands(group.key), registry, options).length > 0
+    filterVisible(registry.listCommands(group.key), registry, options).length > 0
   );
 }
 

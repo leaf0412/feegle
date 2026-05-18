@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import { ConfigStore } from "../../../src/app/config-store.js";
-import { findSlashCommandByInput, listSlashCommands } from "../../../src/platform/slash-command-catalog.js";
 import { buildSlashCommandRegistry } from "../../../src/platform/build-slash-command-registry.js";
 import { FeishuCommandResponder } from "../../../src/feishu/feishu-command-responder.js";
 import { HandlerKindRegistry } from "../../../src/scheduler/handler-kind-registry.js";
@@ -14,17 +13,20 @@ import type { StockStore } from "../../../src/stock/stock-store.js";
 
 describe("scheduler slash commands", () => {
   it("adds concrete cron, stock, portfolio, and error_target commands to the catalog", () => {
-    expect(listSlashCommands("cron").map((command) => command.id)).toContain("cron_run_now");
-    expect(listSlashCommands("stock").map((command) => command.id)).toContain("portfolio_set");
-    expect(findSlashCommandByInput("/heartbeat")).toBeUndefined();
-    expect(findSlashCommandByInput("/cron list")?.id).toBe("cron_list");
+    const registry = buildSlashCommandRegistry({ repositories: { list: () => [] } });
+
+    expect(registry.listCommands("cron").map((command) => command.id)).toContain("cron_run_now");
+    expect(registry.listCommands("stock").map((command) => command.id)).toContain("portfolio_set");
+    expect(registry.findByInput("/heartbeat")).toBeUndefined();
+    expect(registry.findByInput("/cron list")?.id).toBe("cron_list");
   });
 
   it("silently drops owner-only commands from non-owners", async () => {
     const replies: string[] = [];
     const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: makeRegistry(deps),
+      registry,
       configStore: deps.configStore,
       taskRegistry: deps.taskRegistry
     });
@@ -36,7 +38,7 @@ describe("scheduler slash commands", () => {
       sender: { platform: "feishu", userId: "ou_other" },
       command: {
         type: "slash_command",
-        definition: findSlashCommandByInput("/error_target set")!,
+        definition: registry.findByInput("/error_target set")!,
         raw: "/error_target set"
       }
     });
@@ -47,8 +49,9 @@ describe("scheduler slash commands", () => {
   it("binds the failure target for owners", async () => {
     const replies: string[] = [];
     const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: makeRegistry(deps),
+      registry,
       configStore: deps.configStore,
       taskRegistry: deps.taskRegistry
     });
@@ -60,7 +63,7 @@ describe("scheduler slash commands", () => {
       sender: { platform: "feishu", userId: "ou_owner" },
       command: {
         type: "slash_command",
-        definition: findSlashCommandByInput("/error_target set")!,
+        definition: registry.findByInput("/error_target set")!,
         raw: "/error_target set"
       }
     });
@@ -72,8 +75,9 @@ describe("scheduler slash commands", () => {
   it("creates cron tasks only after validating kind params", async () => {
     const replies: string[] = [];
     const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: makeRegistry(deps),
+      registry,
       configStore: deps.configStore,
       taskRegistry: deps.taskRegistry
     });
@@ -85,7 +89,7 @@ describe("scheduler slash commands", () => {
       sender: { platform: "feishu", userId: "ou_owner" },
       command: {
         type: "slash_command",
-        definition: findSlashCommandByInput("/cron add heartbeat \"0 9 * * *\"")!,
+        definition: registry.findByInput("/cron add heartbeat \"0 9 * * *\"")!,
         raw: '/cron add heartbeat "0 9 * * *"'
       }
     });
@@ -97,8 +101,9 @@ describe("scheduler slash commands", () => {
   it("binds stock subscriptions and creates a domain monitor task", async () => {
     const replies: string[] = [];
     const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: makeRegistry(deps),
+      registry,
       configStore: deps.configStore,
       taskRegistry: deps.taskRegistry
     });
@@ -110,7 +115,7 @@ describe("scheduler slash commands", () => {
       sender: { platform: "feishu", userId: "ou_owner" },
       command: {
         type: "slash_command",
-        definition: findSlashCommandByInput("/bind_stocks 600519")!,
+        definition: registry.findByInput("/bind_stocks 600519")!,
         raw: "/bind_stocks 600519"
       }
     });

@@ -410,7 +410,7 @@ describe("extractBotMenuCommand", () => {
       event_key: "list",
       operator: { operator_id: { open_id: "ou_alice" } }
     });
-    expect(envelope?.command.type).toMatch(/unknown|slash_command/);
+    expect(envelope?.command.type).toBe("slash_input");
   });
 
   it("returns null when event_key or operator id is missing", () => {

@@ -38,13 +38,11 @@ describe("parseFeishuCommand", () => {
     });
   });
 
-  it("recognizes registered slash commands without sending them to the agent", () => {
-    const parsed = parseFeishuCommand("/repo list");
-
-    expect(parsed.type).toBe("slash_command");
-    if (parsed.type === "slash_command") {
-      expect(parsed.definition.id).toBe("repo_list");
-    }
+  it("passes slash input to the command responder for registry-owned lookup", () => {
+    expect(parseFeishuCommand("/repo list")).toEqual({
+      type: "slash_input",
+      raw: "/repo list"
+    });
   });
 
   it("returns chat for non-slash text while preserving raw text", () => {
@@ -54,12 +52,12 @@ describe("parseFeishuCommand", () => {
     });
   });
 
-  it("returns unknown for malformed slash commands while preserving raw text", () => {
+  it("preserves malformed slash input for registry-owned lookup", () => {
     const raw = "  /repo select  ";
 
     expect(parseFeishuCommand(raw)).toEqual({
-      type: "unknown",
-      raw
+      type: "slash_input",
+      raw: "/repo select"
     });
   });
 

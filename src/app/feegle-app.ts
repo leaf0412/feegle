@@ -5,14 +5,11 @@ import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runtime.js";
 import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
+import type { SlashCommandModule } from "../platform/slash-command-module.js";
 import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
+import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
 import { DedupStore } from "../scheduler/dedup-store.js";
-import { HandlerKindRegistry } from "../scheduler/handler-kind-registry.js";
-import { AgentPromptKind } from "../scheduler/kinds/agent-prompt-kind.js";
-import { HeartbeatKind } from "../scheduler/kinds/heartbeat-kind.js";
-import { StockAdvisorKind } from "../scheduler/kinds/stock-advisor-kind.js";
-import { StockMonitorKind } from "../scheduler/kinds/stock-monitor-kind.js";
-import { StockPortfolioSnapshotKind } from "../scheduler/kinds/stock-portfolio-snapshot-kind.js";
+import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
 import { ConsoleJsonLogger } from "../scheduler/logger.js";
 import { RunsLog } from "../scheduler/runs-log.js";
 import { TaskRegistry } from "../scheduler/task-registry.js";
@@ -20,12 +17,15 @@ import { TaskScheduler } from "../scheduler/task-scheduler.js";
 import { TaskStore } from "../scheduler/task-store.js";
 import type { Task } from "../scheduler/task.js";
 import { RuntimeHostInfoProvider } from "../scheduler/util/host-info.js";
-import { SinaQuoteClient } from "../stock/sina-quote-client.js";
+import { buildQuoteClientRegistry } from "../stock/build-quote-client-registry.js";
+import { defaultQuoteClientId } from "../stock/default-quote-client-modules.js";
+import type { QuoteClientModule } from "../stock/quote-client-module.js";
 import { StockStore } from "../stock/stock-store.js";
+import { buildNotificationBroker } from "./build-notification-broker.js";
 import { ConfigStore, type ConfigStorePort } from "./config-store.js";
 import { acquireFeegleLock } from "./feegle-lock.js";
 import { NotificationBroker } from "./notification-broker.js";
-import { FeishuNotificationAdapter } from "../feishu/feishu-notification-adapter.js";
+import type { NotificationAdapterModule } from "./notification-adapter-module.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -41,6 +41,11 @@ export interface FeegleAppDeps {
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
   loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
   createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort }) => Startable;
+  slashCommandModules?: readonly SlashCommandModule[];
+  handlerKindModules?: readonly HandlerKindModule[];
+  quoteClientModules?: readonly QuoteClientModule[];
+  quoteClientId?: string;
+  notificationAdapterModules?: readonly NotificationAdapterModule[];
 }
 
 export class FeegleApp {
@@ -59,17 +64,23 @@ export class FeegleApp {
     const taskStore = await TaskStore.load(this.deps.feegleHome);
     await taskStore.ensureSeed(defaultSeedTasks());
     const taskRegistry = new TaskRegistry(taskStore);
-    const notify = new NotificationBroker({
-      feishu: new FeishuNotificationAdapter(this.deps.feishuClient)
+    const notify = buildNotificationBroker({
+      feishuClient: this.deps.feishuClient,
+      modules: this.deps.notificationAdapterModules
     });
 
-    const quote = new SinaQuoteClient();
-    const kinds = new HandlerKindRegistry()
-      .register(new HeartbeatKind({ taskRegistry }))
-      .register(new StockMonitorKind({ stockStore, quote }))
-      .register(new StockPortfolioSnapshotKind({ stockStore, quote }))
-      .register(new StockAdvisorKind({ stockStore, quote, agents: this.deps.agentProviders }))
-      .register(new AgentPromptKind({ agents: this.deps.agentProviders }));
+    const quoteClientId = this.deps.quoteClientId ?? defaultQuoteClientId;
+    const quote = requiredQuoteClient(
+      buildQuoteClientRegistry({ modules: this.deps.quoteClientModules }).get(quoteClientId),
+      quoteClientId
+    );
+    const kinds = buildHandlerKindRegistry({
+      taskRegistry,
+      stockStore,
+      quote,
+      agents: this.deps.agentProviders,
+      modules: this.deps.handlerKindModules
+    });
 
     warnStartupGaps(configStore, taskRegistry, this.deps.ownerIdentities);
     this.scheduler = this.deps.createScheduler?.({ notify, configStore }) ?? new TaskScheduler({
@@ -96,7 +107,8 @@ export class FeegleApp {
       quote,
       kinds,
       scheduler: this.scheduler as TaskScheduler,
-      runsLog
+      runsLog,
+      modules: this.deps.slashCommandModules
     });
     const chatHandler = new FeishuChatHandler({
       client: this.deps.feishuClient,
@@ -119,6 +131,13 @@ export class FeegleApp {
     await this.scheduler?.stop?.();
     await this.lockfileRelease?.();
   }
+}
+
+function requiredQuoteClient<T>(client: T | undefined, id: string): T {
+  if (!client) {
+    throw new Error(`Quote client not registered: ${id}`);
+  }
+  return client;
 }
 
 function defaultSeedTasks(): Task[] {

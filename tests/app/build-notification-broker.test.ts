@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import { buildNotificationBroker } from "../../src/app/build-notification-broker.js";
+import type { NotificationPort } from "../../src/app/notification-port.js";
+import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+
+describe("buildNotificationBroker", () => {
+  it("lets external modules register notification adapters without editing the app entry", async () => {
+    const calls: string[] = [];
+    const adapter: NotificationPort = {
+      sendText: async (_target, text) => {
+        calls.push(text);
+      },
+      sendCard: async (_target, card) => {
+        calls.push(String(card.elements.length));
+      }
+    };
+    const broker = buildNotificationBroker({
+      feishuClient: {} as FeishuClientPort,
+      modules: [
+        {
+          id: "external",
+          register: (target) => {
+            target.register("external", adapter);
+          }
+        }
+      ]
+    });
+
+    await broker.sendText({ platform: "external", chatId: "oc_1" }, "ok");
+
+    expect(calls).toEqual(["ok"]);
+  });
+});

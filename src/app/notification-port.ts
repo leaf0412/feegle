@@ -1,7 +1,7 @@
 import type { PlatformCard } from "../platform/platform-card.js";
 
 export interface NotificationTarget {
-  platform: "feishu";
+  platform: string;
   chatId: string;
 }
 

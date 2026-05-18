@@ -3,7 +3,8 @@ import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responde
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
 import type { RepositoryRecord } from "../../src/domain/models.js";
-import type { SlashCommandRegistry } from "../../src/platform/slash-command-handler.js";
+import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
+import type { SlashCommandHandler, SlashCommandRegistry } from "../../src/platform/slash-command-handler.js";
 
 describe("FeishuCommandResponder", () => {
   it("replies with selected repositories", async () => {
@@ -144,6 +145,42 @@ describe("FeishuCommandResponder", () => {
     });
 
     expect(replies.at(-1)?.text).toBe("/repo show 仍在规划中，暂未接入执行器。");
+  });
+
+  it("resolves slash input through the same registry that executes handlers", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const definition: SlashCommandDefinition = {
+      id: "sample_external",
+      command: "/sample",
+      description: "sample",
+      groupKey: "system",
+      action: "cmd:/sample"
+    };
+    const handler: SlashCommandHandler = {
+      id: "sample_external",
+      async execute(context) {
+        return { kind: "text", text: `external: ${context.args}` };
+      }
+    };
+    const registry = buildSlashCommandRegistry({
+      repositories: { list: () => [] },
+      modules: [
+        {
+          id: "external",
+          register: (target) => target.register(definition, handler)
+        }
+      ]
+    });
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry });
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_sample",
+      command: { type: "slash_input", raw: "/sample hello world" }
+    });
+
+    expect(replies).toEqual([{ messageId: "om_sample", text: "external: hello world" }]);
   });
 
   it("lists registered repositories for /repo list without invoking the agent", async () => {
