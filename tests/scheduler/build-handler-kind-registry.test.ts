@@ -32,4 +32,27 @@ describe("buildHandlerKindRegistry", () => {
 
     expect(registry.get("external-kind")).toBe(kind);
   });
+
+  it("rejects duplicate kind ids across modules so a scheduled task has a single implementation", () => {
+    const kind: HandlerKind<Record<string, never>> = {
+      id: "duplicate-kind",
+      title: "Dup",
+      description: "dup",
+      parseParams: () => ({}),
+      describeParams: () => "none",
+      run: async () => ({ outcome: "noop" })
+    };
+    expect(() =>
+      buildHandlerKindRegistry({
+        taskRegistry: new TaskRegistry({ list: () => [], upsert: async () => {}, remove: async () => {} }),
+        stockStore: {} as StockStore,
+        quote: { query: async () => [] },
+        agents: new AgentProviderRegistry(),
+        modules: [
+          { id: "first", register: (target) => target.register(kind) },
+          { id: "second", register: (target) => target.register(kind) }
+        ]
+      })
+    ).toThrow(/Duplicate kind/);
+  });
 });

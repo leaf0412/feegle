@@ -40,4 +40,20 @@ describe("buildNotificationBroker", () => {
       })
     ).toThrow(/frozen/);
   });
+
+  it("rejects duplicate platform adapters across modules so each platform has one adapter", () => {
+    const adapter: NotificationPort = {
+      sendText: async () => {},
+      sendCard: async () => {}
+    };
+    expect(() =>
+      buildNotificationBroker({
+        feishuClient: {} as FeishuClientPort,
+        modules: [
+          { id: "first", register: (target) => target.register("dup", adapter) },
+          { id: "second", register: (target) => target.register("dup", adapter) }
+        ]
+      })
+    ).toThrow(/already registered/);
+  });
 });

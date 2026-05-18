@@ -23,4 +23,16 @@ describe("buildQuoteClientRegistry", () => {
     const registry = buildQuoteClientRegistry();
     expect(() => registry.register("late", { query: async () => [] })).toThrow(/frozen/);
   });
+
+  it("rejects duplicate quote client ids across modules so each id has one implementation", () => {
+    const client: QuoteClient = { query: async () => [] };
+    expect(() =>
+      buildQuoteClientRegistry({
+        modules: [
+          { id: "first", register: (target) => target.register("dup", client) },
+          { id: "second", register: (target) => target.register("dup", client) }
+        ]
+      })
+    ).toThrow(/Duplicate quote client/);
+  });
 });
