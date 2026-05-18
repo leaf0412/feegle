@@ -40,8 +40,8 @@ describe("HelpCommandHandler", () => {
 
 function registryWithCronList(identities: ReadonlySet<string>): SlashCommandRegistry {
   const registry = new SlashCommandRegistry();
-  registry.register(defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help"), new HelpCommandHandler(registry, { ownerIdentities: identities }));
-  registry.register(defineSlashCommand("cron_list", "/cron list", "列出所有任务", "cron", "cmd:/cron list"), makeOwnerOnly("cron_list"));
+  registry.registerCommand(defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help"), new HelpCommandHandler(registry, { ownerIdentities: identities }));
+  registry.registerCommand(defineSlashCommand("cron_list", "/cron list", "列出所有任务", "cron", "cmd:/cron list"), makeOwnerOnly("cron_list"));
   return registry;
 }
 

@@ -48,7 +48,7 @@ export function plannedCommandModule(): SlashCommandModule {
     id: "planned",
     register: (registry) => {
       for (const definition of plannedDefinitions) {
-        registry.register(definition);
+        registry.declarePlanned(definition);
       }
     }
   };

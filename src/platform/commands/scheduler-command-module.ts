@@ -62,26 +62,26 @@ export function schedulerCommandModule(): SlashCommandModule {
     id: "scheduler",
     register: (registry, deps) => {
       const schedulerDeps = requireSchedulerDeps(deps);
-      registry.register(cronDefinitions.cron_list, new CronListCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_show, new CronShowCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_add, new CronAddCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_edit, new CronEditCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_remove, new CronRemoveCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_pause, new CronPauseCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_resume, new CronResumeCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_run_now, new CronRunNowCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_set_target, new CronSetTargetCommandHandler(schedulerDeps));
-      registry.register(cronDefinitions.cron_history, new CronHistoryCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.bind_stocks, new BindStocksCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.unbind_stocks, new UnbindStocksCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.stocks, new StocksCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.portfolio_set, new PortfolioSetCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.portfolio_list, new PortfolioListCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.portfolio_clear, new PortfolioClearCommandHandler(schedulerDeps));
-      registry.register(stockDefinitions.portfolio_unset, new PortfolioUnsetCommandHandler(schedulerDeps));
-      registry.register(setupDefinitions.error_target_set, new ErrorTargetSetCommandHandler(schedulerDeps));
-      registry.register(setupDefinitions.error_target_show, new ErrorTargetShowCommandHandler(schedulerDeps));
-      registry.register(setupDefinitions.error_target_clear, new ErrorTargetClearCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_list, new CronListCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_show, new CronShowCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_add, new CronAddCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_edit, new CronEditCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_remove, new CronRemoveCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_pause, new CronPauseCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_resume, new CronResumeCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_run_now, new CronRunNowCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_set_target, new CronSetTargetCommandHandler(schedulerDeps));
+      registry.registerCommand(cronDefinitions.cron_history, new CronHistoryCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.bind_stocks, new BindStocksCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.unbind_stocks, new UnbindStocksCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.stocks, new StocksCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.portfolio_set, new PortfolioSetCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.portfolio_list, new PortfolioListCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.portfolio_clear, new PortfolioClearCommandHandler(schedulerDeps));
+      registry.registerCommand(stockDefinitions.portfolio_unset, new PortfolioUnsetCommandHandler(schedulerDeps));
+      registry.registerCommand(setupDefinitions.error_target_set, new ErrorTargetSetCommandHandler(schedulerDeps));
+      registry.registerCommand(setupDefinitions.error_target_show, new ErrorTargetShowCommandHandler(schedulerDeps));
+      registry.registerCommand(setupDefinitions.error_target_clear, new ErrorTargetClearCommandHandler(schedulerDeps));
     }
   };
 }

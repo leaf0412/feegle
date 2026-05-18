@@ -40,28 +40,25 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
   private readonly canonicalIds = new Set<string>();
   private readonly definitions = new Map<string, SlashCommandDefinition>();
 
-  register(definition: SlashCommandDefinition, handler?: SlashCommandHandler): this;
-  register(handler: SlashCommandHandler): this;
-  register(definitionOrHandler: SlashCommandDefinition | SlashCommandHandler, maybeHandler?: SlashCommandHandler): this {
-    const definition = isSlashCommandDefinition(definitionOrHandler) ? definitionOrHandler : undefined;
-    const handler = isSlashCommandDefinition(definitionOrHandler) ? maybeHandler : definitionOrHandler;
-    if (definition) {
-      this.registerDefinition(definition);
+  declarePlanned(definition: SlashCommandDefinition): this {
+    this.guardIdAvailable(definition.id);
+    this.definitions.set(definition.id, cloneCommand(definition));
+    return this;
+  }
+
+  registerCommand(definition: SlashCommandDefinition, handler: SlashCommandHandler): this {
+    if (definition.id !== handler.id) {
+      throw new Error(`definition id (${definition.id}) and handler id (${handler.id}) must match`);
     }
-    if (!handler) {
-      return this;
-    }
-    if (this.handlers.has(handler.id)) {
-      throw new Error(`Slash command handler already registered for id: ${handler.id}`);
-    }
-    this.handlers.set(handler.id, handler);
-    this.canonicalIds.add(handler.id);
-    for (const alias of handler.aliases ?? []) {
-      if (this.handlers.has(alias)) {
-        throw new Error(`Slash command alias collision: ${alias}`);
-      }
-      this.handlers.set(alias, handler);
-    }
+    this.guardIdAvailable(definition.id);
+    this.definitions.set(definition.id, cloneCommand(definition));
+    this.attachHandler(handler);
+    return this;
+  }
+
+  registerInternalHandler(handler: SlashCommandHandler): this {
+    this.guardIdAvailable(handler.id);
+    this.attachHandler(handler);
     return this;
   }
 
@@ -107,20 +104,22 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
       .map(cloneCommand);
   }
 
-  private registerDefinition(definition: SlashCommandDefinition): void {
-    const existing = this.definitions.get(definition.id);
-    if (existing) {
-      if (!sameDefinition(existing, definition)) {
-        throw new Error(`Slash command definition already registered for id: ${definition.id}`);
-      }
-      return;
+  private guardIdAvailable(id: string): void {
+    if (this.definitions.has(id) || this.handlers.has(id) || this.canonicalIds.has(id)) {
+      throw new Error(`Slash command id already registered: ${id}`);
     }
-    this.definitions.set(definition.id, cloneCommand(definition));
   }
-}
 
-function isSlashCommandDefinition(value: SlashCommandDefinition | SlashCommandHandler): value is SlashCommandDefinition {
-  return "command" in value && "description" in value && "groupKey" in value && "action" in value;
+  private attachHandler(handler: SlashCommandHandler): void {
+    this.handlers.set(handler.id, handler);
+    this.canonicalIds.add(handler.id);
+    for (const alias of handler.aliases ?? []) {
+      if (this.handlers.has(alias)) {
+        throw new Error(`Slash command alias collision: ${alias}`);
+      }
+      this.handlers.set(alias, handler);
+    }
+  }
 }
 
 function commandMatches(command: SlashCommandDefinition, normalizedInput: string): boolean {
@@ -158,8 +157,4 @@ function cloneCommand(command: SlashCommandDefinition): SlashCommandDefinition {
     ...command,
     aliases: command.aliases ? [...command.aliases] : undefined
   };
-}
-
-function sameDefinition(left: SlashCommandDefinition, right: SlashCommandDefinition): boolean {
-  return JSON.stringify(cloneCommand(left)) === JSON.stringify(cloneCommand(right));
 }

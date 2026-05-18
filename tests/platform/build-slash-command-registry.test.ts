@@ -27,7 +27,7 @@ describe("buildSlashCommandRegistry", () => {
         {
           id: "external",
           register: (target) => {
-            target.register(definition, handler);
+            target.registerCommand(definition, handler);
           }
         }
       ]

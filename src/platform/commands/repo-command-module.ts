@@ -20,9 +20,9 @@ export function repoCommandModule(): SlashCommandModule {
     id: "repo",
     register: (registry, deps) => {
       for (const definition of repoDefinitions) {
-        registry.register(definition);
+        registry.declarePlanned(definition);
       }
-      registry.register(repoListDefinition, new RepoListCommandHandler(deps.repositories));
+      registry.registerCommand(repoListDefinition, new RepoListCommandHandler(deps.repositories));
     }
   };
 }

@@ -22,10 +22,10 @@ export function systemCommandModule(): SlashCommandModule {
     register: (registry, deps) => {
       const handlerDeps = { ownerIdentities: deps.ownerIdentities };
       for (const definition of systemDefinitions) {
-        registry.register(definition);
+        registry.declarePlanned(definition);
       }
-      registry.register(helpDefinition, new HelpCommandHandler(registry, handlerDeps));
-      registry.register(new CommandDetailHandler(registry, handlerDeps));
+      registry.registerCommand(helpDefinition, new HelpCommandHandler(registry, handlerDeps));
+      registry.registerInternalHandler(new CommandDetailHandler(registry, handlerDeps));
     }
   };
 }

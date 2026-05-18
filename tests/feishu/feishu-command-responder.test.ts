@@ -169,7 +169,7 @@ describe("FeishuCommandResponder", () => {
       modules: [
         {
           id: "external",
-          register: (target) => target.register(definition, handler)
+          register: (target) => target.registerCommand(definition, handler)
         }
       ]
     });
