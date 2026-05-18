@@ -45,6 +45,7 @@ export const StockStoreSchema = z.object({
 
 export type Threshold = z.infer<typeof ThresholdSchema>;
 export type PortfolioEntry = z.infer<typeof PortfolioEntrySchema>;
+export type PortfolioPosition = PortfolioEntry & { stockCode: string };
 export type PortfolioPatch = Partial<Omit<PortfolioEntry, "updatedAt">>;
 export type Subscription = z.infer<typeof SubscriptionSchema>;
 export type Snapshot = z.infer<typeof SnapshotSchema>;

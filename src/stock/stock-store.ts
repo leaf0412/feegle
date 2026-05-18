@@ -6,6 +6,7 @@ import {
   StockStoreSchema,
   type PortfolioEntry,
   type PortfolioPatch,
+  type PortfolioPosition,
   type Snapshot,
   type StockStoreData,
   type Subscription
@@ -90,8 +91,12 @@ export class StockStore {
     return { removed, missing };
   }
 
-  listPortfolio(): readonly PortfolioEntry[] {
-    return Object.values(this.data.portfolio).map((entry) => ({ ...entry, thresholds: cloneThresholds(entry) }));
+  listPortfolio(): readonly PortfolioPosition[] {
+    return Object.entries(this.data.portfolio).map(([stockCode, entry]) => ({
+      stockCode,
+      ...entry,
+      thresholds: cloneThresholds(entry)
+    }));
   }
 
   getPortfolio(code: StockCode): PortfolioEntry | undefined {

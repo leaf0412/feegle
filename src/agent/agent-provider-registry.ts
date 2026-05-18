@@ -57,6 +57,11 @@ export class AgentProviderRegistry {
     return provider ? { ...provider } : undefined;
   }
 
+  resolve(kind: string): AgentProviderDefinition | undefined {
+    const provider = this.providers.get(kind);
+    return provider ? { ...provider } : undefined;
+  }
+
   resolveActiveAgent(): AgentCli | undefined {
     const provider = this.active();
     return provider?.buildAgent();
