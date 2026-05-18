@@ -31,12 +31,15 @@ export interface FeishuCommandResponderOptions {
   registry: SlashCommandRegistry;
   chatHandler?: FeishuChatHandler;
   trace?: FeishuCommandTraceSink;
+  configStore?: { get(): { failureTarget: unknown } };
+  taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
 }
 
 interface DispatchInput {
   source: "message" | "card";
   chatId: string;
   messageId: string;
+  sender?: { platform: "feishu"; userId: string };
   sessionKey?: string;
   command: FeishuCommand;
 }
@@ -122,7 +125,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     input: DispatchInput,
     commandId: string,
     args: string
-  ): Promise<SlashCommandReply> {
+  ): Promise<SlashCommandReply | undefined> {
     const definition = findSlashCommandById(commandId);
     const handler = this.options.registry.resolve(commandId);
     if (!handler || !definition) {
@@ -133,14 +136,19 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
           : `未注册的命令：${commandId}`
       };
     }
-    return handler.execute({
+    const context = {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sender: input.sender ?? { platform: "feishu" as const, userId: "" },
       definition,
       raw: definition.command,
       args
-    });
+    };
+    if (handler.canAccess?.(context) === false) {
+      return undefined;
+    }
+    return this.appendFailureTargetBanner(handler, await handler.execute(context));
   }
 
   private async dispatchPlatformAction(
@@ -168,6 +176,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sender: input.sender ?? { platform: "feishu", userId: "" },
       definition: {
         id: "__command_detail",
         command: "/command",
@@ -178,6 +187,28 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       raw: "/command",
       args
     });
+  }
+
+  private appendFailureTargetBanner(handler: SlashCommandHandler, reply: SlashCommandReply): SlashCommandReply {
+    if (
+      !handler.ownerOnly ||
+      handler.id.startsWith("error_target_") ||
+      this.options.configStore?.get().failureTarget !== null ||
+      !this.options.taskRegistry?.list().some((task) => task.enabled)
+    ) {
+      return reply;
+    }
+    const banner = "⚠️ 故障通知群未绑定，失败通知无法送达。请在目标群运行 /error_target set";
+    if (reply.kind === "text") {
+      return { ...reply, text: `${reply.text}\n\n${banner}` };
+    }
+    return {
+      ...reply,
+      card: {
+        ...reply.card,
+        elements: [...reply.card.elements, { kind: "markdown", content: banner }]
+      }
+    };
   }
 
   private async deliver(input: DispatchInput, reply: SlashCommandReply): Promise<void> {

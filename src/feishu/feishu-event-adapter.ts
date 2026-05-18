@@ -12,6 +12,7 @@ export type { FeishuMessageExtractOptions } from "./feishu-message-normalizer.js
 export interface FeishuCommandEnvelope {
   chatId: string;
   messageId: string;
+  sender?: { platform: "feishu"; userId: string };
   command: FeishuCommand;
   shouldRespond?: boolean;
   message?: PlatformIncomingMessage;
@@ -109,6 +110,16 @@ export interface FeishuCardActionTriggerEvent {
   action?: {
     value?: unknown;
   };
+  operator?: {
+    open_id?: string;
+    union_id?: string;
+    user_id?: string;
+  };
+  user_id?: {
+    open_id?: string;
+    union_id?: string;
+    user_id?: string;
+  };
 }
 
 export function extractTextMessageCommand(event: FeishuMessageReceiveEvent): FeishuCommandEnvelope | null;
@@ -168,6 +179,7 @@ export function explainTextMessageCommand(
     envelope: {
       chatId: message.chat_id,
       messageId: message.message_id,
+      sender: feishuSender(event.sender?.sender_id),
       command: parseFeishuCommand(commandText),
       shouldRespond: options ? canRespondToFeishuTextMessage(event, options, commandText) : true,
       ...(platformMessage ? { message: platformMessage } : {})
@@ -185,6 +197,7 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
   return {
     chatId,
     messageId,
+    sender: feishuSender(event.operator ?? event.user_id),
     shouldRespond: true,
     command: parseFeishuCardActionValue(event.action?.value)
   };
@@ -213,9 +226,17 @@ export function extractBotMenuCommand(
   return {
     chatId: userId,
     messageId,
+    sender: { platform: "feishu", userId },
     shouldRespond: true,
     command: parseFeishuCommand(raw)
   };
+}
+
+function feishuSender(
+  senderId: { open_id?: string; union_id?: string; user_id?: string } | undefined
+): { platform: "feishu"; userId: string } | undefined {
+  const userId = senderId?.open_id ?? senderId?.user_id ?? senderId?.union_id;
+  return userId ? { platform: "feishu", userId } : undefined;
 }
 
 function parseTextContent(content: string): string | null {

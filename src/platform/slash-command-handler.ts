@@ -7,6 +7,7 @@ export interface SlashCommandContext {
   source: SlashCommandInvocationSource;
   chatId: string;
   messageId: string;
+  sender: { platform: "feishu"; userId: string };
   definition: SlashCommandDefinition;
   raw: string;
   args: string;
@@ -20,6 +21,8 @@ export type SlashCommandReply =
 export interface SlashCommandHandler {
   readonly id: string;
   readonly aliases?: ReadonlyArray<string>;
+  readonly ownerOnly?: boolean;
+  canAccess?(context: SlashCommandContext): boolean;
   execute(context: SlashCommandContext): Promise<SlashCommandReply>;
 }
 
