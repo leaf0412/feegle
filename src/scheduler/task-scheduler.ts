@@ -1,0 +1,253 @@
+import cron from "node-cron";
+import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
+import type { FeegleConfig } from "../app/config-store.js";
+import type { NotificationPort } from "../app/notification-port.js";
+import { createPlatformCard } from "../platform/platform-card.js";
+import { withinActiveHours } from "./active-hours.js";
+import type { HandlerKindRegistry } from "./handler-kind-registry.js";
+import { SingleFlight } from "./single-flight.js";
+import type { RunsLog, RunsLogEntry } from "./runs-log.js";
+import type { Task, TaskLastRun, TaskRunStatus } from "./task.js";
+import type { Clock, DailyDedupStore, HostInfoProvider, Logger } from "./task-context.js";
+import type { TaskMutationObserver, TaskRegistry } from "./task-registry.js";
+
+interface ConfigStorePort {
+  get(): Readonly<FeegleConfig>;
+}
+
+export interface TaskSchedulerDeps {
+  registry: TaskRegistry;
+  configStore: ConfigStorePort;
+  kinds: HandlerKindRegistry;
+  dedup: DailyDedupStore;
+  runsLog: Pick<RunsLog, "append">;
+  notify: NotificationPort;
+  agents: AgentProviderRegistry;
+  host: HostInfoProvider;
+  clock: Clock;
+  logger: Logger;
+}
+
+export class TaskScheduler implements TaskMutationObserver {
+  private readonly activeTasks = new Map<string, { stop(): void }>();
+  private readonly singleFlight = new SingleFlight();
+  private unsubscribe?: () => void;
+
+  constructor(private readonly deps: TaskSchedulerDeps) {}
+
+  async start(): Promise<void> {
+    this.unsubscribe = this.deps.registry.subscribe(this);
+    for (const task of this.deps.registry.list()) {
+      if (task.enabled) {
+        this.schedule(task);
+      }
+    }
+  }
+
+  async stop(): Promise<void> {
+    this.unsubscribe?.();
+    for (const task of this.activeTasks.values()) {
+      task.stop();
+    }
+    this.activeTasks.clear();
+  }
+
+  async runOnce(taskId: string, options: { force?: boolean } = {}): Promise<TaskLastRun> {
+    return this.execute(taskId, { force: options.force === true, checkActiveHours: false, rethrow: true });
+  }
+
+  onAdded(task: Task): void {
+    if (task.enabled) {
+      this.schedule(task);
+    }
+  }
+
+  onUpdated(task: Task): void {
+    this.unschedule(task.id);
+    if (task.enabled) {
+      this.schedule(task);
+    }
+  }
+
+  onRemoved(taskId: string): void {
+    this.unschedule(taskId);
+  }
+
+  private schedule(task: Task): void {
+    this.unschedule(task.id);
+    const scheduled = cron.schedule(
+      task.cron,
+      () => {
+        void this.execute(task.id, { force: false, checkActiveHours: true, rethrow: false });
+      },
+      { timezone: task.timezone }
+    );
+    this.activeTasks.set(task.id, scheduled);
+  }
+
+  private unschedule(taskId: string): void {
+    const scheduled = this.activeTasks.get(taskId);
+    if (scheduled) {
+      scheduled.stop();
+      this.activeTasks.delete(taskId);
+    }
+  }
+
+  private async execute(
+    taskId: string,
+    options: { force: boolean; checkActiveHours: boolean; rethrow: boolean }
+  ): Promise<TaskLastRun> {
+    const task = this.deps.registry.get(taskId);
+    if (!task || !task.enabled) {
+      return { at: this.deps.clock.now().toISOString(), status: "skipped", durationMs: 0, note: "disabled" };
+    }
+    const now = this.deps.clock.now();
+    if (options.checkActiveHours && !withinActiveHours(task, now)) {
+      this.deps.logger.debug("outside activeHours, skip", { taskId, now: now.toISOString() });
+      return { at: now.toISOString(), status: "skipped", durationMs: 0, note: "outside-active-hours" };
+    }
+    if (!options.force && !this.singleFlight.tryAcquire(taskId)) {
+      return this.record(task, "skipped", 0, "still-running", now, { consecutiveFailures: task.consecutiveFailures });
+    }
+
+    const startedAt = Date.now();
+    try {
+      const kind = this.deps.kinds.get(task.kind);
+      if (!kind) {
+        throw new Error(`Unknown kind: ${task.kind}`);
+      }
+      const params = kind.parseParams(task.params);
+      const result = await kind.run(
+        {
+          task,
+          now,
+          logger: this.deps.logger,
+          notify: this.deps.notify,
+          agents: this.deps.agents,
+          dedup: this.deps.dedup,
+          host: this.deps.host
+        },
+        params
+      );
+      const durationMs = Date.now() - startedAt;
+      return this.applySuccess(task, outcomeToStatus(result.outcome), durationMs, result.note, now);
+    } catch (error) {
+      const lastRun = await this.applyFailure(task, error, Date.now() - startedAt, now);
+      if (options.rethrow) {
+        throw error;
+      }
+      return lastRun;
+    } finally {
+      if (!options.force) {
+        this.singleFlight.release(taskId);
+      }
+    }
+  }
+
+  private async applySuccess(
+    task: Task,
+    status: TaskRunStatus,
+    durationMs: number,
+    note: string | undefined,
+    now: Date
+  ): Promise<TaskLastRun> {
+    if (task.consecutiveFailures > 0) {
+      const target = this.deps.configStore.get().failureTarget;
+      if (target) {
+        await this.deps.notify.sendCard(
+          target,
+          createPlatformCard().title("任务恢复", "green").markdown(`任务 ${task.name} 已恢复。`).build()
+        );
+      }
+    }
+    return this.record(task, status, durationMs, note, now, {
+      consecutiveFailures: 0,
+      lastErrorNotifiedAt: null
+    });
+  }
+
+  private async applyFailure(task: Task, error: unknown, durationMs: number, now: Date): Promise<TaskLastRun> {
+    const consecutiveFailures = task.consecutiveFailures + 1;
+    const note = errorMessage(error);
+    const lastRun = await this.record(task, "failed", durationMs, note, now, { consecutiveFailures });
+    if (shouldNotify(task.errorPolicy, consecutiveFailures, task.lastErrorNotifiedAt, now)) {
+      const target = this.deps.configStore.get().failureTarget;
+      if (!target) {
+        this.deps.logger.warn("failure with no failureTarget configured", {
+          taskId: task.id,
+          errorClass: errorClass(error)
+        });
+      } else {
+        await this.deps.notify.sendCard(
+          target,
+          createPlatformCard()
+            .title("任务失败", "red")
+            .markdown(`任务 ${task.name} 失败：${note}\n连续失败：${consecutiveFailures}`)
+            .build()
+        );
+        await this.deps.registry.update(task.id, { lastErrorNotifiedAt: now.toISOString() });
+      }
+    }
+    return lastRun;
+  }
+
+  private async record(
+    task: Task,
+    status: TaskRunStatus,
+    durationMs: number,
+    note: string | undefined,
+    now: Date,
+    patch: Partial<Task>
+  ): Promise<TaskLastRun> {
+    const lastRun: TaskLastRun = {
+      at: now.toISOString(),
+      status,
+      durationMs,
+      ...(note ? { note } : {})
+    };
+    await this.deps.registry.update(task.id, { ...patch, lastRun });
+    const entry: RunsLogEntry = {
+      taskId: task.id,
+      kind: task.kind,
+      at: lastRun.at,
+      outcome: status,
+      durationMs,
+      ...(note ? { note } : {})
+    };
+    await this.deps.runsLog.append(entry);
+    return lastRun;
+  }
+}
+
+function outcomeToStatus(outcome: "sent" | "silent" | "noop"): TaskRunStatus {
+  if (outcome === "sent") {
+    return "ok";
+  }
+  return outcome;
+}
+
+function shouldNotify(
+  policy: Task["errorPolicy"],
+  consecutiveFailures: number,
+  lastErrorNotifiedAt: string | null,
+  now: Date
+): boolean {
+  if (policy === "silent") {
+    return false;
+  }
+  if (policy === "always" || consecutiveFailures === 1 || !lastErrorNotifiedAt) {
+    return true;
+  }
+  return now.getTime() - new Date(lastErrorNotifiedAt).getTime() > 30 * 60 * 1000;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function errorClass(error: unknown): string {
+  if (typeof error === "object" && error && "errorClass" in error && typeof error.errorClass === "string") {
+    return error.errorClass;
+  }
+  return error instanceof Error ? error.constructor.name : typeof error;
+}

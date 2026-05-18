@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
+import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
+
+const kind: HandlerKind<Record<string, never>> = {
+  id: "heartbeat",
+  title: "Heartbeat",
+  description: "Sends heartbeat",
+  parseParams: () => ({}),
+  describeParams: () => "no params",
+  run: async () => ({ outcome: "noop" })
+};
+
+describe("HandlerKindRegistry", () => {
+  it("rejects duplicate ids so a task kind has a single implementation", () => {
+    const registry = new HandlerKindRegistry().register(kind);
+
+    expect(() => registry.register(kind)).toThrow("Duplicate kind: heartbeat");
+  });
+
+  it("lists registered kinds for cron command discovery", () => {
+    expect(new HandlerKindRegistry().register(kind).list()).toEqual([kind]);
+  });
+});
