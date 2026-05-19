@@ -27,6 +27,7 @@ export interface FeishuUserDirectoryOptions {
 
 export class FeishuUserDirectory {
   private readonly userNameCache = new Map<string, string>();
+  private readonly userEmailCache = new Map<string, string>();
   private readonly chatNameCache = new Map<string, string>();
   private readonly chatMembersCache = new Map<string, { fetchedAt: number; nameToId: Map<string, string> }>();
   private readonly now: () => number;
@@ -50,6 +51,23 @@ export class FeishuUserDirectory {
       return openId;
     }
     this.userNameCache.set(openId, fetched);
+    return fetched;
+  }
+
+
+  async resolveUserEmail(openId: string): Promise<string> {
+    if (!isValidFeishuLookupID(openId)) {
+      return "";
+    }
+    const cached = this.userEmailCache.get(openId);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const fetched = await this.client.fetchUserEmail(openId);
+    if (fetched === undefined || fetched === "") {
+      return "";
+    }
+    this.userEmailCache.set(openId, fetched);
     return fetched;
   }
 

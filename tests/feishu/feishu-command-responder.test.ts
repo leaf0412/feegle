@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
 import type { RepositoryRecord } from "../../src/domain/models.js";
-import type { SlashCommandRegistry } from "../../src/platform/slash-command-handler.js";
+import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
+import type { SlashCommandHandler, SlashCommandRegistry } from "../../src/platform/slash-command-handler.js";
+import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("FeishuCommandResponder", () => {
   it("replies with selected repositories", async () => {
@@ -61,22 +64,79 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("ignores act: platform actions until the action router is connected", async () => {
+  it("dispatches cmd: card actions through the slash command registry", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
 
     await responder.handleCommand({
       source: "card",
       chatId: "oc_1",
-      messageId: "om_2",
+      messageId: "om_cmd",
+      sender: { platform: "feishu", userId: "ou_alice" },
       command: {
         type: "platform_action",
-        action: { kind: "act", command: "/push", args: "repo web", raw: "act:/push repo web" },
-        sessionKey: "feishu:oc_1:channel"
+        action: { kind: "cmd", command: "/whoami", args: "", raw: "cmd:/whoami" }
       }
     });
 
-    expect(replies).toEqual([]);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]?.messageId).toBe("om_cmd");
+    expect(replies[0]?.text).toContain("platform: feishu");
+    expect(replies[0]?.text).toContain("userId: ou_alice");
+  });
+
+  it("dispatches act: card actions through the slash command registry", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_act",
+      sender: { platform: "feishu", userId: "ou_bob" },
+      command: {
+        type: "platform_action",
+        action: { kind: "act", command: "/whoami", args: "", raw: "act:/whoami" }
+      }
+    });
+
+    expect(replies[0]?.text).toContain("platform: feishu");
+  });
+
+  it("replies 未知命令 when a cmd/act platform action targets an unregistered command", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_unknown",
+      command: {
+        type: "platform_action",
+        action: { kind: "act", command: "/push", args: "repo web", raw: "act:/push repo web" }
+      }
+    });
+
+    expect(replies).toEqual([
+      { messageId: "om_unknown", text: "未知命令：act:/push repo web" }
+    ]);
+  });
+
+  it("replies 仍在规划中 when a cmd: platform action targets a planned slash command", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_planned",
+      command: {
+        type: "platform_action",
+        action: { kind: "cmd", command: "/new", args: "", raw: "cmd:/new" }
+      }
+    });
+
+    expect(replies[0]?.text).toContain("仍在规划中");
   });
 
   it("replies to /help with a navigable command card", async () => {
@@ -144,6 +204,43 @@ describe("FeishuCommandResponder", () => {
     });
 
     expect(replies.at(-1)?.text).toBe("/repo show 仍在规划中，暂未接入执行器。");
+  });
+
+  it("resolves slash input through the same registry that executes handlers", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const definition: SlashCommandDefinition = {
+      id: "sample_external",
+      command: "/sample",
+      description: "sample",
+      groupKey: "system",
+      action: "cmd:/sample"
+    };
+    const handler: SlashCommandHandler = {
+      id: "sample_external",
+      async execute(context) {
+        return { kind: "text", text: `external: ${context.args}` };
+      }
+    };
+    const registry = buildSlashCommandRegistry({
+      repositories: { list: () => [] },
+      defaults: false,
+      modules: [
+        {
+          id: "external",
+          register: (target) => target.registerCommand(definition, handler)
+        }
+      ]
+    });
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry });
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_sample",
+      command: { type: "slash_input", raw: "/sample hello world" }
+    });
+
+    expect(replies).toEqual([{ messageId: "om_sample", text: "external: hello world" }]);
   });
 
   it("lists registered repositories for /repo list without invoking the agent", async () => {
@@ -216,7 +313,7 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([
       {
         messageId: "om_3",
-        text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
+        text: "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。"
       }
     ]);
     expect(progress).toEqual([]);
@@ -328,7 +425,7 @@ describe("FeishuCommandResponder", () => {
       expect(replies).toEqual([
         {
           messageId: "om_trace_throws",
-          text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
+          text: "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。"
         }
       ]);
       expect(consoleWarn).toHaveBeenCalledWith("Feishu command trace hook failed", "trace sink failed");
@@ -339,7 +436,9 @@ describe("FeishuCommandResponder", () => {
 });
 
 function testRegistry(repositories: RepositoryRecord[] = []): SlashCommandRegistry {
-  return buildSlashCommandRegistry({ repositories: { list: () => repositories.map((record) => ({ ...record })) } });
+  return buildSlashCommandRegistry(
+    stubSchedulerSlashDeps({ repositories: { list: () => repositories.map((record) => ({ ...record })) } })
+  );
 }
 
 function fakeClient(
@@ -348,7 +447,7 @@ function fakeClient(
   progress: unknown[] = [],
   reactions: unknown[] = []
 ): FeishuClientPort {
-  return {
+  return makeFakeFeishuClient({
     async sendText(chatId, text) {
       replies.push({ messageId: chatId, text });
       return "om_reply";
@@ -380,37 +479,6 @@ function fakeClient(
     },
     async removeReaction(messageId, reactionId) {
       reactions.push({ kind: "remove", messageId, reactionId });
-    },
-    async fetchBotOpenId() {
-      return undefined;
-    },
-    async fetchUserName() {
-      return undefined;
-    },
-    async fetchChatName() {
-      return undefined;
-    },
-    async fetchChatMembers() {
-      return [];
-    },
-    async fetchMessage() {
-      return undefined;
-    },
-    async fetchMergeForwardItems() {
-      return [];
-    },
-    async sendImage() {
-      return undefined;
-    },
-    async sendAudio() {
-      return undefined;
-    },
-    async downloadResource() {
-      return undefined;
-    },
-    async downloadImage() {
-      return undefined;
-    },
-    async deleteMessage() {}
-  };
+    }
+  });
 }

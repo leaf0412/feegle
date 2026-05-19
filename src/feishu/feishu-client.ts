@@ -124,6 +124,7 @@ export interface FeishuClientPort {
   deleteMessage(messageId: string): Promise<void>;
   fetchBotOpenId(): Promise<string | undefined>;
   fetchUserName(openId: string): Promise<string | undefined>;
+  fetchUserEmail(openId: string): Promise<string | undefined>;
   fetchChatName(chatId: string): Promise<string | undefined>;
   fetchChatMembers(chatId: string): Promise<Array<{ memberId: string; name: string }>>;
   fetchMessage(messageId: string): Promise<FeishuFetchedMessage | undefined>;
@@ -281,6 +282,18 @@ export class LarkFeishuClient implements FeishuClientPort {
       params: { user_id_type: "open_id" }
     });
     return readNestedString(response, ["data", "user", "name"]) ?? readNestedString(response, ["user", "name"]);
+  }
+
+  async fetchUserEmail(openId: string): Promise<string | undefined> {
+    const contact = this.client.contact as ContactUserGetApi | undefined;
+    if (!contact?.v3?.user?.get) {
+      return undefined;
+    }
+    const response = await contact.v3.user.get({
+      path: { user_id: openId },
+      params: { user_id_type: "open_id" }
+    });
+    return readNestedString(response, ["data", "user", "email"]) ?? readNestedString(response, ["user", "email"]);
   }
 
   async fetchChatName(chatId: string): Promise<string | undefined> {

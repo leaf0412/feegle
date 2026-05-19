@@ -72,7 +72,34 @@ describe("feishu event adapter", () => {
     ).toEqual({ ok: false, drop: { reason: "app_sender" } });
   });
 
-  it("extracts push card action commands from card.action.trigger events", () => {
+  it("routes select_static option clicks through action.option instead of action.value", () => {
+    const parsed = extractCardActionCommand({
+      action: {
+        tag: "select_static",
+        option: "nav:/command whoami",
+        value: { session_key: "feishu:oc_1:channel" }
+      },
+      context: { open_chat_id: "oc_1", open_message_id: "om_1" }
+    });
+
+    expect(parsed).toEqual({
+      chatId: "oc_1",
+      messageId: "om_1",
+      shouldRespond: true,
+      command: {
+        type: "platform_action",
+        action: {
+          kind: "nav",
+          command: "/command",
+          args: "whoami",
+          raw: "nav:/command whoami"
+        },
+        sessionKey: "feishu:oc_1:channel"
+      }
+    });
+  });
+
+  it("falls back to action.value when no option is chosen (button click)", () => {
     const parsed = extractCardActionCommand({
       action: {
         value: {
@@ -410,7 +437,7 @@ describe("extractBotMenuCommand", () => {
       event_key: "list",
       operator: { operator_id: { open_id: "ou_alice" } }
     });
-    expect(envelope?.command.type).toMatch(/unknown|slash_command/);
+    expect(envelope?.command.type).toBe("slash_input");
   });
 
   it("returns null when event_key or operator id is missing", () => {

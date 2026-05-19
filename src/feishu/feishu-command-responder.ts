@@ -2,13 +2,15 @@ import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
-import { findSlashCommandById } from "../platform/slash-command-catalog.js";
-import type {
-  SlashCommandHandler,
-  SlashCommandReply,
-  SlashCommandRegistry
+import {
+  extractSlashCommandArgs,
+  type SlashCommandHandler,
+  type SlashCommandReply,
+  type SlashCommandRegistry
 } from "../platform/slash-command-handler.js";
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
+import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
+import type { FeishuUserDirectory } from "./feishu-user-directory.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -31,12 +33,16 @@ export interface FeishuCommandResponderOptions {
   registry: SlashCommandRegistry;
   chatHandler?: FeishuChatHandler;
   trace?: FeishuCommandTraceSink;
+  configStore?: { get(): { failureTarget: unknown } };
+  taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
+  userDirectory?: FeishuUserDirectory;
 }
 
 interface DispatchInput {
   source: "message" | "card";
   chatId: string;
   messageId: string;
+  sender?: { platform: "feishu"; userId: string; email?: string };
   sessionKey?: string;
   command: FeishuCommand;
 }
@@ -73,7 +79,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   private async dispatchChat(input: DispatchInput, userText: string): Promise<void> {
     if (!this.options.chatHandler) {
       await this.traceAsync("reply_text", input, () =>
-        this.client.replyText(input.messageId, "尚未配置 agent。请在管理模型提供方里启用并选择一个。")
+        this.client.replyText(input.messageId, "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。")
       );
       return;
     }
@@ -93,8 +99,15 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     switch (command.type) {
       case "help":
         return this.dispatchSlashCommand(input, "help", command.groupKey ?? "");
+      case "slash_input": {
+        const definition = this.options.registry.findByInput(command.raw);
+        if (!definition) {
+          return { kind: "text", text: `未知命令：${command.raw}` };
+        }
+        return this.dispatchSlashCommand(input, definition.id, extractSlashCommandArgs(command.raw, definition.command));
+      }
       case "slash_command":
-        return this.dispatchSlashCommand(input, command.definition.id, extractArgs(command.raw, command.definition.command));
+        return this.dispatchSlashCommand(input, command.definition.id, extractSlashCommandArgs(command.raw, command.definition.command));
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
       case "chat":
@@ -122,8 +135,8 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     input: DispatchInput,
     commandId: string,
     args: string
-  ): Promise<SlashCommandReply> {
-    const definition = findSlashCommandById(commandId);
+  ): Promise<SlashCommandReply | undefined> {
+    const definition = this.options.registry.findById(commandId);
     const handler = this.options.registry.resolve(commandId);
     if (!handler || !definition) {
       return {
@@ -133,30 +146,47 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
           : `未注册的命令：${commandId}`
       };
     }
-    return handler.execute({
+    const sender = await this.resolveSender(input);
+    const context = {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sender,
       definition,
       raw: definition.command,
       args
-    });
+    };
+    if (handler.canAccess?.(context) === false) {
+      return undefined;
+    }
+    return this.appendFailureTargetBanner(handler, await handler.execute(context));
+  }
+
+  private async resolveSender(input: DispatchInput): Promise<{ platform: "feishu"; userId: string; email?: string }> {
+    const base = input.sender ?? { platform: "feishu" as const, userId: "" };
+    if (!this.options.userDirectory || base.userId === "") {
+      return base;
+    }
+    const email = await this.options.userDirectory.resolveUserEmail(base.userId);
+    if (email === "") {
+      return base;
+    }
+    return { ...base, email: email.toLowerCase() };
   }
 
   private async dispatchPlatformAction(
     input: DispatchInput,
     command: Extract<FeishuCommand, { type: "platform_action" }>
   ): Promise<SlashCommandReply | undefined> {
-    if (command.action.kind !== "nav") {
+    const action = command.action;
+    if (action.kind !== "nav" && action.kind !== "cmd" && action.kind !== "act") {
       return undefined;
     }
-    if (command.action.command === "/help") {
-      return this.dispatchSlashCommand(input, "help", command.action.args);
-    }
-    if (command.action.command === "/command") {
-      return this.runDetailHandler(input, command.action.args);
-    }
-    return undefined;
+    return dispatchPlatformCommandAction(action, {
+      registry: this.options.registry,
+      dispatchSlash: (commandId, args) => this.dispatchSlashCommand(input, commandId, args),
+      runDetailHandler: (args) => this.runDetailHandler(input, args)
+    });
   }
 
   private async runDetailHandler(input: DispatchInput, args: string): Promise<SlashCommandReply | undefined> {
@@ -164,10 +194,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     if (!handler) {
       return undefined;
     }
+    const sender = await this.resolveSender(input);
     return handler.execute({
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sender,
       definition: {
         id: "__command_detail",
         command: "/command",
@@ -178,6 +210,28 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       raw: "/command",
       args
     });
+  }
+
+  private appendFailureTargetBanner(handler: SlashCommandHandler, reply: SlashCommandReply): SlashCommandReply {
+    if (
+      !handler.ownerOnly ||
+      handler.id.startsWith("error_target_") ||
+      this.options.configStore?.get().failureTarget !== null ||
+      !this.options.taskRegistry?.list().some((task) => task.enabled)
+    ) {
+      return reply;
+    }
+    const banner = "⚠️ 故障通知群未绑定，失败通知无法送达。请在目标群运行 /error_target set";
+    if (reply.kind === "text") {
+      return { ...reply, text: `${reply.text}\n\n${banner}` };
+    }
+    return {
+      ...reply,
+      card: {
+        ...reply.card,
+        elements: [...reply.card.elements, { kind: "markdown", content: banner }]
+      }
+    };
   }
 
   private async deliver(input: DispatchInput, reply: SlashCommandReply): Promise<void> {
@@ -244,14 +298,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       throw error;
     }
   }
-}
-
-function extractArgs(raw: string, command: string): string {
-  const literalPrefix = command.split(/[<\[|]/, 1)[0]?.trim() ?? "";
-  if (literalPrefix !== "" && raw.startsWith(literalPrefix)) {
-    return raw.slice(literalPrefix.length).trim();
-  }
-  return raw.trim();
 }
 
 function errorMessage(error: unknown): string {

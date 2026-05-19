@@ -12,6 +12,7 @@ export type { FeishuMessageExtractOptions } from "./feishu-message-normalizer.js
 export interface FeishuCommandEnvelope {
   chatId: string;
   messageId: string;
+  sender?: { platform: "feishu"; userId: string };
   command: FeishuCommand;
   shouldRespond?: boolean;
   message?: PlatformIncomingMessage;
@@ -108,6 +109,18 @@ export interface FeishuCardActionTriggerEvent {
   open_message_id?: string;
   action?: {
     value?: unknown;
+    option?: unknown;
+    tag?: string;
+  };
+  operator?: {
+    open_id?: string;
+    union_id?: string;
+    user_id?: string;
+  };
+  user_id?: {
+    open_id?: string;
+    union_id?: string;
+    user_id?: string;
   };
 }
 
@@ -168,6 +181,7 @@ export function explainTextMessageCommand(
     envelope: {
       chatId: message.chat_id,
       messageId: message.message_id,
+      sender: feishuSender(event.sender?.sender_id),
       command: parseFeishuCommand(commandText),
       shouldRespond: options ? canRespondToFeishuTextMessage(event, options, commandText) : true,
       ...(platformMessage ? { message: platformMessage } : {})
@@ -185,9 +199,25 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
   return {
     chatId,
     messageId,
+    sender: feishuSender(event.operator ?? event.user_id),
     shouldRespond: true,
-    command: parseFeishuCardActionValue(event.action?.value)
+    command: parseFeishuCardActionValue(resolveCardActionPayload(event.action))
   };
+}
+
+function resolveCardActionPayload(action: FeishuCardActionTriggerEvent["action"]): unknown {
+  if (!action) return undefined;
+  if (typeof action.option !== "string") return action.value;
+  const payload: Record<string, unknown> = { action: action.option };
+  if (
+    typeof action.value === "object" &&
+    action.value !== null &&
+    !Array.isArray(action.value) &&
+    typeof (action.value as Record<string, unknown>).session_key === "string"
+  ) {
+    payload.session_key = (action.value as Record<string, unknown>).session_key;
+  }
+  return payload;
 }
 
 export function extractBotMenuCommand(
@@ -213,9 +243,17 @@ export function extractBotMenuCommand(
   return {
     chatId: userId,
     messageId,
+    sender: { platform: "feishu", userId },
     shouldRespond: true,
     command: parseFeishuCommand(raw)
   };
+}
+
+function feishuSender(
+  senderId: { open_id?: string; union_id?: string; user_id?: string } | undefined
+): { platform: "feishu"; userId: string } | undefined {
+  const userId = senderId?.open_id ?? senderId?.user_id ?? senderId?.union_id;
+  return userId ? { platform: "feishu", userId } : undefined;
 }
 
 function parseTextContent(content: string): string | null {

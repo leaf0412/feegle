@@ -4,9 +4,10 @@ import type { AgentCli, AgentChatMessage, AgentRunOptions } from "../../src/agen
 import { ChatHistoryStore } from "../../src/agent/chat-history-store.js";
 import { FeishuChatHandler } from "../../src/feishu/feishu-chat-handler.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("FeishuChatHandler", () => {
-  it("replies with a configuration prompt when no provider is active", async () => {
+  it("prompts to register a provider when the registry is empty", async () => {
     const client = trackingClient();
     const handler = new FeishuChatHandler({
       client,
@@ -24,8 +25,35 @@ describe("FeishuChatHandler", () => {
     expect(result).toEqual({ status: "no_provider" });
     expect(client.replies).toHaveLength(1);
     expect(client.replies[0]).toMatchObject({ messageId: "om_trigger" });
-    expect(client.replies[0].text).toContain("尚未配置 agent");
+    expect(client.replies[0].text).toContain("尚未注册任何 agent provider");
+    expect(client.replies[0].text).toContain("/provider register codex");
     expect(client.cards.start).toHaveLength(0);
+  });
+
+  it("prompts to activate a registered provider when none is active", async () => {
+    const client = trackingClient();
+    const providers = new AgentProviderRegistry();
+    providers.register({
+      kind: "codex",
+      displayName: "Codex",
+      buildAgent: () => ({}) as never
+    });
+    const handler = new FeishuChatHandler({
+      client,
+      providers,
+      history: new ChatHistoryStore()
+    });
+
+    const result = await handler.handle({
+      chatId: "oc_1",
+      triggerMessageId: "om_trigger",
+      sessionKey: "feishu:oc_1:ou_alice",
+      userText: "hello"
+    });
+
+    expect(result).toEqual({ status: "no_provider" });
+    expect(client.replies[0].text).toContain("已注册 codex");
+    expect(client.replies[0].text).toContain("/provider use");
   });
 
   it("streams agent progress into a preview card and finalises with the answer", async () => {
@@ -145,8 +173,7 @@ function trackingClient(): TrackingClient {
   const startCalls: Array<{ replyToMessageId?: string; card: unknown }> = [];
   const updateCalls: Array<unknown> = [];
   let nextId = 1;
-  const fallback = async () => undefined;
-  return {
+  const base = makeFakeFeishuClient({
     async replyText(messageId, text) {
       replies.push({ messageId, text });
       return "om_reply";
@@ -163,24 +190,7 @@ function trackingClient(): TrackingClient {
     },
     async updateInteractiveCard(_messageId, card) {
       updateCalls.push(card);
-    },
-    async deleteMessage() {},
-    async sendText() { return undefined; },
-    async sendFile() { return undefined; },
-    async updateProgress() {},
-    async addReaction() { return undefined; },
-    async removeReaction() {},
-    async fetchBotOpenId() { return undefined; },
-    async fetchUserName() { return undefined; },
-    async fetchChatName() { return undefined; },
-    async fetchChatMembers() { return []; },
-    async fetchMessage() { return undefined; },
-    async fetchMergeForwardItems() { return []; },
-    async sendImage() { return undefined; },
-    async sendAudio() { return undefined; },
-    async downloadResource() { return undefined; },
-    async downloadImage() { return undefined; },
-    replies,
-    cards: { start: startCalls, update: updateCalls }
-  } as TrackingClient;
+    }
+  });
+  return { ...base, replies, cards: { start: startCalls, update: updateCalls } };
 }

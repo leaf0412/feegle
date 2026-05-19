@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { findSlashCommandByInput, listSlashCommands } from "../../src/platform/slash-command-catalog.js";
+import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
+import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("slash command catalog", () => {
   it("lists CC Connect and Feegle commands in the shared catalog", () => {
-    const sessionCommands = listSlashCommands("session");
+    const registry = buildSlashCommandRegistry(stubSchedulerSlashDeps());
+    const sessionCommands = registry.listCommands("session");
 
     expect(sessionCommands.map((command) => command.command)).toContain("/new");
     expect(sessionCommands.map((command) => command.command)).toContain("/sessions");
   });
 
   it("keeps the shared catalog aligned with CC Connect groups without role shortcuts", () => {
-    const allCommands = listSlashCommands();
+    const registry = buildSlashCommandRegistry(stubSchedulerSlashDeps());
+    const allCommands = registry.listCommands();
 
     expect(allCommands.map((command) => command.command)).toContain("/repo list");
     expect(allCommands.map((command) => command.command)).not.toContain("/role list");
@@ -18,13 +21,17 @@ describe("slash command catalog", () => {
   });
 
   it("matches nested commands before generic roots", () => {
-    expect(findSlashCommandByInput("/repo scan")?.id).toBe("repo_scan");
-    expect(findSlashCommandByInput("/repo show")?.id).toBe("repo_show");
-    expect(findSlashCommandByInput("/repo list")?.id).toBe("repo_list");
+    const registry = buildSlashCommandRegistry(stubSchedulerSlashDeps());
+
+    expect(registry.findByInput("/repo scan")?.id).toBe("repo_scan");
+    expect(registry.findByInput("/repo show")?.id).toBe("repo_show");
+    expect(registry.findByInput("/repo list")?.id).toBe("repo_list");
   });
 
   it("matches aliases", () => {
-    expect(findSlashCommandByInput("/bid feature/dev main #1")?.id).toBe("bind");
-    expect(findSlashCommandByInput("/repo sync")?.id).toBe("repo_scan");
+    const registry = buildSlashCommandRegistry(stubSchedulerSlashDeps());
+
+    expect(registry.findByInput("/bid feature/dev main #1")?.id).toBe("bind");
+    expect(registry.findByInput("/repo sync")?.id).toBe("repo_scan");
   });
 });

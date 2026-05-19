@@ -1,22 +1,24 @@
-import { CommandDetailHandler } from "./commands/command-detail.js";
-import { HelpCommandHandler } from "./commands/help-command.js";
-import { RepoListCommandHandler, type RepositoryListSource } from "./commands/repo-list-command.js";
+import { defaultSlashCommandModules } from "./commands/default-slash-command-modules.js";
+import type { SlashCommandModule, SlashCommandRegistryDeps } from "./slash-command-module.js";
 import { SlashCommandRegistry } from "./slash-command-handler.js";
 
-export interface SlashCommandRegistryDeps {
-  repositories: RepositoryListSource;
+export interface BuildSlashCommandRegistryOptions extends SlashCommandRegistryDeps {
+  modules?: readonly SlashCommandModule[];
+  defaults?: boolean;
 }
 
 /**
- * Wire the implemented slash command handlers into a registry.
- *
- * New commands register here exactly once. The responder never grows
- * an if-else per command.
+ * Builds the command registry from modules.
+ * New commands should live behind a command module instead of editing this builder.
+ * Pass `defaults: false` to skip the bundled default modules (useful when isolating
+ * module-composition tests from production defaults' dep requirements).
  */
-export function buildSlashCommandRegistry(deps: SlashCommandRegistryDeps): SlashCommandRegistry {
+export function buildSlashCommandRegistry(deps: BuildSlashCommandRegistryOptions): SlashCommandRegistry {
   const registry = new SlashCommandRegistry();
-  registry.register(new HelpCommandHandler(registry));
-  registry.register(new CommandDetailHandler(registry));
-  registry.register(new RepoListCommandHandler(deps.repositories));
+  const baseModules = (deps.defaults ?? true) ? defaultSlashCommandModules() : [];
+  for (const module of [...baseModules, ...(deps.modules ?? [])]) {
+    module.register(registry, deps);
+  }
+  registry.freeze();
   return registry;
 }

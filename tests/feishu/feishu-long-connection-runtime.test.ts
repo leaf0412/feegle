@@ -437,6 +437,7 @@ describe("FeishuLongConnectionRuntime", () => {
         source: "message",
         chatId: "oc_1",
         messageId: "om_record_only",
+        sender: { platform: "feishu", userId: "ou_1" },
         sessionKey: expect.any(String),
         command: { type: "chat", raw: "只记录，不回复" },
         shouldRespond: false

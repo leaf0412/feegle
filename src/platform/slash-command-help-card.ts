@@ -1,32 +1,42 @@
+import { isOwner } from "./owner-access.js";
 import { createPlatformCard, type PlatformCard, type PlatformCardButton } from "./platform-card.js";
 import {
   defaultSlashCommandGroupKey,
-  findSlashCommandById,
   listSlashCommandGroups,
-  listSlashCommands,
   type SlashCommandDefinition,
   type SlashCommandGroup
 } from "./slash-command-catalog.js";
-import type { SlashCommandRegistryReadView } from "./slash-command-handler.js";
+import type { SlashCommandContext, SlashCommandRegistryReadView } from "./slash-command-handler.js";
 
 const ALL_COMMANDS_KEY = "all";
 const ALL_COMMANDS_TITLE = "全部";
 const GROUP_BUTTONS_PER_ROW = 3;
 
+export interface HelpCardViewerOptions {
+  viewer?: SlashCommandContext;
+  ownerEmails?: ReadonlySet<string>;
+}
+
 export function buildSlashCommandHelpCard(
   registry: SlashCommandRegistryReadView,
-  groupKey = defaultSlashCommandGroupKey
+  groupKey = defaultSlashCommandGroupKey,
+  options: HelpCardViewerOptions = {}
 ): PlatformCard {
-  const groups = [...listSlashCommandGroups(), { key: ALL_COMMANDS_KEY, title: ALL_COMMANDS_TITLE }];
-  const selectedGroup = groups.find((group) => group.key === groupKey) ?? groups[0];
-  const commands = selectedGroup.key === ALL_COMMANDS_KEY
-    ? listSlashCommands()
-    : listSlashCommands(selectedGroup.key);
+  const visibleGroups = visibleGroupsFor(registry, options);
+  const groupsWithAll = [...visibleGroups, { key: ALL_COMMANDS_KEY, title: ALL_COMMANDS_TITLE }];
+  const selectedGroup = groupsWithAll.find((group) => group.key === groupKey) ?? groupsWithAll[0];
+  const commands = filterVisible(
+    selectedGroup.key === ALL_COMMANDS_KEY ? registry.listCommands() : registry.listCommands(selectedGroup.key),
+    registry,
+    options
+  );
   const card = createPlatformCard().title(`命令面板 · ${selectedGroup.title}`, "blue");
 
-  for (let index = 0; index < groups.length; index += GROUP_BUTTONS_PER_ROW) {
+  for (let index = 0; index < groupsWithAll.length; index += GROUP_BUTTONS_PER_ROW) {
     card.buttonRow(
-      groups.slice(index, index + GROUP_BUTTONS_PER_ROW).map((group) => buildGroupButton(group, selectedGroup.key)),
+      groupsWithAll
+        .slice(index, index + GROUP_BUTTONS_PER_ROW)
+        .map((group) => buildGroupButton(group, selectedGroup.key)),
       "equal_columns"
     );
   }
@@ -48,10 +58,11 @@ export function buildSlashCommandHelpCard(
 
 export function buildSlashCommandDetailCard(
   commandId: string,
-  registry: SlashCommandRegistryReadView
+  registry: SlashCommandRegistryReadView,
+  options: HelpCardViewerOptions = {}
 ): PlatformCard {
-  const command = findSlashCommandById(commandId);
-  if (!command) {
+  const command = registry.findById(commandId);
+  if (!command || !isCommandVisibleToViewer(command, registry, options)) {
     return createPlatformCard()
       .title("命令不存在", "red")
       .markdown(`没有找到命令：${commandId}`)
@@ -79,6 +90,41 @@ export function buildSlashCommandDetailCard(
       "equal_columns"
     )
     .build();
+}
+
+function visibleGroupsFor(
+  registry: SlashCommandRegistryReadView,
+  options: HelpCardViewerOptions
+): SlashCommandGroup[] {
+  return listSlashCommandGroups().filter((group) =>
+    filterVisible(registry.listCommands(group.key), registry, options).length > 0
+  );
+}
+
+function filterVisible(
+  commands: ReadonlyArray<SlashCommandDefinition>,
+  registry: SlashCommandRegistryReadView,
+  options: HelpCardViewerOptions
+): SlashCommandDefinition[] {
+  return commands.filter((command) => isCommandVisibleToViewer(command, registry, options));
+}
+
+function isCommandVisibleToViewer(
+  command: SlashCommandDefinition,
+  registry: SlashCommandRegistryReadView,
+  options: HelpCardViewerOptions
+): boolean {
+  const handler = registry.resolve(command.id);
+  if (!handler) {
+    return true;
+  }
+  if (!handler.ownerOnly) {
+    return true;
+  }
+  if (!options.viewer || !options.ownerEmails) {
+    return false;
+  }
+  return isOwner(options.viewer, options.ownerEmails);
 }
 
 function buildGroupButton(group: SlashCommandGroup, selectedKey: string): PlatformCardButton {

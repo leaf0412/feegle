@@ -53,6 +53,13 @@ export {
 export { renderFeishuCard } from "./feishu/feishu-card-renderer.js";
 export { renderFeishuProgressCard } from "./feishu/feishu-progress-card.js";
 export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
+export { FeegleApp } from "./app/feegle-app.js";
+export type { NotificationPort, NotificationTarget } from "./app/notification-port.js";
+export { ConfigStore } from "./app/config-store.js";
+export { TaskScheduler } from "./scheduler/task-scheduler.js";
+export type { Task } from "./scheduler/task.js";
+export { StockStore } from "./stock/stock-store.js";
+export type { Quote, QuoteClient } from "./stock/stock-quote-port.js";
 export {
   FeishuLongConnectionRuntime,
   type FeishuCommandHandler,

@@ -68,6 +68,8 @@ export FEISHU_SHARE_SESSION_IN_CHANNEL="false"
 export FEISHU_THREAD_ISOLATION="false"
 export FEISHU_REPLY_TO_TRIGGER="true"
 export FEISHU_PROGRESS_STYLE="legacy"
+export FEEGLE_HOME="$HOME/.feegle"
+export FEEGLE_OWNER_EMAILS="alice@example.com"
 ```
 
 Do not commit real secrets. Keep them in your shell, local process manager, or a local `.env` file that is not committed.
@@ -81,6 +83,80 @@ Feishu routing options:
 - `FEISHU_SHARE_SESSION_IN_CHANNEL=true` uses one shared session key per group chat.
 - `FEISHU_THREAD_ISOLATION=true` isolates sessions by root/thread message id.
 - `FEISHU_PROGRESS_STYLE` accepts `legacy`, `compact`, or `card`.
+- `FEEGLE_HOME` overrides the scheduler persistence directory; default is `~/.feegle`.
+- `FEEGLE_OWNER_EMAILS` is required for cron/stock commands. Values are comma-separated emails (e.g. `alice@example.com,bob@example.com`). At dispatch time the bot resolves the sender's email via the Feishu contact API and matches against this set — make sure the app has `contact:user.email` scope and that owner emails are filled in the Feishu directory.
+
+## Scheduler And Stock Commands
+
+Feegle persists scheduler state under `~/.feegle` unless `FEEGLE_HOME` is set:
+
+```text
+config.json
+task-store.json
+stock-store.json
+dedup.json
+runs.log.jsonl
+.locks/feegle.lock
+```
+
+Bind the failure notification group before enabling tasks:
+
+```text
+/error_target set
+/error_target show
+/error_target clear
+```
+
+Owner-only scheduler commands:
+
+```text
+/cron list
+/cron show <id>
+/cron add <kind> <cron> [k=v...]
+/cron edit <id> [k=v...]
+/cron remove <id>
+/cron pause <id>
+/cron resume <id>
+/cron run-now <id> [--force]
+/cron set-target <id> [chatId]
+/cron history <id> [--last N]
+```
+
+Stock commands:
+
+```text
+/bind_stocks <codes>
+/unbind_stocks <codes>
+/stocks [codes]
+/portfolio set <code> cost=<price> shares=<n> [stopLoss=<price>]
+/portfolio list
+/portfolio clear <code>
+/portfolio unset <code> <stopLoss|thresholds>
+```
+
+Owner-only agent provider commands:
+
+```text
+/provider list
+/provider register <kind> cwd=<path> [command=<cli>] [sandbox=read-only|workspace-write|danger-full-access] [approvalPolicy=untrusted|on-request|never] [timeoutMs=<ms>]
+/provider unregister <kind>
+/provider use <kind>
+```
+
+`<kind>` 取值：`codex` 或 `claude_code`。第一次启用流程：
+
+```text
+/provider register codex cwd=/Users/yb/work
+/provider use codex
+```
+
+之后即可对 bot 发自然语言对话。`/provider register` 默认不激活，必须显式 `use`。要改字段（例如换 cwd），先 `unregister` 再 `register`。
+
+Live quote smoke test is opt-in:
+
+```bash
+RUN_LIVE_QUOTE_TEST=1 npx vitest run tests/live
+```
 
 ## Run The Feishu Adapter
 

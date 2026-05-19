@@ -19,6 +19,7 @@ export interface FeishuCommandHandler {
     source: "message" | "card";
     chatId: string;
     messageId: string;
+    sender?: { platform: "feishu"; userId: string };
     sessionKey?: string;
     command: FeishuCommand;
     shouldRespond?: boolean;
@@ -100,6 +101,7 @@ export class FeishuLongConnectionRuntime {
               source: "message",
               chatId: envelope.chatId,
               messageId: envelope.messageId,
+              sender: envelope.sender,
               sessionKey: envelope.message?.sessionKey,
               command: envelope.command,
               shouldRespond: envelope.shouldRespond
@@ -149,6 +151,7 @@ export class FeishuLongConnectionRuntime {
               source: "message",
               chatId: envelope.chatId,
               messageId: envelope.messageId,
+              sender: envelope.sender,
               command: envelope.command,
               shouldRespond: envelope.shouldRespond
             })
