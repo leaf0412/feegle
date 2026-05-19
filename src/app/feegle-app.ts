@@ -27,6 +27,7 @@ import { StockStore } from "../stock/stock-store.js";
 import { buildNotificationBroker } from "./build-notification-broker.js";
 import { ConfigStore, type ConfigStorePort } from "./config-store.js";
 import { acquireFeegleLock } from "./feegle-lock.js";
+import { HookManager } from "./hooks.js";
 import { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterModule } from "./notification-adapter-module.js";
 
@@ -44,20 +45,24 @@ export interface FeegleAppDeps {
   runtimeFactory: (handler: FeishuCommandHandler) => Startable;
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
   loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
-  createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort }) => Startable;
+  createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort; hooks?: HookManager }) => Startable;
   slashCommandModules?: readonly SlashCommandModule[];
   handlerKindModules?: readonly HandlerKindModule[];
   quoteClientModules?: readonly QuoteClientModule[];
   quoteClientId?: string;
   notificationAdapterModules?: readonly NotificationAdapterModule[];
+  hooks?: HookManager;
 }
 
 export class FeegleApp {
   private lockfileRelease?: () => Promise<void>;
   private scheduler?: Startable;
   private runtime?: Startable;
+  private hooks?: HookManager;
 
-  constructor(private readonly deps: FeegleAppDeps) {}
+  constructor(private readonly deps: FeegleAppDeps) {
+    this.hooks = deps.hooks;
+  }
 
   async start(): Promise<void> {
     this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
@@ -93,7 +98,7 @@ export class FeegleApp {
     });
 
     warnStartupGaps(configStore, taskRegistry, this.deps.ownerEmails);
-    this.scheduler = this.deps.createScheduler?.({ notify, configStore }) ?? new TaskScheduler({
+    this.scheduler = this.deps.createScheduler?.({ notify, configStore, hooks: this.hooks }) ?? new TaskScheduler({
       registry: taskRegistry,
       configStore,
       kinds,
@@ -103,9 +108,11 @@ export class FeegleApp {
       agents: agentProviders,
       host: new RuntimeHostInfoProvider(),
       clock: { now: () => new Date() },
-      logger: new ConsoleJsonLogger()
+      logger: new ConsoleJsonLogger(),
+      hooks: this.hooks
     });
     await this.scheduler?.start();
+    this.hooks?.emit({ event: "scheduler.started" });
 
     const repositories = new InMemoryRepositoryRegistry();
     const userDirectory = new FeishuUserDirectory(this.deps.feishuClient);
@@ -144,6 +151,7 @@ export class FeegleApp {
   async stop(): Promise<void> {
     await this.runtime?.stop?.();
     await this.scheduler?.stop?.();
+    this.hooks?.emit({ event: "scheduler.stopped" });
     await this.lockfileRelease?.();
   }
 }

@@ -124,3 +124,5 @@ export {
 } from "./platform/action-router.js";
 export { createAgent, listAgentKinds, registerAgent, agentDisplayName } from "./agent/agent-registry.js";
 export type { AgentFactory } from "./agent/agent-registry.js";
+export { HookManager, HOOK_EVENTS } from "./app/hooks.js";
+export type { HookConfig, HookEventPayload, HookEventType, HookHandlerType } from "./app/hooks.js";

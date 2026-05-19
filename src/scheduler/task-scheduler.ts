@@ -1,6 +1,7 @@
 import { Cron } from "croner";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { FeegleConfig } from "../app/config-store.js";
+import type { HookManager } from "../app/hooks.js";
 import type { NotificationPort } from "../app/notification-port.js";
 import { buildFailureCard } from "./build-failure-card.js";
 import { buildRecoveryCard } from "./build-recovery-card.js";
@@ -30,16 +31,19 @@ export interface TaskSchedulerDeps {
   clock: Clock;
   logger: Logger;
   undeliveredFailures?: UndeliveredFailureCounter;
+  hooks?: HookManager;
 }
 
 export class TaskScheduler implements TaskMutationObserver {
   private readonly activeTasks = new Map<string, { stop(): void }>();
   private readonly singleFlight = new SingleFlight();
   private readonly undeliveredFailures: UndeliveredFailureCounter;
+  private readonly hooks?: HookManager;
   private unsubscribe?: () => void;
 
   constructor(private readonly deps: TaskSchedulerDeps) {
     this.undeliveredFailures = deps.undeliveredFailures ?? new UndeliveredFailureCounter();
+    this.hooks = deps.hooks;
   }
 
   async start(): Promise<void> {
@@ -137,9 +141,22 @@ export class TaskScheduler implements TaskMutationObserver {
         params
       );
       const durationMs = Date.now() - startedAt;
-      return this.applySuccess(task, outcomeToStatus(result.outcome), durationMs, result.note, now);
+      const lastRun = await this.applySuccess(task, outcomeToStatus(result.outcome), durationMs, result.note, now);
+      this.hooks?.emit({
+        event: "task.completed",
+        content: result.note,
+        extra: { taskId: task.id, taskName: task.name, kind: task.kind, durationMs }
+      });
+      return lastRun;
     } catch (error) {
-      const lastRun = await this.applyFailure(task, error, Date.now() - startedAt, now);
+      const durationMs = Date.now() - startedAt;
+      const note = errorMessage(error);
+      const lastRun = await this.applyFailure(task, error, durationMs, now);
+      this.hooks?.emit({
+        event: "task.failed",
+        error: note,
+        extra: { taskId: task.id, taskName: task.name, kind: task.kind, durationMs }
+      });
       if (options.rethrow) {
         throw error;
       }
