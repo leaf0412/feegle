@@ -75,7 +75,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   private async dispatchChat(input: DispatchInput, userText: string): Promise<void> {
     if (!this.options.chatHandler) {
       await this.traceAsync("reply_text", input, () =>
-        this.client.replyText(input.messageId, "尚未配置 agent。请在管理模型提供方里启用并选择一个。")
+        this.client.replyText(input.messageId, "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。")
       );
       return;
     }

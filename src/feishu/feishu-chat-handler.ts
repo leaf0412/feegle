@@ -51,7 +51,11 @@ export class FeishuChatHandler {
   async handle(request: FeishuChatRequest): Promise<FeishuChatResult> {
     const provider = this.deps.providers.active();
     if (!provider) {
-      const text = "尚未配置 agent。请在管理模型提供方里启用并选择一个，例如 /provider 选择 codex。";
+      const available = this.deps.providers.available();
+      const text =
+        available.length === 0
+          ? "尚未注册任何 agent provider。请运行 /provider register codex cwd=<path>，再 /provider use codex 激活。"
+          : `已注册 ${available.map((p) => p.kind).join("、")}，但都未激活。运行 /provider use <kind> 激活一个。`;
       await this.deps.client.replyText(request.triggerMessageId, text);
       return { status: "no_provider" };
     }

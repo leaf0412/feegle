@@ -255,7 +255,7 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([
       {
         messageId: "om_3",
-        text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
+        text: "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。"
       }
     ]);
     expect(progress).toEqual([]);
@@ -367,7 +367,7 @@ describe("FeishuCommandResponder", () => {
       expect(replies).toEqual([
         {
           messageId: "om_trace_throws",
-          text: "尚未配置 agent。请在管理模型提供方里启用并选择一个。"
+          text: "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。"
         }
       ]);
       expect(consoleWarn).toHaveBeenCalledWith("Feishu command trace hook failed", "trace sink failed");
