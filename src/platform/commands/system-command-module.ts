@@ -2,6 +2,7 @@ import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import { CommandDetailHandler } from "./command-detail.js";
 import { HelpCommandHandler } from "./help-command.js";
+import { StatusCommandHandler } from "./system/status-command.js";
 import { VersionCommandHandler } from "./system/version-command.js";
 import { WhoamiCommandHandler } from "./whoami-command.js";
 
@@ -14,8 +15,8 @@ const whoamiDefinition = defineSlashCommand(
   "cmd:/whoami"
 );
 const versionDefinition = defineSlashCommand("version", "/version", "查看版本", "system", "nav:/version");
+const statusDefinition = defineSlashCommand("status", "/status", "查看状态", "system", "nav:/status");
 const plannedSystemDefinitions = [
-  defineSlashCommand("status", "/status", "查看状态", "system", "nav:/status"),
   defineSlashCommand("doctor", "/doctor", "运行诊断", "system", "nav:/doctor"),
   defineSlashCommand("usage", "/usage", "查看用量", "system", "cmd:/usage"),
   defineSlashCommand("upgrade", "/upgrade", "检查升级", "system", "nav:/upgrade"),
@@ -33,6 +34,20 @@ export function systemCommandModule(): SlashCommandModule {
       registry.registerCommand(helpDefinition, new HelpCommandHandler(registry, handlerDeps));
       registry.registerCommand(whoamiDefinition, new WhoamiCommandHandler(handlerDeps));
       registry.registerCommand(versionDefinition, new VersionCommandHandler());
+
+      if (deps.taskRegistry && deps.providers) {
+        registry.registerCommand(
+          statusDefinition,
+          new StatusCommandHandler({
+            taskRegistry: deps.taskRegistry,
+            providers: deps.providers,
+            runsLog: deps.runsLog
+          })
+        );
+      } else {
+        registry.declarePlanned(statusDefinition);
+      }
+
       registry.registerInternalHandler(new CommandDetailHandler(registry, handlerDeps));
     }
   };
