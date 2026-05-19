@@ -2,7 +2,6 @@ import * as lark from "@larksuiteoapi/node-sdk";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
-import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { FeegleApp } from "../app/feegle-app.js";
 import { resolveFeegleHome } from "../app/feegle-home.js";
 import { parseOwnerIdentities } from "../app/owner-identities.js";
@@ -29,12 +28,10 @@ const feishuClient: FeishuClientPort = new LarkFeishuClient(
     appSecret: config.appSecret
   })
 );
-const providers = buildAgentProviderRegistry(process.env);
 const app = new FeegleApp({
   feegleHome: resolveFeegleHome(process.env),
   ownerIdentities: parseOwnerIdentities(process.env.FEEGLE_OWNER_IDENTITIES),
   feishuClient,
-  agentProviders: providers,
   runtimeFactory: (handler) => new FeishuLongConnectionRuntime(config, lark, handler)
 });
 

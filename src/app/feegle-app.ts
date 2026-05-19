@@ -1,5 +1,7 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
+import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
+import { ProviderStore } from "../agent/provider-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
@@ -36,7 +38,8 @@ export interface FeegleAppDeps {
   feegleHome: string;
   ownerIdentities: ReadonlySet<string>;
   feishuClient: FeishuClientPort;
-  agentProviders: AgentProviderRegistry;
+  agentProviders?: AgentProviderRegistry;
+  loadAgentProviders?: (feegleHome: string) => Promise<AgentProviderRegistry>;
   runtimeFactory: (handler: FeishuCommandHandler) => Startable;
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
   loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
@@ -58,6 +61,12 @@ export class FeegleApp {
   async start(): Promise<void> {
     this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
     const configStore = await (this.deps.loadConfigStore ?? ConfigStore.load)(this.deps.feegleHome);
+    const providerStore = await ProviderStore.load(this.deps.feegleHome);
+    const agentProviders =
+      this.deps.agentProviders ??
+      (this.deps.loadAgentProviders
+        ? await this.deps.loadAgentProviders(this.deps.feegleHome)
+        : buildAgentProviderRegistry({ store: providerStore }));
     const stockStore = await StockStore.load(this.deps.feegleHome);
     const dedupStore = await DedupStore.load(this.deps.feegleHome);
     const runsLog = await RunsLog.open(this.deps.feegleHome);
@@ -78,7 +87,7 @@ export class FeegleApp {
       taskRegistry,
       stockStore,
       quote,
-      agents: this.deps.agentProviders,
+      agents: agentProviders,
       modules: this.deps.handlerKindModules
     });
 
@@ -90,7 +99,7 @@ export class FeegleApp {
       dedup: dedupStore,
       runsLog,
       notify,
-      agents: this.deps.agentProviders,
+      agents: agentProviders,
       host: new RuntimeHostInfoProvider(),
       clock: { now: () => new Date() },
       logger: new ConsoleJsonLogger()
@@ -108,11 +117,13 @@ export class FeegleApp {
       kinds,
       scheduler: this.scheduler as TaskScheduler,
       runsLog,
+      providers: agentProviders,
+      providerStore,
       modules: this.deps.slashCommandModules
     });
     const chatHandler = new FeishuChatHandler({
       client: this.deps.feishuClient,
-      providers: this.deps.agentProviders,
+      providers: agentProviders,
       history: new ChatHistoryStore()
     });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
