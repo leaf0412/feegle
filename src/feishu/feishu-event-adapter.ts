@@ -109,6 +109,8 @@ export interface FeishuCardActionTriggerEvent {
   open_message_id?: string;
   action?: {
     value?: unknown;
+    option?: unknown;
+    tag?: string;
   };
   operator?: {
     open_id?: string;
@@ -199,8 +201,23 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
     messageId,
     sender: feishuSender(event.operator ?? event.user_id),
     shouldRespond: true,
-    command: parseFeishuCardActionValue(event.action?.value)
+    command: parseFeishuCardActionValue(resolveCardActionPayload(event.action))
   };
+}
+
+function resolveCardActionPayload(action: FeishuCardActionTriggerEvent["action"]): unknown {
+  if (!action) return undefined;
+  if (typeof action.option !== "string") return action.value;
+  const payload: Record<string, unknown> = { action: action.option };
+  if (
+    typeof action.value === "object" &&
+    action.value !== null &&
+    !Array.isArray(action.value) &&
+    typeof (action.value as Record<string, unknown>).session_key === "string"
+  ) {
+    payload.session_key = (action.value as Record<string, unknown>).session_key;
+  }
+  return payload;
 }
 
 export function extractBotMenuCommand(
