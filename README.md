@@ -134,6 +134,24 @@ Stock commands:
 /portfolio unset <code> <stopLoss|thresholds>
 ```
 
+Owner-only agent provider commands:
+
+```text
+/provider list
+/provider register <kind> cwd=<path> [command=<cli>] [sandbox=read-only|workspace-write|danger-full-access] [approvalPolicy=untrusted|on-request|never] [timeoutMs=<ms>]
+/provider unregister <kind>
+/provider use <kind>
+```
+
+`<kind>` 取值：`codex` 或 `claude_code`。第一次启用流程：
+
+```text
+/provider register codex cwd=/Users/yb/work
+/provider use codex
+```
+
+之后即可对 bot 发自然语言对话。`/provider register` 默认不激活，必须显式 `use`。要改字段（例如换 cwd），先 `unregister` 再 `register`。
+
 Live quote smoke test is opt-in:
 
 ```bash
