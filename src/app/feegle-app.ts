@@ -12,6 +12,7 @@ import { buildSlashCommandRegistry } from "../platform/build-slash-command-regis
 import { AliasStore } from "../platform/commands/alias-store.js";
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
 import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
+import { RepositoryStore } from "../repositories/repository-store.js";
 import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
 import { DedupStore } from "../scheduler/dedup-store.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
@@ -73,6 +74,7 @@ export class FeegleApp {
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
     const chatHistory = new ChatHistoryStore();
     const aliasStore = await AliasStore.load(this.deps.feegleHome);
+    const repositoryStore = await RepositoryStore.load(this.deps.feegleHome);
     const agentProviders =
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
@@ -125,6 +127,7 @@ export class FeegleApp {
       feegleHome: this.deps.feegleHome,
       userDirectory,
       repositories,
+      repositoryStore,
       ownerEmails: this.deps.ownerEmails,
       taskRegistry,
       configStore,
