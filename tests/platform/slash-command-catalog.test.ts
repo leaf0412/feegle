@@ -8,7 +8,8 @@ describe("slash command catalog", () => {
     const sessionCommands = registry.listCommands("session");
 
     expect(sessionCommands.map((command) => command.command)).toContain("/new");
-    expect(sessionCommands.map((command) => command.command)).toContain("/sessions");
+    expect(sessionCommands.map((command) => command.command)).toContain("/list");
+    expect(sessionCommands.map((command) => command.command)).toContain("/stop");
   });
 
   it("keeps the shared catalog aligned with CC Connect groups without role shortcuts", () => {

@@ -10,7 +10,6 @@ const repoDefinitions = [
   defineSlashCommand("repo_add", "/repo add <url>", "注册外部仓库", "repo", "nav:/command repo_add"),
   defineSlashCommand("repo_remove", "/repo remove <#索引|url|alias|repo-key>", "删除外部仓库", "repo", "nav:/command repo_remove"),
   defineSlashCommand("repo_scan", "/repo scan", "刷新已注册仓库元数据", "repo", "nav:/command repo_scan", ["/repo sync"]),
-  defineSlashCommand("shifu", "/shifu bind|show|unbind|sync", "shifu 同步管理", "repo", "nav:/command shifu"),
   defineSlashCommand("workspace", "/workspace", "工作区绑定与初始化", "repo", "cmd:/workspace"),
   defineSlashCommand("dir", "/dir", "选择工作目录", "repo", "nav:/dir")
 ];
