@@ -9,7 +9,10 @@ registerAgent("claude_code", "Claude Code", (record) => {
     createClaudeCodeCliPromptRunner({
       command: record.command as string | undefined,
       cwd: record.cwd as string,
-      timeoutMs: record.timeoutMs as number | undefined
+      timeoutMs: record.timeoutMs as number | undefined,
+      model: record.model as string | undefined,
+      mode: record.mode as string | undefined,
+      allowedTools: record.allowedTools as readonly string[] | undefined
     })
   );
 });

@@ -8,6 +8,9 @@ export interface CodexCliRunnerOptions {
   sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   approvalPolicy?: "untrusted" | "on-request" | "never";
   timeoutMs?: number;
+  model?: string;
+  reasoningEffort?: "low" | "medium" | "high";
+  allowedTools?: readonly string[];
 }
 
 export interface CodexCliCommandResult {
@@ -46,9 +49,17 @@ export function createCodexCliPromptRunner(
 }
 
 function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
-  return [
+  const args: string[] = [
     "--ask-for-approval",
-    options.approvalPolicy ?? "never",
+    options.approvalPolicy ?? "never"
+  ];
+  if (options.model) {
+    args.push("--model", options.model);
+  }
+  if (options.reasoningEffort) {
+    args.push("-c", `model_reasoning_effort="${options.reasoningEffort}"`);
+  }
+  args.push(
     "exec",
     "--skip-git-repo-check",
     "--cd",
@@ -57,7 +68,8 @@ function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
     options.sandbox ?? "workspace-write",
     "--json",
     "-"
-  ];
+  );
+  return args;
 }
 
 function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): string {

@@ -3,20 +3,38 @@ import { join } from "node:path";
 import { z } from "zod";
 import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
 
+export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+export const CLAUDE_PERMISSION_MODES = [
+  "default",
+  "acceptEdits",
+  "plan",
+  "auto",
+  "bypassPermissions"
+] as const;
+export type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
+
 const CodexRecordSchema = z.object({
   kind: z.literal("codex"),
   command: z.string().min(1).optional(),
   cwd: z.string().min(1),
   sandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).optional(),
   approvalPolicy: z.enum(["untrusted", "on-request", "never"]).optional(),
-  timeoutMs: z.number().positive().optional()
+  timeoutMs: z.number().positive().optional(),
+  model: z.string().min(1).optional(),
+  reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+  allowedTools: z.array(z.string().min(1)).optional()
 });
 
 const ClaudeCodeRecordSchema = z.object({
   kind: z.literal("claude_code"),
   command: z.string().min(1).optional(),
   cwd: z.string().min(1),
-  timeoutMs: z.number().positive().optional()
+  timeoutMs: z.number().positive().optional(),
+  model: z.string().min(1).optional(),
+  mode: z.enum(CLAUDE_PERMISSION_MODES).optional(),
+  allowedTools: z.array(z.string().min(1)).optional()
 });
 
 export const ProviderRecordSchema = z.discriminatedUnion("kind", [
@@ -100,6 +118,27 @@ export class ProviderStore {
     };
     await writeJsonAtomically(this.filePath, next);
     this.data = next;
+  }
+
+  async updateSettings(
+    kind: ProviderKind,
+    patch: Partial<Omit<ProviderRecord, "kind" | "cwd">>
+  ): Promise<ProviderRecord> {
+    const index = this.data.providers.findIndex((entry) => entry.kind === kind);
+    if (index === -1) {
+      throw new Error(`provider not registered: ${kind}`);
+    }
+    const current = this.data.providers[index]!;
+    const merged = { ...current, ...patch, kind: current.kind, cwd: current.cwd };
+    const validated = ProviderRecordSchema.parse(merged);
+    const next: ProvidersFile = {
+      schemaVersion: 1,
+      providers: this.data.providers.map((entry, i) => (i === index ? validated : entry)),
+      activeKind: this.data.activeKind
+    };
+    await writeJsonAtomically(this.filePath, next);
+    this.data = next;
+    return { ...validated };
   }
 
   async remove(kind: ProviderKind): Promise<{ activeCleared: boolean }> {

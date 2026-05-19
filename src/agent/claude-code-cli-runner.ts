@@ -6,6 +6,9 @@ export interface ClaudeCodeCliRunnerOptions {
   command?: string;
   cwd: string;
   timeoutMs?: number;
+  model?: string;
+  mode?: string;
+  allowedTools?: readonly string[];
 }
 
 export interface ClaudeCodeCliCommandResult {
@@ -34,7 +37,7 @@ export function createClaudeCodeCliPromptRunner(
 ): PromptRunner {
   return async (prompt, runOptions) => {
     try {
-      const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(), {
+      const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(options), {
         cwd: options.cwd,
         input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
         timeout: options.timeoutMs ?? 300_000
@@ -50,8 +53,8 @@ export function createClaudeCodeCliPromptRunner(
   };
 }
 
-function buildClaudeCodeArgs(): string[] {
-  return [
+function buildClaudeCodeArgs(options: ClaudeCodeCliRunnerOptions): string[] {
+  const args: string[] = [
     "-p",
     "--output-format",
     "stream-json",
@@ -59,6 +62,16 @@ function buildClaudeCodeArgs(): string[] {
     "stream-json",
     "--verbose"
   ];
+  if (options.model) {
+    args.push("--model", options.model);
+  }
+  if (options.mode) {
+    args.push("--permission-mode", options.mode);
+  }
+  if (options.allowedTools && options.allowedTools.length > 0) {
+    args.push("--allowedTools", options.allowedTools.join(","));
+  }
+  return args;
 }
 
 function buildUserMessage(prompt: string): unknown {
