@@ -1,3 +1,4 @@
+import type { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { ProviderStore } from "../agent/provider-store.js";
 import type { SchedulerCommandDeps } from "./commands/scheduler-command-deps.js";
@@ -7,6 +8,7 @@ import type { SlashCommandRegistry } from "./slash-command-handler.js";
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
   ownerIdentities?: SchedulerCommandDeps["ownerIdentities"];
+  userDirectory?: FeishuUserDirectory;
   taskRegistry?: SchedulerCommandDeps["taskRegistry"];
   configStore?: SchedulerCommandDeps["configStore"];
   stockStore?: SchedulerCommandDeps["stockStore"];

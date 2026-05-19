@@ -428,6 +428,9 @@ function fakeClient(
     async fetchUserName() {
       return undefined;
     },
+    async fetchUserEmail() {
+      return undefined;
+    },
     async fetchChatName() {
       return undefined;
     },

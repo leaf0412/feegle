@@ -88,6 +88,7 @@ function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
     deleteMessage: async () => {},
     fetchBotOpenId: fallback,
     fetchUserName: fallback,
+    fetchUserEmail: fallback,
     fetchChatName: fallback,
     fetchChatMembers: async () => [],
     fetchMessage: fallback,

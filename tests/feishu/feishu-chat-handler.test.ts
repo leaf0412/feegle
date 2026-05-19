@@ -199,6 +199,7 @@ function trackingClient(): TrackingClient {
     async removeReaction() {},
     async fetchBotOpenId() { return undefined; },
     async fetchUserName() { return undefined; },
+    async fetchUserEmail() { return undefined; },
     async fetchChatName() { return undefined; },
     async fetchChatMembers() { return []; },
     async fetchMessage() { return undefined; },

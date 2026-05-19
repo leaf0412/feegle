@@ -238,6 +238,7 @@ function fakeClient(replies: string[]): FeishuClientPort {
     deleteMessage: async () => {},
     fetchBotOpenId: async () => undefined,
     fetchUserName: async () => undefined,
+    fetchUserEmail: async () => undefined,
     fetchChatName: async () => undefined,
     fetchChatMembers: async () => [],
     fetchMessage: async () => undefined,

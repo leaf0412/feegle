@@ -4,9 +4,11 @@ import type {
   SlashCommandReply
 } from "../slash-command-handler.js";
 import { isOwner } from "../owner-access.js";
+import type { FeishuUserDirectory } from "../../feishu/feishu-user-directory.js";
 
 export interface WhoamiCommandHandlerDeps {
   ownerIdentities?: ReadonlySet<string>;
+  userDirectory?: FeishuUserDirectory;
 }
 
 export class WhoamiCommandHandler implements SlashCommandHandler {
@@ -17,20 +19,43 @@ export class WhoamiCommandHandler implements SlashCommandHandler {
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const matchKey = `${context.sender.platform}:${context.sender.userId}`;
     const ownerCheck = this.deps.ownerIdentities && isOwner(context, this.deps.ownerIdentities);
-    return { kind: "text", text: render(context, matchKey, ownerCheck === true) };
+    const name = this.deps.userDirectory
+      ? await this.deps.userDirectory.resolveUserName(context.sender.userId)
+      : undefined;
+    const email = this.deps.userDirectory
+      ? await this.deps.userDirectory.resolveUserEmail(context.sender.userId)
+      : undefined;
+    return { kind: "text", text: render(context, matchKey, ownerCheck === true, name, email) };
   }
 }
 
-function render(context: SlashCommandContext, matchKey: string, owner: boolean): string {
-  return [
-    "🪪 bot 视角下的你",
+function render(
+  context: SlashCommandContext,
+  matchKey: string,
+  owner: boolean,
+  name?: string,
+  email?: string
+): string {
+  const lines = [
+    "bot 视角下的你",
     `- platform: ${context.sender.platform}`,
     `- userId: ${context.sender.userId || "(空)"}`,
+  ];
+  if (name && name !== context.sender.userId) {
+    lines.push(`- 姓名: ${name}`);
+  }
+  if (email) {
+    lines.push(`- 邮箱: ${email}`);
+  }
+  lines.push(
     `- 当前 owner 匹配键: ${matchKey}`,
     `- isOwner: ${owner ? "✅" : "❌"}`,
     "",
+  );
+  lines.push(
     owner
       ? "已通过 owner 校验，可使用 /cron · /bind_stocks · /portfolio · /error_target · /provider 等命令。"
       : "未匹配 FEEGLE_OWNER_IDENTITIES。把上面「当前 owner 匹配键」整串加入该环境变量（逗号分隔多个）即可解锁 owner-only 命令。"
-  ].join("\n");
+  );
+  return lines.join("\n");
 }

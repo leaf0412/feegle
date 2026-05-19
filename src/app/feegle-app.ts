@@ -3,6 +3,7 @@ import { buildAgentProviderRegistry } from "../agent/build-agent-provider-regist
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
 import { ProviderStore } from "../agent/provider-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
+import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runtime.js";
@@ -108,6 +109,7 @@ export class FeegleApp {
 
     const repositories = new InMemoryRepositoryRegistry();
     const registry = buildSlashCommandRegistry({
+      userDirectory: new FeishuUserDirectory(this.deps.feishuClient),
       repositories,
       ownerIdentities: this.deps.ownerIdentities,
       taskRegistry,
