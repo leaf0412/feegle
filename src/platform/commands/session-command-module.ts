@@ -1,6 +1,7 @@
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import type { SlashCommandModule } from "../slash-command-module.js";
 import { CurrentCommandHandler } from "./session/current-command.js";
+import { DeleteCommandHandler } from "./session/delete-command.js";
 import { HistoryCommandHandler } from "./session/history-command.js";
 import { ListCommandHandler } from "./session/list-command.js";
 import { NameCommandHandler } from "./session/name-command.js";
@@ -15,6 +16,7 @@ const switchDefinition = defineSlashCommand("switch", "/switch", "切换会话",
 const historyDefinition = defineSlashCommand("history", "/history", "查看会话历史", "session", "nav:/history");
 const searchDefinition = defineSlashCommand("search", "/search", "搜索历史会话", "session", "cmd:/search");
 const nameDefinition = defineSlashCommand("name", "/name", "重命名会话", "session", "cmd:/name");
+const deleteDefinition = defineSlashCommand("delete", "/delete", "删除会话", "session", "cmd:/delete");
 
 export function sessionCommandModule(): SlashCommandModule {
   return {
@@ -62,6 +64,13 @@ export function sessionCommandModule(): SlashCommandModule {
           nameDefinition,
           new NameCommandHandler({ sessionStore: deps.sessionStore })
         );
+        registry.registerCommand(
+          deleteDefinition,
+          new DeleteCommandHandler({
+            sessionStore: deps.sessionStore,
+            chatHistory: deps.chatHistory
+          })
+        );
       } else {
         registry.declarePlanned(newDefinition);
         registry.declarePlanned(currentDefinition);
@@ -70,6 +79,7 @@ export function sessionCommandModule(): SlashCommandModule {
         registry.declarePlanned(historyDefinition);
         registry.declarePlanned(searchDefinition);
         registry.declarePlanned(nameDefinition);
+        registry.declarePlanned(deleteDefinition);
       }
     }
   };
