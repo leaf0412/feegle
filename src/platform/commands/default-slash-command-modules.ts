@@ -1,4 +1,5 @@
 import type { SlashCommandModule } from "../slash-command-module.js";
+import { agentCommandModule } from "./agent-command-module.js";
 import { plannedCommandModule } from "./planned-command-module.js";
 import { providerCommandModule } from "./provider-command-module.js";
 import { repoCommandModule } from "./repo-command-module.js";
@@ -12,6 +13,7 @@ const defaultModuleFactories = [
   systemCommandModule,
   setupCommandModule,
   sessionCommandModule,
+  agentCommandModule,
   repoCommandModule,
   schedulerCommandModule,
   providerCommandModule

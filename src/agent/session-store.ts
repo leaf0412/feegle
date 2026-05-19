@@ -7,6 +7,7 @@ export const SessionRecordSchema = z.object({
   sessionKey: z.string().min(1),
   name: z.string().min(1).optional(),
   agentKind: z.string().min(1).optional(),
+  quiet: z.boolean().optional(),
   createdAt: z.string(),
   lastActiveAt: z.string(),
   status: z.enum(["active", "closed"])
@@ -107,6 +108,10 @@ export class SessionStore {
       throw new Error("session name must not be empty");
     }
     return this.mutate(sessionKey, (session) => ({ ...session, name: trimmed }));
+  }
+
+  async setQuiet(sessionKey: string, quiet: boolean): Promise<SessionRecord> {
+    return this.mutate(sessionKey, (session) => ({ ...session, quiet }));
   }
 
   async close(sessionKey: string): Promise<SessionRecord> {
