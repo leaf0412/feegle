@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import { listAgentKinds } from "../../../agent/agent-registry.js";
 import {
   buildProviderAdapter,
   defaultProviderDisplayName
@@ -24,10 +25,12 @@ export interface ProviderCommandDeps {
   providerStore: ProviderStore;
 }
 
-const KNOWN_KINDS: readonly ProviderKind[] = ["codex", "claude_code"];
-
 const CODEX_FIELDS = new Set(["cwd", "command", "sandbox", "approvalPolicy", "timeoutMs"]);
 const CLAUDE_CODE_FIELDS = new Set(["cwd", "command", "timeoutMs"]);
+
+function knownKinds(): readonly ProviderKind[] {
+  return listAgentKinds() as ProviderKind[];
+}
 
 abstract class ProviderCommand implements SlashCommandHandler {
   readonly ownerOnly = true;
@@ -54,7 +57,8 @@ export class ProviderRegisterCommandHandler extends ProviderCommand {
       return textReply(`参数错误：${errorMessage(error)}\n用法：/provider register <kind> cwd=<path> [k=v...]`);
     }
     if (!isKnownKind(parsed.kind)) {
-      return textReply(`未知 kind: ${parsed.kind}。可选: ${KNOWN_KINDS.join(", ")}`);
+      const kinds = knownKinds().join(", ");
+      return textReply(`未知 kind: ${parsed.kind}。可选: ${kinds}`);
     }
     const allowedFields = parsed.kind === "codex" ? CODEX_FIELDS : CLAUDE_CODE_FIELDS;
     for (const key of Object.keys(parsed.fields)) {
@@ -137,7 +141,8 @@ export class ProviderUseCommandHandler extends ProviderCommand {
       return textReply("用法：/provider use <kind>");
     }
     if (!isKnownKind(kind)) {
-      return textReply(`未知 kind: ${kind}。可选: ${KNOWN_KINDS.join(", ")}`);
+      const kinds = knownKinds().join(", ");
+      return textReply(`未知 kind: ${kind}。可选: ${kinds}`);
     }
     if (!this.deps.providers.resolve(kind)) {
       return textReply(`未注册: ${kind}。先 /provider register ${kind} cwd=...`);
@@ -163,7 +168,8 @@ export class ProviderUnregisterCommandHandler extends ProviderCommand {
       return textReply("用法：/provider unregister <kind>");
     }
     if (!isKnownKind(kind)) {
-      return textReply(`未知 kind: ${kind}。可选: ${KNOWN_KINDS.join(", ")}`);
+      const kinds = knownKinds().join(", ");
+      return textReply(`未知 kind: ${kind}。可选: ${kinds}`);
     }
     if (!this.deps.providers.resolve(kind)) {
       return textReply(`未注册: ${kind}`);
@@ -184,7 +190,7 @@ export class ProviderUnregisterCommandHandler extends ProviderCommand {
 }
 
 function isKnownKind(kind: string): kind is ProviderKind {
-  return (KNOWN_KINDS as readonly string[]).includes(kind);
+  return (knownKinds() as readonly string[]).includes(kind);
 }
 
 function coerceRecord(kind: ProviderKind, fields: Record<string, string>): ProviderRecord {
