@@ -4,10 +4,6 @@ import type { SlashCommandModule } from "../slash-command-module.js";
 const plannedDefinitions = [
   defineSlashCommand("stop", "/stop", "中止当前会话", "session", "act:/stop"),
 
-  defineSlashCommand("reasoning", "/reasoning", "切换推理强度", "agent", "nav:/reasoning"),
-  defineSlashCommand("mode", "/mode", "切换运行模式", "agent", "nav:/mode"),
-  defineSlashCommand("memory", "/memory", "管理记忆", "agent", "cmd:/memory"),
-  defineSlashCommand("allow", "/allow", "授权工具权限", "agent", "cmd:/allow"),
 
   defineSlashCommand("commands", "/commands", "管理自定义命令", "setup", "nav:/commands"),
   defineSlashCommand("alias", "/alias", "管理命令别名", "setup", "nav:/alias"),

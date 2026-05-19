@@ -122,7 +122,7 @@ export class ProviderStore {
 
   async updateSettings(
     kind: ProviderKind,
-    patch: Partial<Omit<ProviderRecord, "kind" | "cwd">>
+    patch: Record<string, unknown>
   ): Promise<ProviderRecord> {
     const index = this.data.providers.findIndex((entry) => entry.kind === kind);
     if (index === -1) {
