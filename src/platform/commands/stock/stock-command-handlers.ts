@@ -11,7 +11,7 @@ abstract class StockCommand implements SlashCommandHandler {
   readonly ownerOnly = true;
   constructor(protected readonly deps: SchedulerCommandDeps) {}
   canAccess(context: SlashCommandContext): boolean {
-    return isOwner(context, this.deps.ownerIdentities);
+    return isOwner(context, this.deps.ownerEmails);
   }
   abstract readonly id: string;
   abstract execute(context: SlashCommandContext): Promise<SlashCommandReply>;

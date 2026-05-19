@@ -9,7 +9,7 @@ describe("FeegleApp", () => {
     const events: string[] = [];
     const app = new FeegleApp({
       feegleHome: "/tmp/feegle-app-test",
-      ownerIdentities: new Set(["feishu:ou_1"]),
+      ownerEmails: new Set(["alice@example.com"]),
       feishuClient: {} as FeishuClientPort,
       agentProviders: new AgentProviderRegistry(),
       acquireLock: async () => {

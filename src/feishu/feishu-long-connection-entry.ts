@@ -4,7 +4,7 @@ import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
 import { FeegleApp } from "../app/feegle-app.js";
 import { resolveFeegleHome } from "../app/feegle-home.js";
-import { parseOwnerIdentities } from "../app/owner-identities.js";
+import { parseOwnerEmails } from "../app/owner-emails.js";
 
 const config = parseFeishuPlatformConfig({
   appId: readRequiredEnv("FEISHU_APP_ID"),
@@ -30,7 +30,7 @@ const feishuClient: FeishuClientPort = new LarkFeishuClient(
 );
 const app = new FeegleApp({
   feegleHome: resolveFeegleHome(process.env),
-  ownerIdentities: parseOwnerIdentities(process.env.FEEGLE_OWNER_IDENTITIES),
+  ownerEmails: parseOwnerEmails(process.env.FEEGLE_OWNER_EMAILS),
   feishuClient,
   runtimeFactory: (handler) => new FeishuLongConnectionRuntime(config, lark, handler)
 });

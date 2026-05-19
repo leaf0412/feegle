@@ -14,7 +14,7 @@ const GROUP_BUTTONS_PER_ROW = 3;
 
 export interface HelpCardViewerOptions {
   viewer?: SlashCommandContext;
-  ownerIdentities?: ReadonlySet<string>;
+  ownerEmails?: ReadonlySet<string>;
 }
 
 export function buildSlashCommandHelpCard(
@@ -121,10 +121,10 @@ function isCommandVisibleToViewer(
   if (!handler.ownerOnly) {
     return true;
   }
-  if (!options.viewer || !options.ownerIdentities) {
+  if (!options.viewer || !options.ownerEmails) {
     return false;
   }
-  return isOwner(options.viewer, options.ownerIdentities);
+  return isOwner(options.viewer, options.ownerEmails);
 }
 
 function buildGroupButton(group: SlashCommandGroup, selectedKey: string): PlatformCardButton {

@@ -5,10 +5,10 @@ import type { SchedulerCommandDeps } from "../scheduler-command-deps.js";
 abstract class ErrorTargetCommand implements SlashCommandHandler {
   readonly ownerOnly = true;
 
-  constructor(protected readonly deps: Pick<SchedulerCommandDeps, "ownerIdentities" | "configStore">) {}
+  constructor(protected readonly deps: Pick<SchedulerCommandDeps, "ownerEmails" | "configStore">) {}
 
   canAccess(context: SlashCommandContext): boolean {
-    return isOwner(context, this.deps.ownerIdentities);
+    return isOwner(context, this.deps.ownerEmails);
   }
 
   abstract readonly id: string;

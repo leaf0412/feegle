@@ -28,7 +28,7 @@ export function systemCommandModule(): SlashCommandModule {
   return {
     id: "system",
     register: (registry, deps) => {
-      const handlerDeps = { ownerIdentities: deps.ownerIdentities, userDirectory: deps.userDirectory };
+      const handlerDeps = { ownerEmails: deps.ownerEmails, userDirectory: deps.userDirectory };
       for (const definition of systemDefinitions) {
         registry.declarePlanned(definition);
       }

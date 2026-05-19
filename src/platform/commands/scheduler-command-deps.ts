@@ -7,7 +7,7 @@ import type { QuoteClient } from "../../stock/stock-quote-port.js";
 import type { StockStore } from "../../stock/stock-store.js";
 
 export interface SchedulerCommandDeps {
-  ownerIdentities: ReadonlySet<string>;
+  ownerEmails: ReadonlySet<string>;
   taskRegistry: TaskRegistry;
   configStore: ConfigStorePort;
   stockStore: StockStore;

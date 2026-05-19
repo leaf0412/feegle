@@ -7,7 +7,7 @@ import { isOwner } from "../owner-access.js";
 import type { FeishuUserDirectory } from "../../feishu/feishu-user-directory.js";
 
 export interface WhoamiCommandHandlerDeps {
-  ownerIdentities?: ReadonlySet<string>;
+  ownerEmails?: ReadonlySet<string>;
   userDirectory?: FeishuUserDirectory;
 }
 
@@ -17,45 +17,37 @@ export class WhoamiCommandHandler implements SlashCommandHandler {
   constructor(private readonly deps: WhoamiCommandHandlerDeps = {}) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
-    const matchKey = `${context.sender.platform}:${context.sender.userId}`;
-    const ownerCheck = this.deps.ownerIdentities && isOwner(context, this.deps.ownerIdentities);
+    const ownerCheck = this.deps.ownerEmails ? isOwner(context, this.deps.ownerEmails) : false;
     const name = this.deps.userDirectory
       ? await this.deps.userDirectory.resolveUserName(context.sender.userId)
       : undefined;
-    const email = this.deps.userDirectory
-      ? await this.deps.userDirectory.resolveUserEmail(context.sender.userId)
-      : undefined;
-    return { kind: "text", text: render(context, matchKey, ownerCheck === true, name, email) };
+    return { kind: "text", text: render(context, context.sender.email, ownerCheck, name) };
   }
 }
 
 function render(
   context: SlashCommandContext,
-  matchKey: string,
+  email: string | undefined,
   owner: boolean,
-  name?: string,
-  email?: string
+  name?: string
 ): string {
   const lines = [
     "bot 视角下的你",
     `- platform: ${context.sender.platform}`,
-    `- userId: ${context.sender.userId || "(空)"}`,
+    `- userId: ${context.sender.userId || "(空)"}`
   ];
   if (name && name !== context.sender.userId) {
     lines.push(`- 姓名: ${name}`);
   }
-  if (email) {
-    lines.push(`- 邮箱: ${email}`);
+  lines.push(`- 邮箱: ${email || "(未获取到)"}`);
+  lines.push(`- isOwner: ${owner ? "✅" : "❌"}`);
+  lines.push("");
+  if (owner) {
+    lines.push("已通过 owner 校验，可使用 /cron · /bind_stocks · /portfolio · /error_target · /provider 等命令。");
+  } else if (email) {
+    lines.push(`未匹配 FEEGLE_OWNER_EMAILS。把 ${email} 加入该环境变量（逗号分隔多个）即可解锁 owner-only 命令。`);
+  } else {
+    lines.push("飞书未返回邮箱，bot 无法识别 owner。检查飞书企业通讯录是否填写了邮箱，并确认应用具备 contact:user.email 读取权限。");
   }
-  lines.push(
-    `- 当前 owner 匹配键: ${matchKey}`,
-    `- isOwner: ${owner ? "✅" : "❌"}`,
-    "",
-  );
-  lines.push(
-    owner
-      ? "已通过 owner 校验，可使用 /cron · /bind_stocks · /portfolio · /error_target · /provider 等命令。"
-      : "未匹配 FEEGLE_OWNER_IDENTITIES。把上面「当前 owner 匹配键」整串加入该环境变量（逗号分隔多个）即可解锁 owner-only 命令。"
-  );
   return lines.join("\n");
 }

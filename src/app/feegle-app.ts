@@ -37,7 +37,7 @@ export interface Startable {
 
 export interface FeegleAppDeps {
   feegleHome: string;
-  ownerIdentities: ReadonlySet<string>;
+  ownerEmails: ReadonlySet<string>;
   feishuClient: FeishuClientPort;
   agentProviders?: AgentProviderRegistry;
   loadAgentProviders?: (feegleHome: string) => Promise<AgentProviderRegistry>;
@@ -92,7 +92,7 @@ export class FeegleApp {
       modules: this.deps.handlerKindModules
     });
 
-    warnStartupGaps(configStore, taskRegistry, this.deps.ownerIdentities);
+    warnStartupGaps(configStore, taskRegistry, this.deps.ownerEmails);
     this.scheduler = this.deps.createScheduler?.({ notify, configStore }) ?? new TaskScheduler({
       registry: taskRegistry,
       configStore,
@@ -108,10 +108,11 @@ export class FeegleApp {
     await this.scheduler?.start();
 
     const repositories = new InMemoryRepositoryRegistry();
+    const userDirectory = new FeishuUserDirectory(this.deps.feishuClient);
     const registry = buildSlashCommandRegistry({
-      userDirectory: new FeishuUserDirectory(this.deps.feishuClient),
+      userDirectory,
       repositories,
-      ownerIdentities: this.deps.ownerIdentities,
+      ownerEmails: this.deps.ownerEmails,
       taskRegistry,
       configStore,
       stockStore,
@@ -133,7 +134,8 @@ export class FeegleApp {
       chatHandler,
       trace: logFeishuCommandTrace,
       configStore,
-      taskRegistry
+      taskRegistry,
+      userDirectory
     });
     this.runtime = this.deps.runtimeFactory(responder);
     await this.runtime.start();
@@ -177,12 +179,12 @@ function defaultSeedTasks(): Task[] {
   ];
 }
 
-function warnStartupGaps(configStore: ConfigStorePort, taskRegistry: TaskRegistry, ownerIdentities: ReadonlySet<string>): void {
+function warnStartupGaps(configStore: ConfigStorePort, taskRegistry: TaskRegistry, ownerEmails: ReadonlySet<string>): void {
   const tasks = taskRegistry.list();
   if (configStore.get().failureTarget === null && tasks.some((task) => task.enabled)) {
     console.warn("⚠️ failureTarget not configured; enabled tasks exist. Run /error_target set in your target Feishu chat.");
   }
-  if (ownerIdentities.size === 0 && tasks.some((task) => task.source === "domain" || task.source === "user")) {
-    console.warn("⚠️ FEEGLE_OWNER_IDENTITIES not set; all owner-only commands will be silently denied.");
+  if (ownerEmails.size === 0 && tasks.some((task) => task.source === "domain" || task.source === "user")) {
+    console.warn("⚠️ FEEGLE_OWNER_EMAILS not set; all owner-only commands will be silently denied.");
   }
 }

@@ -7,7 +7,7 @@ import type {
 import { buildSlashCommandDetailCard } from "../slash-command-help-card.js";
 
 export interface CommandDetailHandlerDeps {
-  ownerIdentities?: ReadonlySet<string>;
+  ownerEmails?: ReadonlySet<string>;
 }
 
 /**
@@ -26,7 +26,7 @@ export class CommandDetailHandler implements SlashCommandHandler {
     const targetId = context.args.trim();
     const card = buildSlashCommandDetailCard(targetId, this.registry, {
       viewer: context,
-      ownerIdentities: this.deps.ownerIdentities
+      ownerEmails: this.deps.ownerEmails
     });
     return { kind: "card_update", card };
   }

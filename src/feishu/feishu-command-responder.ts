@@ -10,6 +10,7 @@ import {
 } from "../platform/slash-command-handler.js";
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
+import type { FeishuUserDirectory } from "./feishu-user-directory.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -34,13 +35,14 @@ export interface FeishuCommandResponderOptions {
   trace?: FeishuCommandTraceSink;
   configStore?: { get(): { failureTarget: unknown } };
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
+  userDirectory?: FeishuUserDirectory;
 }
 
 interface DispatchInput {
   source: "message" | "card";
   chatId: string;
   messageId: string;
-  sender?: { platform: "feishu"; userId: string };
+  sender?: { platform: "feishu"; userId: string; email?: string };
   sessionKey?: string;
   command: FeishuCommand;
 }
@@ -144,11 +146,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
           : `未注册的命令：${commandId}`
       };
     }
+    const sender = await this.resolveSender(input);
     const context = {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
-      sender: input.sender ?? { platform: "feishu" as const, userId: "" },
+      sender,
       definition,
       raw: definition.command,
       args
@@ -157,6 +160,18 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       return undefined;
     }
     return this.appendFailureTargetBanner(handler, await handler.execute(context));
+  }
+
+  private async resolveSender(input: DispatchInput): Promise<{ platform: "feishu"; userId: string; email?: string }> {
+    const base = input.sender ?? { platform: "feishu" as const, userId: "" };
+    if (!this.options.userDirectory || base.userId === "") {
+      return base;
+    }
+    const email = await this.options.userDirectory.resolveUserEmail(base.userId);
+    if (email === "") {
+      return base;
+    }
+    return { ...base, email: email.toLowerCase() };
   }
 
   private async dispatchPlatformAction(
@@ -179,11 +194,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     if (!handler) {
       return undefined;
     }
+    const sender = await this.resolveSender(input);
     return handler.execute({
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
-      sender: input.sender ?? { platform: "feishu", userId: "" },
+      sender,
       definition: {
         id: "__command_detail",
         command: "/command",

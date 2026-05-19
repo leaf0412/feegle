@@ -17,7 +17,7 @@ import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-
 export function stubSchedulerSlashDeps(overrides: Partial<SlashCommandRegistryDeps> = {}): SlashCommandRegistryDeps {
   return {
     repositories: { list: () => [] },
-    ownerIdentities: new Set<string>(),
+    ownerEmails: new Set<string>(),
     taskRegistry: {} as TaskRegistry,
     configStore: {
       get: () => ({ schemaVersion: 1, failureTarget: null }),

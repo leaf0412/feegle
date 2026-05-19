@@ -7,7 +7,7 @@ import type {
 import { buildSlashCommandHelpCard } from "../slash-command-help-card.js";
 
 export interface HelpCommandHandlerDeps {
-  ownerIdentities?: ReadonlySet<string>;
+  ownerEmails?: ReadonlySet<string>;
 }
 
 export class HelpCommandHandler implements SlashCommandHandler {
@@ -22,7 +22,7 @@ export class HelpCommandHandler implements SlashCommandHandler {
     const groupKey = context.args.trim() || undefined;
     const card = buildSlashCommandHelpCard(this.registry, groupKey, {
       viewer: context,
-      ownerIdentities: this.deps.ownerIdentities
+      ownerEmails: this.deps.ownerEmails
     });
     return context.source === "card" ? { kind: "card_update", card } : { kind: "card", card };
   }

@@ -66,14 +66,14 @@ export function providerCommandModule(): SlashCommandModule {
 
 function requireProviderDeps(deps: SlashCommandRegistryDeps): ProviderCommandDeps {
   const missing: string[] = [];
-  if (!deps.ownerIdentities) missing.push("ownerIdentities");
+  if (!deps.ownerEmails) missing.push("ownerEmails");
   if (!deps.providers) missing.push("providers");
   if (!deps.providerStore) missing.push("providerStore");
   if (missing.length > 0) {
     throw new Error(`provider command module requires deps: ${missing.join(", ")}`);
   }
   return {
-    ownerIdentities: deps.ownerIdentities!,
+    ownerEmails: deps.ownerEmails!,
     providers: deps.providers!,
     providerStore: deps.providerStore!
   };

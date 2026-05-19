@@ -19,7 +19,7 @@
 | **cron-admin** | — | `/cron list/show/add/edit/remove/pause/resume/run-now/set-target/history` | `platform/commands/cron/cron-command-handlers.ts` | `platform/commands/scheduler-command-module.ts` | taskRegistry, scheduler, kinds, runsLog |
 | **error-target** | — | `/error_target set/show/clear` | `platform/commands/setup/error-target-command.ts` | `platform/commands/scheduler-command-module.ts` | configStore |
 | **repo** | — | `/repo list`（已实现）<br>+ `/bind` `/repo show/clear/add/remove/scan` `/shifu` `/workspace` `/dir`（planned） | `platform/commands/repo-list-command.ts` | `platform/commands/repo-command-module.ts` | repositories |
-| **system** | — | `/help`（已实现）<br>+ `/ping` `/info` `/status` `/doctor` `/usage` `/version` `/upgrade` `/restart` `/lang`（planned） | `platform/commands/help-command.ts` `command-detail.ts` | `platform/commands/system-command-module.ts` | ownerIdentities |
+| **system** | — | `/help` `/whoami`（已实现）<br>+ `/ping` `/info` `/status` `/doctor` `/usage` `/version` `/upgrade` `/restart` `/lang`（planned） | `platform/commands/help-command.ts` `whoami-command.ts` `command-detail.ts` | `platform/commands/system-command-module.ts` | ownerEmails, userDirectory |
 | **agent-provider** | — | `/provider list/register/unregister/use`（已实现） | `platform/commands/provider/provider-command-handlers.ts` | `platform/commands/provider-command-module.ts` | providers, providerStore |
 | **planned**（占位） | — | session/setup/knowledge 各组未实现命令 + agent group 剩余占位（`/model` `/reasoning` `/mode` `/memory` …） | （无 handler） | `platform/commands/planned-command-module.ts` | — |
 

@@ -7,14 +7,13 @@ import {
 } from "../../../src/platform/slash-command-handler.js";
 import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
 
-const owner = "ou_owner";
-const nonOwner = "ou_other";
-const ownerIdentities = new Set([`feishu:${owner}`]);
+const ownerEmail = "alice@example.com";
+const ownerEmails = new Set([ownerEmail]);
 
 describe("HelpCommandHandler", () => {
   it("hides owner-only commands from a non-owner browsing the owner-only group", async () => {
-    const registry = registryWithCronList(ownerIdentities);
-    const reply = await dispatchHelp(registry, nonOwner, "cron");
+    const registry = registryWithCronList(ownerEmails);
+    const reply = await dispatchHelp(registry, "ou_other", "bob@example.com", "cron");
     expect(reply.kind === "card").toBe(true);
     const serialized = JSON.stringify(reply.kind === "card" ? reply.card : null);
     expect(serialized).not.toContain("/cron list");
@@ -22,25 +21,32 @@ describe("HelpCommandHandler", () => {
   });
 
   it("shows owner-only commands to owners", async () => {
-    const registry = registryWithCronList(ownerIdentities);
-    const reply = await dispatchHelp(registry, owner, "cron");
+    const registry = registryWithCronList(ownerEmails);
+    const reply = await dispatchHelp(registry, "ou_owner", ownerEmail, "cron");
     expect(reply.kind === "card").toBe(true);
     const serialized = JSON.stringify(reply.kind === "card" ? reply.card : null);
     expect(serialized).toContain("/cron list");
   });
 
   it("hides owner-only commands from non-owners in the 'all' view too", async () => {
-    const registry = registryWithCronList(ownerIdentities);
-    const reply = await dispatchHelp(registry, nonOwner, "all");
+    const registry = registryWithCronList(ownerEmails);
+    const reply = await dispatchHelp(registry, "ou_other", "bob@example.com", "all");
     expect(reply.kind === "card").toBe(true);
+    const serialized = JSON.stringify(reply.kind === "card" ? reply.card : null);
+    expect(serialized).not.toContain("cron_list");
+  });
+
+  it("hides owner-only commands when the viewer has no email resolved", async () => {
+    const registry = registryWithCronList(ownerEmails);
+    const reply = await dispatchHelp(registry, "ou_unknown", undefined, "all");
     const serialized = JSON.stringify(reply.kind === "card" ? reply.card : null);
     expect(serialized).not.toContain("cron_list");
   });
 });
 
-function registryWithCronList(identities: ReadonlySet<string>): SlashCommandRegistry {
+function registryWithCronList(emails: ReadonlySet<string>): SlashCommandRegistry {
   const registry = new SlashCommandRegistry();
-  registry.registerCommand(defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help"), new HelpCommandHandler(registry, { ownerIdentities: identities }));
+  registry.registerCommand(defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help"), new HelpCommandHandler(registry, { ownerEmails: emails }));
   registry.registerCommand(defineSlashCommand("cron_list", "/cron list", "列出所有任务", "cron", "cmd:/cron list"), makeOwnerOnly("cron_list"));
   return registry;
 }
@@ -49,7 +55,7 @@ function makeOwnerOnly(id: string): SlashCommandHandler {
   return {
     id,
     ownerOnly: true,
-    canAccess: (context) => context.sender.userId === owner,
+    canAccess: (context) => context.sender.email === ownerEmail,
     execute: async () => ({ kind: "text", text: "" })
   };
 }
@@ -57,6 +63,7 @@ function makeOwnerOnly(id: string): SlashCommandHandler {
 async function dispatchHelp(
   registry: SlashCommandRegistry,
   userId: string,
+  email: string | undefined,
   args = ""
 ) {
   const handler = registry.resolve("help");
@@ -67,7 +74,7 @@ async function dispatchHelp(
     source: "message",
     chatId: "oc_1",
     messageId: "om_1",
-    sender: { platform: "feishu", userId },
+    sender: { platform: "feishu", userId, email },
     definition,
     raw: "/help",
     args

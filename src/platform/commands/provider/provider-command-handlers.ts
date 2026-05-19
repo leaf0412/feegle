@@ -19,7 +19,7 @@ import { isOwner } from "../../owner-access.js";
 import { parseProviderArgs } from "./parse-provider-args.js";
 
 export interface ProviderCommandDeps {
-  ownerIdentities: ReadonlySet<string>;
+  ownerEmails: ReadonlySet<string>;
   providers: AgentProviderRegistry;
   providerStore: ProviderStore;
 }
@@ -37,7 +37,7 @@ abstract class ProviderCommand implements SlashCommandHandler {
   abstract readonly id: string;
 
   canAccess(context: SlashCommandContext): boolean {
-    return isOwner(context, this.deps.ownerIdentities);
+    return isOwner(context, this.deps.ownerEmails);
   }
 
   abstract execute(context: SlashCommandContext): Promise<SlashCommandReply>;

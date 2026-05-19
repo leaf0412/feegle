@@ -88,7 +88,7 @@ export function schedulerCommandModule(): SlashCommandModule {
 
 function requireSchedulerDeps(deps: SlashCommandRegistryDeps): SchedulerCommandDeps {
   const missing: string[] = [];
-  if (!deps.ownerIdentities) missing.push("ownerIdentities");
+  if (!deps.ownerEmails) missing.push("ownerEmails");
   if (!deps.taskRegistry) missing.push("taskRegistry");
   if (!deps.configStore) missing.push("configStore");
   if (!deps.stockStore) missing.push("stockStore");
@@ -99,7 +99,7 @@ function requireSchedulerDeps(deps: SlashCommandRegistryDeps): SchedulerCommandD
     throw new Error(`scheduler command module requires deps: ${missing.join(", ")}`);
   }
   return {
-    ownerIdentities: deps.ownerIdentities!,
+    ownerEmails: deps.ownerEmails!,
     taskRegistry: deps.taskRegistry!,
     configStore: deps.configStore!,
     stockStore: deps.stockStore!,

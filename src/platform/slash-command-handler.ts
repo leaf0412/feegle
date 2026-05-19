@@ -7,7 +7,7 @@ export interface SlashCommandContext {
   source: SlashCommandInvocationSource;
   chatId: string;
   messageId: string;
-  sender: { platform: "feishu"; userId: string };
+  sender: { platform: "feishu"; userId: string; email?: string };
   definition: SlashCommandDefinition;
   raw: string;
   args: string;

@@ -69,7 +69,7 @@ export FEISHU_THREAD_ISOLATION="false"
 export FEISHU_REPLY_TO_TRIGGER="true"
 export FEISHU_PROGRESS_STYLE="legacy"
 export FEEGLE_HOME="$HOME/.feegle"
-export FEEGLE_OWNER_IDENTITIES="feishu:ou_xxx"
+export FEEGLE_OWNER_EMAILS="alice@example.com"
 ```
 
 Do not commit real secrets. Keep them in your shell, local process manager, or a local `.env` file that is not committed.
@@ -84,7 +84,7 @@ Feishu routing options:
 - `FEISHU_THREAD_ISOLATION=true` isolates sessions by root/thread message id.
 - `FEISHU_PROGRESS_STYLE` accepts `legacy`, `compact`, or `card`.
 - `FEEGLE_HOME` overrides the scheduler persistence directory; default is `~/.feegle`.
-- `FEEGLE_OWNER_IDENTITIES` is required for cron/stock commands. Values are comma-separated identities such as `feishu:ou_xxx`.
+- `FEEGLE_OWNER_EMAILS` is required for cron/stock commands. Values are comma-separated emails (e.g. `alice@example.com,bob@example.com`). At dispatch time the bot resolves the sender's email via the Feishu contact API and matches against this set — make sure the app has `contact:user.email` scope and that owner emails are filled in the Feishu directory.
 
 ## Scheduler And Stock Commands
 

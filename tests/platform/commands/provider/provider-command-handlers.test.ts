@@ -12,7 +12,8 @@ import {
 } from "../../../../src/platform/commands/provider/provider-command-handlers.js";
 import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
 
-const OWNER = new Set(["feishu:ou_owner"]);
+const OWNER_EMAIL = "alice@example.com";
+const OWNER = new Set([OWNER_EMAIL]);
 
 const DEFINITION = {
   id: "provider_register",
@@ -27,7 +28,7 @@ function ctx(args: string, overrides: Partial<SlashCommandContext> = {}): SlashC
     source: "message",
     chatId: "oc_test",
     messageId: "om_test",
-    sender: { platform: "feishu", userId: "ou_owner" },
+    sender: { platform: "feishu", userId: "ou_owner", email: OWNER_EMAIL },
     definition: { ...DEFINITION, ...overrides.definition },
     raw: "/provider register",
     args,
@@ -53,7 +54,7 @@ describe("provider command handlers", () => {
   describe("register", () => {
     it("registers a codex provider when cwd exists", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -66,7 +67,7 @@ describe("provider command handlers", () => {
 
     it("rejects unknown kind", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -76,7 +77,7 @@ describe("provider command handlers", () => {
 
     it("rejects when cwd is missing", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -86,7 +87,7 @@ describe("provider command handlers", () => {
 
     it("rejects when cwd path does not exist", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -98,7 +99,7 @@ describe("provider command handlers", () => {
       await store.upsert({ kind: "codex", cwd: home });
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -108,7 +109,7 @@ describe("provider command handlers", () => {
 
     it("rejects invalid sandbox enum", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -118,7 +119,7 @@ describe("provider command handlers", () => {
 
     it("rejects unknown field", async () => {
       const handler = new ProviderRegisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -130,7 +131,7 @@ describe("provider command handlers", () => {
   describe("list", () => {
     it("renders an empty hint when no providers exist", async () => {
       const handler = new ProviderListCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -144,7 +145,7 @@ describe("provider command handlers", () => {
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       registry.setActive("codex");
       const handler = new ProviderListCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -160,7 +161,7 @@ describe("provider command handlers", () => {
       await store.upsert({ kind: "codex", cwd: home });
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       const handler = new ProviderUseCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -172,7 +173,7 @@ describe("provider command handlers", () => {
 
     it("rejects use for an unregistered kind", async () => {
       const handler = new ProviderUseCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -186,7 +187,7 @@ describe("provider command handlers", () => {
       await store.upsert({ kind: "codex", cwd: home });
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       const handler = new ProviderUnregisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -201,7 +202,7 @@ describe("provider command handlers", () => {
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       registry.setActive("codex");
       const handler = new ProviderUnregisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
@@ -213,7 +214,7 @@ describe("provider command handlers", () => {
 
     it("reports not-registered when unregistering an unknown kind", async () => {
       const handler = new ProviderUnregisterCommandHandler({
-        ownerIdentities: OWNER,
+        ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });

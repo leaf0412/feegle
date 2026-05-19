@@ -33,7 +33,7 @@ describe("scheduler slash commands", () => {
 
   it("silently drops owner-only commands from non-owners", async () => {
     const replies: string[] = [];
-    const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const deps = makeDeps(new Set(["alice@example.com"]));
     const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
       registry,
@@ -58,7 +58,7 @@ describe("scheduler slash commands", () => {
 
   it("binds the failure target for owners", async () => {
     const replies: string[] = [];
-    const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const deps = makeDeps(new Set(["alice@example.com"]));
     const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
       registry,
@@ -70,7 +70,7 @@ describe("scheduler slash commands", () => {
       source: "message",
       chatId: "oc_ops",
       messageId: "om_1",
-      sender: { platform: "feishu", userId: "ou_owner" },
+      sender: { platform: "feishu", userId: "ou_owner", email: "alice@example.com" },
       command: {
         type: "slash_command",
         definition: registry.findByInput("/error_target set")!,
@@ -84,7 +84,7 @@ describe("scheduler slash commands", () => {
 
   it("creates cron tasks only after validating kind params", async () => {
     const replies: string[] = [];
-    const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const deps = makeDeps(new Set(["alice@example.com"]));
     const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
       registry,
@@ -96,7 +96,7 @@ describe("scheduler slash commands", () => {
       source: "message",
       chatId: "oc_1",
       messageId: "om_1",
-      sender: { platform: "feishu", userId: "ou_owner" },
+      sender: { platform: "feishu", userId: "ou_owner", email: "alice@example.com" },
       command: {
         type: "slash_command",
         definition: registry.findByInput("/cron add heartbeat \"0 9 * * *\"")!,
@@ -110,7 +110,7 @@ describe("scheduler slash commands", () => {
 
   it("binds stock subscriptions and creates a domain monitor task", async () => {
     const replies: string[] = [];
-    const deps = makeDeps(new Set(["feishu:ou_owner"]));
+    const deps = makeDeps(new Set(["alice@example.com"]));
     const registry = makeRegistry(deps);
     const responder = new FeishuCommandResponder(fakeClient(replies), {
       registry,
@@ -122,7 +122,7 @@ describe("scheduler slash commands", () => {
       source: "message",
       chatId: "oc_1",
       messageId: "om_1",
-      sender: { platform: "feishu", userId: "ou_owner" },
+      sender: { platform: "feishu", userId: "ou_owner", email: "alice@example.com" },
       command: {
         type: "slash_command",
         definition: registry.findByInput("/bind_stocks 600519")!,
@@ -138,7 +138,7 @@ describe("scheduler slash commands", () => {
 function makeRegistry(deps: ReturnType<typeof makeDeps>) {
   return buildSlashCommandRegistry({
     repositories: { list: () => [] },
-    ownerIdentities: deps.ownerIdentities,
+    ownerEmails: deps.ownerEmails,
     taskRegistry: deps.taskRegistry,
     configStore: deps.configStore,
     stockStore: deps.stockStore,
@@ -150,7 +150,7 @@ function makeRegistry(deps: ReturnType<typeof makeDeps>) {
   });
 }
 
-function makeDeps(ownerIdentities: ReadonlySet<string>) {
+function makeDeps(ownerEmails: ReadonlySet<string>) {
   const tasks: Task[] = [];
   const taskRegistry = new TaskRegistry({
     list: () => tasks,
@@ -212,7 +212,7 @@ function makeDeps(ownerIdentities: ReadonlySet<string>) {
     logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} }
   });
   return {
-    ownerIdentities,
+    ownerEmails,
     taskRegistry,
     configStore,
     stockStore,
