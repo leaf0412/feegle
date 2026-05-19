@@ -9,6 +9,7 @@ import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runtime.js";
 import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
+import { AliasStore } from "../platform/commands/alias-store.js";
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
 import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
@@ -71,6 +72,7 @@ export class FeegleApp {
     const providerStore = await ProviderStore.load(this.deps.feegleHome);
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
     const chatHistory = new ChatHistoryStore();
+    const aliasStore = await AliasStore.load(this.deps.feegleHome);
     const agentProviders =
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
@@ -135,6 +137,7 @@ export class FeegleApp {
       providerStore,
       sessionStore,
       chatHistory,
+      aliasStore,
       modules: this.deps.slashCommandModules
     });
     const chatHandler = new FeishuChatHandler({
