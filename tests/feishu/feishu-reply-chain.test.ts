@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeishuClientPort, FeishuFetchedMessage } from "../../src/feishu/feishu-client.js";
+import type { FeishuFetchedMessage } from "../../src/feishu/feishu-client.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import {
   fetchQuotedMessage,
   fetchReplyChain,
@@ -64,7 +65,7 @@ describe("fetchReplyChain", () => {
         mentions: []
       }
     };
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMessage: vi.fn().mockImplementation(async (id: string) => messages[id]),
       fetchUserName: vi.fn().mockResolvedValue("Alice")
     });
@@ -82,7 +83,7 @@ describe("fetchReplyChain", () => {
       content: JSON.stringify({ text: id }),
       mentions: []
     }));
-    const client = fakeClient({ fetchMessage, fetchUserName: vi.fn().mockResolvedValue("Alice") });
+    const client = makeFakeFeishuClient({ fetchMessage, fetchUserName: vi.fn().mockResolvedValue("Alice") });
     const directory = new FeishuUserDirectory(client);
     const chain = await fetchReplyChain(client, directory, "om_loop");
     expect(chain).toHaveLength(1);
@@ -97,7 +98,7 @@ describe("fetchReplyChain", () => {
       content: JSON.stringify({ text: "from peer" }),
       mentions: []
     };
-    const client = fakeClient({ fetchMessage: vi.fn().mockResolvedValue(message) });
+    const client = makeFakeFeishuClient({ fetchMessage: vi.fn().mockResolvedValue(message) });
     const directory = new FeishuUserDirectory(client);
     const chain = await fetchReplyChain(client, directory, "om_peer", {
       peerBots: new Map([["cli_app", "Gemini"]])
@@ -112,7 +113,7 @@ describe("fetchReplyChain", () => {
     const card = JSON.stringify({
       body: { tag: "body", property: { elements: [{ tag: "markdown", property: { content: "card hi" } }] } }
     });
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMessage: vi
         .fn()
         .mockResolvedValueOnce({
@@ -151,7 +152,7 @@ describe("fetchQuotedMessage", () => {
       content: JSON.stringify({ text: "hi" }),
       mentions: []
     };
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMessage: vi.fn().mockResolvedValue(message),
       fetchUserName: vi.fn().mockResolvedValue("Alice")
     });
@@ -162,30 +163,3 @@ describe("fetchQuotedMessage", () => {
   });
 });
 
-function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
-  const fallback = async () => undefined;
-  return {
-    sendText: fallback,
-    sendInteractiveCard: fallback,
-    sendFile: fallback,
-    replyText: fallback,
-    replyInteractiveCard: fallback,
-    updateInteractiveCard: async () => {},
-    updateProgress: async () => {},
-    addReaction: fallback,
-    removeReaction: async () => {},
-    fetchBotOpenId: fallback,
-    fetchUserName: fallback,
-    fetchUserEmail: fallback,
-    fetchChatName: fallback,
-    fetchChatMembers: async () => [],
-    fetchMessage: fallback,
-    fetchMergeForwardItems: async () => [],
-    sendImage: fallback,
-    sendAudio: fallback,
-    downloadResource: fallback,
-    downloadImage: fallback,
-    deleteMessage: async () => {},
-    ...overrides
-  };
-}

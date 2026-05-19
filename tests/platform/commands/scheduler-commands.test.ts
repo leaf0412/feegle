@@ -10,6 +10,7 @@ import { TaskScheduler } from "../../../src/scheduler/task-scheduler.js";
 import type { HandlerKind } from "../../../src/scheduler/handler-kind.js";
 import type { Task } from "../../../src/scheduler/task.js";
 import type { FeishuClientPort } from "../../../src/feishu/feishu-client.js";
+import { makeFakeFeishuClient } from "../../fixtures/fake-feishu-client.js";
 import type { StockStore } from "../../../src/stock/stock-store.js";
 
 describe("scheduler slash commands", () => {
@@ -222,30 +223,10 @@ function makeDeps(ownerIdentities: ReadonlySet<string>) {
 }
 
 function fakeClient(replies: string[]): FeishuClientPort {
-  return {
+  return makeFakeFeishuClient({
     replyText: async (_messageId, text) => {
       replies.push(text);
       return "om_reply";
-    },
-    replyInteractiveCard: async () => "om_card",
-    updateInteractiveCard: async () => {},
-    sendText: async () => "om_text",
-    sendInteractiveCard: async () => "om_card",
-    sendFile: async () => "om_file",
-    updateProgress: async () => {},
-    addReaction: async () => "reaction",
-    removeReaction: async () => {},
-    deleteMessage: async () => {},
-    fetchBotOpenId: async () => undefined,
-    fetchUserName: async () => undefined,
-    fetchUserEmail: async () => undefined,
-    fetchChatName: async () => undefined,
-    fetchChatMembers: async () => [],
-    fetchMessage: async () => undefined,
-    fetchMergeForwardItems: async () => [],
-    sendImage: async () => "om_image",
-    sendAudio: async () => "om_audio",
-    downloadResource: async () => undefined,
-    downloadImage: async () => undefined
-  };
+    }
+  });
 }

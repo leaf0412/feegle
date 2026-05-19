@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
 import type { RepositoryRecord } from "../../src/domain/models.js";
 import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
@@ -389,7 +390,7 @@ function fakeClient(
   progress: unknown[] = [],
   reactions: unknown[] = []
 ): FeishuClientPort {
-  return {
+  return makeFakeFeishuClient({
     async sendText(chatId, text) {
       replies.push({ messageId: chatId, text });
       return "om_reply";
@@ -421,40 +422,6 @@ function fakeClient(
     },
     async removeReaction(messageId, reactionId) {
       reactions.push({ kind: "remove", messageId, reactionId });
-    },
-    async fetchBotOpenId() {
-      return undefined;
-    },
-    async fetchUserName() {
-      return undefined;
-    },
-    async fetchUserEmail() {
-      return undefined;
-    },
-    async fetchChatName() {
-      return undefined;
-    },
-    async fetchChatMembers() {
-      return [];
-    },
-    async fetchMessage() {
-      return undefined;
-    },
-    async fetchMergeForwardItems() {
-      return [];
-    },
-    async sendImage() {
-      return undefined;
-    },
-    async sendAudio() {
-      return undefined;
-    },
-    async downloadResource() {
-      return undefined;
-    },
-    async downloadImage() {
-      return undefined;
-    },
-    async deleteMessage() {}
-  };
+    }
+  });
 }

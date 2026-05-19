@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeishuClientPort, FeishuMergeForwardItem } from "../../src/feishu/feishu-client.js";
+import type { FeishuMergeForwardItem } from "../../src/feishu/feishu-client.js";
 import { parseMergeForward } from "../../src/feishu/feishu-merge-forward.js";
 import { FeishuUserDirectory } from "../../src/feishu/feishu-user-directory.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("parseMergeForward", () => {
   it("returns empty result when there are no sub-messages", async () => {
-    const client = fakeClient({ fetchMergeForwardItems: vi.fn().mockResolvedValue([]) });
+    const client = makeFakeFeishuClient({ fetchMergeForwardItems: vi.fn().mockResolvedValue([]) });
     const directory = new FeishuUserDirectory(client);
     await expect(parseMergeForward(client, directory, "om_root")).resolves.toEqual({
       text: "",
@@ -49,7 +50,7 @@ describe("parseMergeForward", () => {
     ];
     const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
     const fileBytes = Buffer.from("notes");
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMergeForwardItems: vi.fn().mockResolvedValue(items),
       fetchUserName: vi.fn().mockResolvedValue("Alice"),
       downloadImage: vi.fn().mockResolvedValue({ data: imageBytes, mimeType: "image/png" }),
@@ -89,7 +90,7 @@ describe("parseMergeForward", () => {
         mentions: []
       }
     ];
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMergeForwardItems: vi.fn().mockResolvedValue(items),
       fetchUserName: vi.fn().mockResolvedValue("Alice")
     });
@@ -112,7 +113,7 @@ describe("parseMergeForward", () => {
         mentions: []
       }
     ];
-    const client = fakeClient({
+    const client = makeFakeFeishuClient({
       fetchMergeForwardItems: vi.fn().mockResolvedValue(items),
       fetchUserName: vi.fn().mockResolvedValue("Alice"),
       downloadImage: vi.fn().mockResolvedValue(undefined)
@@ -124,30 +125,3 @@ describe("parseMergeForward", () => {
   });
 });
 
-function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
-  const fallback = async () => undefined;
-  return {
-    sendText: fallback,
-    sendInteractiveCard: fallback,
-    sendFile: fallback,
-    replyText: fallback,
-    replyInteractiveCard: fallback,
-    updateInteractiveCard: async () => {},
-    updateProgress: async () => {},
-    addReaction: fallback,
-    removeReaction: async () => {},
-    fetchBotOpenId: fallback,
-    fetchUserName: fallback,
-    fetchUserEmail: fallback,
-    fetchChatName: fallback,
-    fetchChatMembers: async () => [],
-    fetchMessage: fallback,
-    fetchMergeForwardItems: async () => [],
-    sendImage: fallback,
-    sendAudio: fallback,
-    downloadResource: fallback,
-    downloadImage: fallback,
-    deleteMessage: async () => {},
-    ...overrides
-  };
-}

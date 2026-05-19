@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import {
   FeishuUserDirectory,
   isValidFeishuLookupID,
   resolveMentionsInContent
 } from "../../src/feishu/feishu-user-directory.js";
+import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("isValidFeishuLookupID", () => {
   it("accepts open ids containing letters, digits, underscores, dashes", () => {
@@ -21,7 +21,7 @@ describe("isValidFeishuLookupID", () => {
 describe("FeishuUserDirectory", () => {
   it("caches successful user name lookups", async () => {
     const fetchUserName = vi.fn().mockResolvedValue("Alice");
-    const directory = new FeishuUserDirectory(fakeClient({ fetchUserName }));
+    const directory = new FeishuUserDirectory(makeFakeFeishuClient({ fetchUserName }));
 
     await expect(directory.resolveUserName("ou_alice")).resolves.toBe("Alice");
     await expect(directory.resolveUserName("ou_alice")).resolves.toBe("Alice");
@@ -30,21 +30,21 @@ describe("FeishuUserDirectory", () => {
 
   it("falls back to the id when the lookup does not return a name", async () => {
     const directory = new FeishuUserDirectory(
-      fakeClient({ fetchUserName: vi.fn().mockResolvedValue(undefined) })
+      makeFakeFeishuClient({ fetchUserName: vi.fn().mockResolvedValue(undefined) })
     );
     await expect(directory.resolveUserName("ou_missing")).resolves.toBe("ou_missing");
   });
 
   it("rejects invalid lookup ids without calling the API", async () => {
     const fetchUserName = vi.fn();
-    const directory = new FeishuUserDirectory(fakeClient({ fetchUserName }));
+    const directory = new FeishuUserDirectory(makeFakeFeishuClient({ fetchUserName }));
     await expect(directory.resolveUserName("ou abc")).resolves.toBe("ou abc");
     expect(fetchUserName).not.toHaveBeenCalled();
   });
 
   it("marks duplicate names as ambiguous (empty memberId) in chat member cache", async () => {
     const directory = new FeishuUserDirectory(
-      fakeClient({
+      makeFakeFeishuClient({
         fetchChatMembers: vi.fn().mockResolvedValue([
           { memberId: "ou_1", name: "Alice" },
           { memberId: "ou_2", name: "Alice" },
@@ -63,7 +63,7 @@ describe("FeishuUserDirectory", () => {
       .mockResolvedValueOnce([{ memberId: "ou_1", name: "Alice" }])
       .mockResolvedValueOnce([{ memberId: "ou_2", name: "Alice" }]);
     let now = 1_000_000;
-    const directory = new FeishuUserDirectory(fakeClient({ fetchChatMembers }), {
+    const directory = new FeishuUserDirectory(makeFakeFeishuClient({ fetchChatMembers }), {
       now: () => now,
       cacheTtlMs: 60_000
     });
@@ -80,7 +80,7 @@ describe("FeishuUserDirectory", () => {
 describe("resolveMentionsInContent", () => {
   it("rewrites @name to interactive card at tags when content contains markdown", async () => {
     const directory = new FeishuUserDirectory(
-      fakeClient({
+      makeFakeFeishuClient({
         fetchChatMembers: vi
           .fn()
           .mockResolvedValue([
@@ -95,7 +95,7 @@ describe("resolveMentionsInContent", () => {
 
   it("uses text-format at tags when content has no markdown", async () => {
     const directory = new FeishuUserDirectory(
-      fakeClient({
+      makeFakeFeishuClient({
         fetchChatMembers: vi.fn().mockResolvedValue([{ memberId: "ou_alice", name: "Alice" }])
       })
     );
@@ -105,36 +105,9 @@ describe("resolveMentionsInContent", () => {
 
   it("leaves content untouched when no @ mention is present", async () => {
     const fetchChatMembers = vi.fn();
-    const directory = new FeishuUserDirectory(fakeClient({ fetchChatMembers }));
+    const directory = new FeishuUserDirectory(makeFakeFeishuClient({ fetchChatMembers }));
     await expect(resolveMentionsInContent(directory, "oc_1", "hello")).resolves.toBe("hello");
     expect(fetchChatMembers).not.toHaveBeenCalled();
   });
 });
 
-function fakeClient(overrides: Partial<FeishuClientPort>): FeishuClientPort {
-  const fallback = async () => undefined;
-  return {
-    sendText: fallback,
-    sendInteractiveCard: fallback,
-    sendFile: fallback,
-    replyText: fallback,
-    replyInteractiveCard: fallback,
-    updateInteractiveCard: async () => {},
-    updateProgress: async () => {},
-    addReaction: fallback,
-    removeReaction: async () => {},
-    fetchBotOpenId: fallback,
-    fetchUserName: fallback,
-    fetchUserEmail: fallback,
-    fetchChatName: fallback,
-    fetchChatMembers: async () => [],
-    fetchMessage: fallback,
-    fetchMergeForwardItems: async () => [],
-    sendImage: fallback,
-    sendAudio: fallback,
-    downloadResource: fallback,
-    downloadImage: fallback,
-    deleteMessage: async () => {},
-    ...overrides
-  };
-}
