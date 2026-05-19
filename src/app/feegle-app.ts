@@ -2,6 +2,7 @@ import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js"
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
 import { ProviderStore } from "../agent/provider-store.js";
+import { SessionStore } from "../agent/session-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
 import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
@@ -68,6 +69,8 @@ export class FeegleApp {
     this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
     const configStore = await (this.deps.loadConfigStore ?? ConfigStore.load)(this.deps.feegleHome);
     const providerStore = await ProviderStore.load(this.deps.feegleHome);
+    const sessionStore = await SessionStore.load(this.deps.feegleHome);
+    const chatHistory = new ChatHistoryStore();
     const agentProviders =
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
@@ -130,12 +133,15 @@ export class FeegleApp {
       runsLog,
       providers: agentProviders,
       providerStore,
+      sessionStore,
+      chatHistory,
       modules: this.deps.slashCommandModules
     });
     const chatHandler = new FeishuChatHandler({
       client: this.deps.feishuClient,
       providers: agentProviders,
-      history: new ChatHistoryStore()
+      history: chatHistory,
+      sessionStore
     });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
       registry,

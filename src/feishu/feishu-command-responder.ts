@@ -151,6 +151,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sessionKey: input.sessionKey,
       sender,
       definition,
       raw: definition.command,
@@ -199,6 +200,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       source: input.source,
       chatId: input.chatId,
       messageId: input.messageId,
+      sessionKey: input.sessionKey,
       sender,
       definition: {
         id: "__command_detail",

@@ -6,6 +6,7 @@ import type {
 } from "../agent/agent-cli.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
+import type { SessionStore } from "../agent/session-store.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import { FeishuPreviewSession } from "./feishu-preview-session.js";
 import {
@@ -19,6 +20,7 @@ export interface FeishuChatHandlerDeps {
   client: FeishuClientPort;
   providers: AgentProviderRegistry;
   history: ChatHistoryStore;
+  sessionStore?: SessionStore;
   now?: () => number;
 }
 
@@ -61,6 +63,14 @@ export class FeishuChatHandler {
     }
 
     const agent: AgentCli = provider.buildAgent();
+    if (this.deps.sessionStore) {
+      try {
+        await this.deps.sessionStore.getOrCreate(request.sessionKey, { agentKind: provider.kind });
+        await this.deps.sessionStore.touch(request.sessionKey);
+      } catch (error) {
+        console.warn("session store touch failed", errorMessage(error));
+      }
+    }
     this.deps.history.append(request.sessionKey, { role: "user", content: request.userText });
     const messages = this.deps.history.get(request.sessionKey);
 
