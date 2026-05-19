@@ -11,8 +11,10 @@ import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runt
 import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
 import { AliasStore } from "../platform/commands/alias-store.js";
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
+import { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 import { RepositoryStore } from "../repositories/repository-store.js";
+import { WorkspaceStore } from "../repositories/workspace-store.js";
 import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
 import { DedupStore } from "../scheduler/dedup-store.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
@@ -75,6 +77,8 @@ export class FeegleApp {
     const chatHistory = new ChatHistoryStore();
     const aliasStore = await AliasStore.load(this.deps.feegleHome);
     const repositoryStore = await RepositoryStore.load(this.deps.feegleHome);
+    const workspaceStore = await WorkspaceStore.load(this.deps.feegleHome);
+    const chatBindingStore = await ChatBindingStore.load(this.deps.feegleHome);
     const agentProviders =
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
@@ -128,6 +132,8 @@ export class FeegleApp {
       userDirectory,
       repositories,
       repositoryStore,
+      workspaceStore,
+      chatBindingStore,
       ownerEmails: this.deps.ownerEmails,
       taskRegistry,
       configStore,

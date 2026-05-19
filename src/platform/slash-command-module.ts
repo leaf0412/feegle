@@ -3,7 +3,9 @@ import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js"
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
 import type { ProviderStore } from "../agent/provider-store.js";
 import type { SessionStore } from "../agent/session-store.js";
+import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
+import type { WorkspaceStore } from "../repositories/workspace-store.js";
 import type { AliasStore } from "./commands/alias-store.js";
 import type { SchedulerCommandDeps } from "./commands/scheduler-command-deps.js";
 import type { RepositoryListSource } from "./commands/repo-list-command.js";
@@ -12,6 +14,8 @@ import type { SlashCommandRegistry } from "./slash-command-handler.js";
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
   repositoryStore?: RepositoryStore;
+  workspaceStore?: WorkspaceStore;
+  chatBindingStore?: ChatBindingStore;
   feegleHome?: string;
   ownerEmails?: SchedulerCommandDeps["ownerEmails"];
   userDirectory?: FeishuUserDirectory;
