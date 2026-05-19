@@ -2,8 +2,16 @@ import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import { CommandDetailHandler } from "./command-detail.js";
 import { HelpCommandHandler } from "./help-command.js";
+import { WhoamiCommandHandler } from "./whoami-command.js";
 
 const helpDefinition = defineSlashCommand("help", "/help", "显示帮助", "system", "nav:/help");
+const whoamiDefinition = defineSlashCommand(
+  "whoami",
+  "/whoami",
+  "查看 bot 视角下你的身份（调试用）",
+  "system",
+  "cmd:/whoami"
+);
 const systemDefinitions = [
   defineSlashCommand("ping", "/ping", "检查状态", "system", "nav:/command ping"),
   defineSlashCommand("info", "/info", "查看实例状态（网络、JVM、Worker、心跳）", "system", "nav:/command info"),
@@ -25,6 +33,7 @@ export function systemCommandModule(): SlashCommandModule {
         registry.declarePlanned(definition);
       }
       registry.registerCommand(helpDefinition, new HelpCommandHandler(registry, handlerDeps));
+      registry.registerCommand(whoamiDefinition, new WhoamiCommandHandler(handlerDeps));
       registry.registerInternalHandler(new CommandDetailHandler(registry, handlerDeps));
     }
   };
