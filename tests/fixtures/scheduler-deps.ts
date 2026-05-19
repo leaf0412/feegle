@@ -1,3 +1,5 @@
+import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
+import type { ProviderStore } from "../../src/agent/provider-store.js";
 import type { ConfigStorePort } from "../../src/app/config-store.js";
 import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
 import type { TaskRegistry } from "../../src/scheduler/task-registry.js";
@@ -25,6 +27,8 @@ export function stubSchedulerSlashDeps(overrides: Partial<SlashCommandRegistryDe
     quote: { query: async () => [] } as QuoteClient,
     kinds: new HandlerKindRegistry(),
     scheduler: {} as TaskScheduler,
+    providers: new AgentProviderRegistry(),
+    providerStore: {} as ProviderStore,
     ...overrides
   };
 }

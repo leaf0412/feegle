@@ -18,7 +18,6 @@ const plannedDefinitions = [
   defineSlashCommand("model", "/model", "切换模型", "agent", "nav:/model"),
   defineSlashCommand("reasoning", "/reasoning", "切换推理强度", "agent", "nav:/reasoning"),
   defineSlashCommand("mode", "/mode", "切换运行模式", "agent", "nav:/mode"),
-  defineSlashCommand("provider", "/provider", "管理模型提供方", "agent", "nav:/provider"),
   defineSlashCommand("memory", "/memory", "管理记忆", "agent", "cmd:/memory"),
   defineSlashCommand("allow", "/allow", "授权工具权限", "agent", "cmd:/allow"),
   defineSlashCommand("quiet", "/quiet", "切换安静模式", "agent", "cmd:/quiet"),

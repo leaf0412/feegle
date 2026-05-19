@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
+import type { ProviderStore } from "../../../src/agent/provider-store.js";
 import { ConfigStore } from "../../../src/app/config-store.js";
 import { buildSlashCommandRegistry } from "../../../src/platform/build-slash-command-registry.js";
 import { FeishuCommandResponder } from "../../../src/feishu/feishu-command-responder.js";
@@ -142,7 +143,9 @@ function makeRegistry(deps: ReturnType<typeof makeDeps>) {
     stockStore: deps.stockStore,
     quote: deps.quote,
     kinds: deps.kinds,
-    scheduler: deps.scheduler
+    scheduler: deps.scheduler,
+    providers: new AgentProviderRegistry(),
+    providerStore: {} as ProviderStore
   });
 }
 
