@@ -137,6 +137,14 @@ export class SlashCommandRegistry implements SlashCommandRegistryReadView {
   }
 }
 
+export function extractSlashCommandArgs(raw: string, command: string): string {
+  const literalPrefix = command.split(/[<\[|]/, 1)[0]?.trim() ?? "";
+  if (literalPrefix !== "" && raw.startsWith(literalPrefix)) {
+    return raw.slice(literalPrefix.length).trim();
+  }
+  return raw.trim();
+}
+
 function commandMatches(command: SlashCommandDefinition, normalizedInput: string): boolean {
   return commandPatterns(command).some((pattern) => inputMatchesPattern(normalizedInput, pattern));
 }

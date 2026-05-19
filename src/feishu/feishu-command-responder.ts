@@ -2,12 +2,14 @@ import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
-import type {
-  SlashCommandHandler,
-  SlashCommandReply,
-  SlashCommandRegistry
+import {
+  extractSlashCommandArgs,
+  type SlashCommandHandler,
+  type SlashCommandReply,
+  type SlashCommandRegistry
 } from "../platform/slash-command-handler.js";
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
+import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -100,10 +102,10 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         if (!definition) {
           return { kind: "text", text: `未知命令：${command.raw}` };
         }
-        return this.dispatchSlashCommand(input, definition.id, extractArgs(command.raw, definition.command));
+        return this.dispatchSlashCommand(input, definition.id, extractSlashCommandArgs(command.raw, definition.command));
       }
       case "slash_command":
-        return this.dispatchSlashCommand(input, command.definition.id, extractArgs(command.raw, command.definition.command));
+        return this.dispatchSlashCommand(input, command.definition.id, extractSlashCommandArgs(command.raw, command.definition.command));
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
       case "chat":
@@ -161,16 +163,15 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     input: DispatchInput,
     command: Extract<FeishuCommand, { type: "platform_action" }>
   ): Promise<SlashCommandReply | undefined> {
-    if (command.action.kind !== "nav") {
+    const action = command.action;
+    if (action.kind !== "nav" && action.kind !== "cmd" && action.kind !== "act") {
       return undefined;
     }
-    if (command.action.command === "/help") {
-      return this.dispatchSlashCommand(input, "help", command.action.args);
-    }
-    if (command.action.command === "/command") {
-      return this.runDetailHandler(input, command.action.args);
-    }
-    return undefined;
+    return dispatchPlatformCommandAction(action, {
+      registry: this.options.registry,
+      dispatchSlash: (commandId, args) => this.dispatchSlashCommand(input, commandId, args),
+      runDetailHandler: (args) => this.runDetailHandler(input, args)
+    });
   }
 
   private async runDetailHandler(input: DispatchInput, args: string): Promise<SlashCommandReply | undefined> {
@@ -281,14 +282,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       throw error;
     }
   }
-}
-
-function extractArgs(raw: string, command: string): string {
-  const literalPrefix = command.split(/[<\[|]/, 1)[0]?.trim() ?? "";
-  if (literalPrefix !== "" && raw.startsWith(literalPrefix)) {
-    return raw.slice(literalPrefix.length).trim();
-  }
-  return raw.trim();
 }
 
 function errorMessage(error: unknown): string {

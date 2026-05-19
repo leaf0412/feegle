@@ -64,22 +64,79 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("ignores act: platform actions until the action router is connected", async () => {
+  it("dispatches cmd: card actions through the slash command registry", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
 
     await responder.handleCommand({
       source: "card",
       chatId: "oc_1",
-      messageId: "om_2",
+      messageId: "om_cmd",
+      sender: { platform: "feishu", userId: "ou_alice" },
       command: {
         type: "platform_action",
-        action: { kind: "act", command: "/push", args: "repo web", raw: "act:/push repo web" },
-        sessionKey: "feishu:oc_1:channel"
+        action: { kind: "cmd", command: "/whoami", args: "", raw: "cmd:/whoami" }
       }
     });
 
-    expect(replies).toEqual([]);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]?.messageId).toBe("om_cmd");
+    expect(replies[0]?.text).toContain("platform: feishu");
+    expect(replies[0]?.text).toContain("userId: ou_alice");
+  });
+
+  it("dispatches act: card actions through the slash command registry", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_act",
+      sender: { platform: "feishu", userId: "ou_bob" },
+      command: {
+        type: "platform_action",
+        action: { kind: "act", command: "/whoami", args: "", raw: "act:/whoami" }
+      }
+    });
+
+    expect(replies[0]?.text).toContain("platform: feishu");
+  });
+
+  it("replies 未知命令 when a cmd/act platform action targets an unregistered command", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_unknown",
+      command: {
+        type: "platform_action",
+        action: { kind: "act", command: "/push", args: "repo web", raw: "act:/push repo web" }
+      }
+    });
+
+    expect(replies).toEqual([
+      { messageId: "om_unknown", text: "未知命令：act:/push repo web" }
+    ]);
+  });
+
+  it("replies 仍在规划中 when a cmd: platform action targets a planned slash command", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_planned",
+      command: {
+        type: "platform_action",
+        action: { kind: "cmd", command: "/new", args: "", raw: "cmd:/new" }
+      }
+    });
+
+    expect(replies[0]?.text).toContain("仍在规划中");
   });
 
   it("replies to /help with a navigable command card", async () => {
