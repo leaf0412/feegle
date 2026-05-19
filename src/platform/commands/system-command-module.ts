@@ -2,6 +2,7 @@ import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import { CommandDetailHandler } from "./command-detail.js";
 import { HelpCommandHandler } from "./help-command.js";
+import { DoctorCommandHandler } from "./system/doctor-command.js";
 import { StatusCommandHandler } from "./system/status-command.js";
 import { VersionCommandHandler } from "./system/version-command.js";
 import { WhoamiCommandHandler } from "./whoami-command.js";
@@ -16,8 +17,8 @@ const whoamiDefinition = defineSlashCommand(
 );
 const versionDefinition = defineSlashCommand("version", "/version", "查看版本", "system", "nav:/version");
 const statusDefinition = defineSlashCommand("status", "/status", "查看状态", "system", "nav:/status");
+const doctorDefinition = defineSlashCommand("doctor", "/doctor", "运行诊断", "system", "nav:/doctor");
 const plannedSystemDefinitions = [
-  defineSlashCommand("doctor", "/doctor", "运行诊断", "system", "nav:/doctor"),
   defineSlashCommand("usage", "/usage", "查看用量", "system", "cmd:/usage"),
   defineSlashCommand("upgrade", "/upgrade", "检查升级", "system", "nav:/upgrade"),
   defineSlashCommand("restart", "/restart", "重启服务", "system", "cmd:/restart")
@@ -46,6 +47,19 @@ export function systemCommandModule(): SlashCommandModule {
         );
       } else {
         registry.declarePlanned(statusDefinition);
+      }
+
+      if (deps.configStore && deps.providers) {
+        registry.registerCommand(
+          doctorDefinition,
+          new DoctorCommandHandler({
+            feegleHome: deps.feegleHome,
+            configStore: deps.configStore,
+            providers: deps.providers
+          })
+        );
+      } else {
+        registry.declarePlanned(doctorDefinition);
       }
 
       registry.registerInternalHandler(new CommandDetailHandler(registry, handlerDeps));

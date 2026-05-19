@@ -7,6 +7,7 @@ import type { SlashCommandRegistry } from "./slash-command-handler.js";
 
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
+  feegleHome?: string;
   ownerEmails?: SchedulerCommandDeps["ownerEmails"];
   userDirectory?: FeishuUserDirectory;
   taskRegistry?: SchedulerCommandDeps["taskRegistry"];

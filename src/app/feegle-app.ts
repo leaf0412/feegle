@@ -117,6 +117,7 @@ export class FeegleApp {
     const repositories = new InMemoryRepositoryRegistry();
     const userDirectory = new FeishuUserDirectory(this.deps.feishuClient);
     const registry = buildSlashCommandRegistry({
+      feegleHome: this.deps.feegleHome,
       userDirectory,
       repositories,
       ownerEmails: this.deps.ownerEmails,
