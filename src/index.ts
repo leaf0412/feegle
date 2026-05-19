@@ -124,5 +124,29 @@ export {
 } from "./platform/action-router.js";
 export { createAgent, listAgentKinds, registerAgent, agentDisplayName } from "./agent/agent-registry.js";
 export type { AgentFactory } from "./agent/agent-registry.js";
+export { hasCapability } from "./agent/agent-capabilities.js";
+export type {
+  AgentDoctorInfo,
+  CommandProvider,
+  ContextCompressor,
+  DoctorCheckResult,
+  DoctorChecker,
+  DoctorStatus,
+  HistoryEntry,
+  HistoryProvider,
+  MemoryFileProvider,
+  ModelOption,
+  ModelSwitcher,
+  ModeSwitcher,
+  PermissionModeInfo,
+  ReasoningEffortSwitcher,
+  SkillProvider,
+  ToolAuthorizer,
+  UsageBucket,
+  UsageCredits,
+  UsageReport,
+  UsageReporter,
+  UsageWindow
+} from "./agent/agent-capabilities.js";
 export { HookManager, HOOK_EVENTS } from "./app/hooks.js";
 export type { HookConfig, HookEventPayload, HookEventType, HookHandlerType } from "./app/hooks.js";
