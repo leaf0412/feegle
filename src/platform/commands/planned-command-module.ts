@@ -2,10 +2,7 @@ import { defineSlashCommand } from "../slash-command-catalog.js";
 import type { SlashCommandModule } from "../slash-command-module.js";
 
 const plannedDefinitions = [
-  defineSlashCommand("search", "/search", "搜索历史会话", "session", "cmd:/search"),
-  defineSlashCommand("history", "/history", "查看会话历史", "session", "nav:/history"),
   defineSlashCommand("delete", "/delete", "删除会话", "session", "cmd:/delete"),
-  defineSlashCommand("name", "/name", "重命名会话", "session", "cmd:/name"),
   defineSlashCommand("stop", "/stop", "中止当前会话", "session", "act:/stop"),
 
   defineSlashCommand("model", "/model", "切换模型", "agent", "nav:/model"),
