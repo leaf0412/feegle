@@ -5,6 +5,9 @@ import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
 import { FeegleApp } from "../app/feegle-app.js";
 import { resolveFeegleHome } from "../app/feegle-home.js";
 import { parseOwnerEmails } from "../app/owner-emails.js";
+import { installConsoleTimestamps } from "../app/console-timestamps.js";
+
+installConsoleTimestamps();
 
 const config = parseFeishuPlatformConfig({
   appId: readRequiredEnv("FEISHU_APP_ID"),
