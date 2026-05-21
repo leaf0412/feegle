@@ -122,6 +122,38 @@ describe("feishu event adapter", () => {
     });
   });
 
+  it("merges Feishu form_submit values from action.form_value into card action commands", () => {
+    const parsed = extractCardActionCommand({
+      action: {
+        value: {
+          action: "act:/workbench directory submit",
+          interaction_id: "pi_1"
+        },
+        form_value: {
+          provider: "codex",
+          workspace_path: "/repo/feegle",
+          manual_path: ""
+        }
+      } as never,
+      context: {
+        open_chat_id: "oc_1",
+        open_message_id: "om_1"
+      }
+    });
+
+    expect(parsed).toEqual({
+      chatId: "oc_1",
+      messageId: "om_1",
+      shouldRespond: true,
+      command: {
+        type: "workbench_directory_submit",
+        interactionId: "pi_1",
+        provider: "codex",
+        workspacePath: "/repo/feegle"
+      }
+    });
+  });
+
   it("keeps unmentioned group messages for recording while marking them as non-responsive", () => {
     const parsed = extractTextMessageCommand(
       {

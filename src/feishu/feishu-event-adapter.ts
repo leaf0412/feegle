@@ -110,6 +110,7 @@ export interface FeishuCardActionTriggerEvent {
   action?: {
     value?: unknown;
     option?: unknown;
+    form_value?: unknown;
     tag?: string;
   };
   operator?: {
@@ -207,7 +208,7 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
 
 function resolveCardActionPayload(action: FeishuCardActionTriggerEvent["action"]): unknown {
   if (!action) return undefined;
-  if (typeof action.option !== "string") return action.value;
+  if (typeof action.option !== "string") return mergeFormValue(action.value, action.form_value);
   const payload: Record<string, unknown> = { action: action.option };
   if (
     typeof action.value === "object" &&
@@ -217,7 +218,14 @@ function resolveCardActionPayload(action: FeishuCardActionTriggerEvent["action"]
   ) {
     payload.session_key = (action.value as Record<string, unknown>).session_key;
   }
-  return payload;
+  return mergeFormValue(payload, action.form_value);
+}
+
+function mergeFormValue(value: unknown, formValue: unknown): unknown {
+  if (!isRecord(value) || !isRecord(formValue)) {
+    return value;
+  }
+  return { ...value, form_value: formValue };
 }
 
 export function extractBotMenuCommand(
