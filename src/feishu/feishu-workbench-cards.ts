@@ -40,6 +40,7 @@ export interface BaseBranchPromptCardInput {
   title: string;
   defaultHeadBranch: string;
   candidates: string[];
+  reason?: string;
 }
 
 export type PlanProgressStage =
@@ -328,6 +329,7 @@ export function buildBaseBranchPromptCard(input: BaseBranchPromptCardInput): Fei
         {
           tag: "markdown",
           content: [
+            ...(input.reason ? [`⚠️ ${input.reason}`, ""] : []),
             "本次执行需要一个**基线分支**，新分支会从它派生。",
             "",
             "**基线分支**：从下方候选选择，或手填一个本地 / 远程已有的分支名。",
