@@ -76,7 +76,7 @@ function buildCodexArgs(options: CodexCliRunnerOptions, cwd: string): string[] {
   return args;
 }
 
-function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): string {
+async function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): Promise<string> {
   const messages: string[] = [];
 
   for (const line of stdout.split(/\r?\n/)) {
@@ -94,7 +94,7 @@ function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): string
     }
     const item = readRecord(event.item);
     const itemType = readString(item.type);
-    emitCodexProgress(itemType, item, options);
+    await emitCodexProgress(itemType, item, options);
     if (itemType !== "agent_message" && itemType !== "message") {
       continue;
     }
@@ -111,12 +111,16 @@ function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): string
   return response;
 }
 
-function emitCodexProgress(itemType: string, item: Record<string, unknown>, options?: AgentRunOptions): void {
+async function emitCodexProgress(
+  itemType: string,
+  item: Record<string, unknown>,
+  options?: AgentRunOptions
+): Promise<void> {
   if (!options?.onProgress) {
     return;
   }
   if (itemType === "tool_call" || itemType === "function_call") {
-    options.onProgress({
+    await options.onProgress({
       kind: "tool_use",
       tool: readString(item.name) || readString(item.tool_name) || "Tool",
       text: readString(item.arguments) || readString(item.input) || stringifyRecord(item)
@@ -124,7 +128,7 @@ function emitCodexProgress(itemType: string, item: Record<string, unknown>, opti
     return;
   }
   if (itemType === "tool_result" || itemType === "function_call_output") {
-    options.onProgress({
+    await options.onProgress({
       kind: "tool_result",
       tool: readString(item.name) || readString(item.tool_name) || undefined,
       text: readString(item.output) || readString(item.result) || stringifyRecord(item)
@@ -134,7 +138,7 @@ function emitCodexProgress(itemType: string, item: Record<string, unknown>, opti
   if (itemType === "agent_message" || itemType === "message") {
     const text = extractItemText(item);
     if (text) {
-      options.onProgress({ kind: "thinking", text });
+      await options.onProgress({ kind: "thinking", text });
     }
   }
 }

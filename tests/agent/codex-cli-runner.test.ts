@@ -115,4 +115,40 @@ describe("createCodexCliPromptRunner", () => {
       { kind: "thinking", text: "done" }
     ]);
   });
+
+  it("waits for each async progress callback before emitting the next update", async () => {
+    const runner = createCodexCliPromptRunner(
+      { command: "codex", cwd: "/tmp/workspace" },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "tool_call", name: "Bash", arguments: "npm test" }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "done" }
+          }),
+          JSON.stringify({ type: "turn.completed" })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const events: string[] = [];
+
+    await runner("hello agent", {
+      async onProgress(update) {
+        events.push(`start:${update.kind}`);
+        await Promise.resolve();
+        events.push(`end:${update.kind}`);
+      }
+    });
+
+    expect(events).toEqual([
+      "start:tool_use",
+      "end:tool_use",
+      "start:thinking",
+      "end:thinking"
+    ]);
+  });
 });

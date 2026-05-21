@@ -32,6 +32,7 @@ export interface FeishuChatHandlerDeps {
   configuredWorkspaces?: Record<string, string>;
   interactionIdFactory?: () => string;
   progressHeartbeatMs?: number;
+  progressUpdateMinIntervalMs?: number;
   now?: () => number;
 }
 
@@ -194,8 +195,12 @@ export class FeishuChatHandler {
     status: FeishuRichCardStatus,
     streaming: boolean
   ): Promise<void> {
+    if (!this.canUpdatePreviewNow(state)) {
+      return;
+    }
     try {
       await preview.update(renderRichCard(state, status, streaming, this.now()));
+      state.lastPreviewUpdateAt = this.now();
     } catch (error) {
       console.warn("Feishu chat preview update failed", errorMessage(error));
     }
@@ -208,13 +213,38 @@ export class FeishuChatHandler {
     streaming: boolean
   ): Promise<void> {
     try {
+      await this.waitUntilPreviewUpdateAllowed(state);
       await preview.finish({
         keepOnFinish: true,
         finalContent: renderRichCard(state, status, streaming, this.now())
       });
+      state.lastPreviewUpdateAt = this.now();
     } catch (error) {
       console.warn("Feishu chat preview finish failed", errorMessage(error));
     }
+  }
+
+  private canUpdatePreviewNow(state: PreviewRenderState): boolean {
+    const lastUpdateAt = state.lastPreviewUpdateAt;
+    if (lastUpdateAt === undefined) {
+      return true;
+    }
+    return this.now() - lastUpdateAt >= this.progressUpdateMinIntervalMs();
+  }
+
+  private async waitUntilPreviewUpdateAllowed(state: PreviewRenderState): Promise<void> {
+    const lastUpdateAt = state.lastPreviewUpdateAt;
+    if (lastUpdateAt === undefined) {
+      return;
+    }
+    const remaining = this.progressUpdateMinIntervalMs() - (this.now() - lastUpdateAt);
+    if (remaining > 0) {
+      await delay(remaining);
+    }
+  }
+
+  private progressUpdateMinIntervalMs(): number {
+    return this.deps.progressUpdateMinIntervalMs ?? 1000;
   }
 
   private startProgressHeartbeat(preview: FeishuPreviewSession, state: PreviewRenderState): () => void {
@@ -230,6 +260,7 @@ interface PreviewRenderState {
   provider: string;
   steps: PlatformProgressToolStep[];
   startedAt: number;
+  lastPreviewUpdateAt?: number;
   answer?: string;
   errorMessage?: string;
 }
@@ -324,4 +355,8 @@ function resolveCwd(
   if (!binding?.workspaceId) return undefined;
   const workspace = workspaceStore.get(binding.workspaceId);
   return workspace?.path;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

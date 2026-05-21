@@ -140,6 +140,46 @@ describe("FeishuChatHandler", () => {
     expect(client.cards.update).toHaveLength(updatesAfterFinish);
   });
 
+  it("delays the final preview update when recent progress would hit Feishu message update limits", async () => {
+    vi.useFakeTimers();
+    const client = trackingClient({ minUpdateGapMs: 1000 });
+    const providers = new AgentProviderRegistry();
+    const agent = stubAgent({
+      chat: async (_messages, options) => {
+        await options?.onProgress?.({ kind: "thinking", text: "分析中" });
+        return "最终答案";
+      }
+    });
+    providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
+    providers.setActive("codex");
+    let nowMs = 0;
+    const handler = new FeishuChatHandler({
+      client,
+      providers,
+      history: new ChatHistoryStore(),
+      now: () => nowMs,
+      progressUpdateMinIntervalMs: 1000
+    });
+
+    const handling = handler.handle({
+      chatId: "oc_1",
+      triggerMessageId: "om_trigger",
+      sessionKey: "feishu:oc_1:channel",
+      userText: "do it"
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(client.cards.update).toHaveLength(1);
+    expect(JSON.stringify(client.cards.update[0])).toContain("分析中");
+
+    nowMs = 1000;
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(handling).resolves.toEqual({ status: "delivered" });
+
+    expect(client.cards.update).toHaveLength(2);
+    expect(JSON.stringify(client.cards.update.at(-1))).toContain("最终答案");
+  });
+
   it("passes the group-bound workspace path as cwd so chat turns run in the selected project", async () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
@@ -309,10 +349,11 @@ interface TrackingClient extends FeishuClientPort {
   };
 }
 
-function trackingClient(): TrackingClient {
+function trackingClient(options: { minUpdateGapMs?: number } = {}): TrackingClient {
   const replies: Array<{ messageId: string; text: string }> = [];
   const startCalls: Array<{ replyToMessageId?: string; card: unknown }> = [];
   const updateCalls: Array<unknown> = [];
+  let lastUpdateAt = -Infinity;
   let nextId = 1;
   const base = makeFakeFeishuClient({
     async replyText(messageId, text) {
@@ -330,6 +371,11 @@ function trackingClient(): TrackingClient {
       return id;
     },
     async updateInteractiveCard(_messageId, card) {
+      const now = Date.now();
+      if (options.minUpdateGapMs !== undefined && now - lastUpdateAt < options.minUpdateGapMs) {
+        throw new Error("Request failed with status code 400");
+      }
+      lastUpdateAt = now;
       updateCalls.push(card);
     }
   });
