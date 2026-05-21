@@ -260,7 +260,7 @@ The project includes platform-neutral cards rendered by the Feishu adapter, plus
 - Review buttons emit shared `act:/prototype approve ...`, `act:/plan confirm ...`, and `act:/requirement cancel ...` values
 - Push buttons are scoped per repository and emit `act:/push repo <repositoryId>` values
 - Directory setup cards collect an agent provider, a configured workspace shortcut, or a manually typed local path
-- Plan review cards keep the full plan in uploaded markdown files and only show compact review actions in chat
+- Plan review cards link to a Feishu cloud document for the full plan and keep local markdown backups for audit
 
 Group workspace bindings are stored in the local runtime SQLite database under `~/.feegle/feegle.db`. If a group sends natural-language text before a directory is bound, Feegle replies with a directory setup card instead of invoking the agent. After the card is submitted, Feegle validates that the selected or typed path is a readable directory, saves it for that group, and resumes the original message.
 
@@ -270,7 +270,14 @@ Long implementation plans are written under:
 ~/.feegle/artifacts/plans/<plan_id>/plan-v<N>.md
 ```
 
-Feegle uploads the markdown file to the Feishu group and sends a compact confirmation card. If the user requests changes, the revision form collects multiline feedback and creates a new version such as `plan-v2.md`; earlier versions remain on disk.
+Feegle creates a Feishu cloud document with the same content, stores its `doc_token` and `doc_url` in the runtime SQLite database, and sends a compact confirmation card with an `打开云文档` button. If the user requests changes, the revision form collects multiline feedback, writes a new local version such as `plan-v2.md`, creates a fresh cloud document, and posts a new review card. Earlier local files and cloud-doc links remain available for version history.
+
+This flow requires these Feishu scopes:
+
+- `docx:document:create`, `docx:document.block:convert`, `docx:document:write_only`, `docx:document:readonly` for creating the document and importing markdown blocks.
+- `space:document:delete` for future cleanup paths that delete stale generated docs.
+
+The tenant must allow newly created app docs to be organization-visible by default so reviewers can open the doc URL without an extra sharing API call.
 
 The OpenAPI client supports:
 
