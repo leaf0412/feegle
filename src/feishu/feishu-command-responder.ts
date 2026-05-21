@@ -51,6 +51,14 @@ export type FeishuWorkbenchReply =
 export interface FeishuWorkbenchHandler extends DirectorySetupSubmitHandler {
   handlePlanRevise?(input: PlanReviseInput): Promise<FeishuWorkbenchReply | undefined>;
   handlePlanRevisionSubmit?(input: PlanRevisionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanApprove?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanCancel?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanReject?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanPush?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanCleanup?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanBaseBranchSubmit?(input: PlanBaseBranchSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanReviseExecution?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanReviseExecutionSubmit?(input: PlanReviseExecutionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
 }
 
 export interface PlanReviseInput {
@@ -64,6 +72,35 @@ export interface PlanRevisionSubmitInput {
   messageId: string;
   sender?: DirectorySetupSubmitInput["sender"];
   command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>;
+}
+
+export interface PlanActionInput {
+  chatId: string;
+  messageId: string;
+  command: Extract<
+    FeishuCommand,
+    {
+      type:
+        | "workbench_plan_approve"
+        | "workbench_plan_cancel"
+        | "workbench_plan_reject"
+        | "workbench_plan_push"
+        | "workbench_plan_cleanup"
+        | "workbench_plan_revise_execution";
+    }
+  >;
+}
+
+export interface PlanBaseBranchSubmitInput {
+  chatId: string;
+  messageId: string;
+  command: Extract<FeishuCommand, { type: "workbench_plan_base_branch_submit" }>;
+}
+
+export interface PlanReviseExecutionSubmitInput {
+  chatId: string;
+  messageId: string;
+  command: Extract<FeishuCommand, { type: "workbench_plan_revise_execution_submit" }>;
 }
 
 interface DispatchInput {
@@ -149,10 +186,12 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "workbench_plan_reject":
       case "workbench_plan_push":
       case "workbench_plan_cleanup":
-      case "workbench_plan_base_branch_submit":
       case "workbench_plan_revise_execution":
+        return this.dispatchPlanAction(input, command);
+      case "workbench_plan_base_branch_submit":
+        return this.dispatchPlanBaseBranchSubmit(input, command);
       case "workbench_plan_revise_execution_submit":
-        return { kind: "text", text: `计划 ${command.type} 处理器尚未接入` };
+        return this.dispatchPlanReviseExecutionSubmit(input, command);
       case "chat":
         return undefined;
       case "repo_select":
@@ -214,6 +253,60 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       chatId: input.chatId,
       messageId: input.messageId,
       ...(input.sender ? { sender: input.sender } : {}),
+      command
+    });
+  }
+
+  private async dispatchPlanAction(
+    input: DispatchInput,
+    command: PlanActionInput["command"]
+  ): Promise<FeishuWorkbenchReply | undefined> {
+    const handlerMap: Record<PlanActionInput["command"]["type"], keyof FeishuWorkbenchHandler> = {
+      workbench_plan_approve: "handlePlanApprove",
+      workbench_plan_cancel: "handlePlanCancel",
+      workbench_plan_reject: "handlePlanReject",
+      workbench_plan_push: "handlePlanPush",
+      workbench_plan_cleanup: "handlePlanCleanup",
+      workbench_plan_revise_execution: "handlePlanReviseExecution"
+    };
+    const key = handlerMap[command.type];
+    const handler = this.options.workbench?.[key] as
+      | ((input: PlanActionInput) => Promise<FeishuWorkbenchReply | undefined>)
+      | undefined;
+    if (!handler) {
+      return { kind: "text", text: `计划 ${command.type} 处理器尚未接入` };
+    }
+    return handler.call(this.options.workbench, {
+      chatId: input.chatId,
+      messageId: input.messageId,
+      command
+    });
+  }
+
+  private async dispatchPlanBaseBranchSubmit(
+    input: DispatchInput,
+    command: PlanBaseBranchSubmitInput["command"]
+  ): Promise<FeishuWorkbenchReply | undefined> {
+    if (!this.options.workbench?.handlePlanBaseBranchSubmit) {
+      return { kind: "text", text: "BaseBranch 处理器尚未接入" };
+    }
+    return this.options.workbench.handlePlanBaseBranchSubmit({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      command
+    });
+  }
+
+  private async dispatchPlanReviseExecutionSubmit(
+    input: DispatchInput,
+    command: PlanReviseExecutionSubmitInput["command"]
+  ): Promise<FeishuWorkbenchReply | undefined> {
+    if (!this.options.workbench?.handlePlanReviseExecutionSubmit) {
+      return { kind: "text", text: "继续调整处理器尚未接入" };
+    }
+    return this.options.workbench.handlePlanReviseExecutionSubmit({
+      chatId: input.chatId,
+      messageId: input.messageId,
       command
     });
   }
