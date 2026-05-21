@@ -86,6 +86,40 @@ Feishu routing options:
 - `FEEGLE_HOME` overrides the scheduler persistence directory; default is `~/.feegle`.
 - `FEEGLE_OWNER_EMAILS` is required for cron/stock commands. Values are comma-separated emails (e.g. `alice@example.com,bob@example.com`). At dispatch time the bot resolves the sender's email via the Feishu contact API and matches against this set — make sure the app has `contact:user.email` scope and that owner emails are filled in the Feishu directory.
 
+## Local Agent Workbench Configuration
+
+Feegle reads operator config from `~/.feegle/config.jsonc` first. If that file does not exist, it falls back to `~/.feegle/config.json`. JSONC supports comments and trailing commas, which makes local agent setup easier to maintain.
+
+Example:
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "failureTarget": null,
+  "agent": {
+    "default": "codex",
+    "providers": {
+      "codex": {
+        "command": "codex",
+        "sandbox": "workspace-write",
+        "approvalPolicy": "on-request"
+      },
+      "claude": {
+        "command": "claude",
+        "sandbox": "workspace-write"
+      }
+    }
+  },
+  "workspaces": {
+    "feegle": "/Users/yb/Desktop/code/personal/feegle"
+  }
+}
+```
+
+`agent.default` selects the provider activated at startup. `agent.providers` defines local CLI providers such as Codex, Claude, or another compatible command. `workspaces` is only a set of shortcuts shown in Feishu cards; it is not a whitelist. A user can still type a directory manually in the group setup card.
+
+The legacy `/provider register` and `/provider use` commands still work when no `agent` config is present.
+
 ## Scheduler And Stock Commands
 
 Feegle persists scheduler state under `~/.feegle` unless `FEEGLE_HOME` is set:
@@ -172,7 +206,7 @@ Start the long-connection process:
 npm run start:feishu
 ```
 
-When the connection is active, send a message in the Feishu group. Deterministic slash commands are handled by code. Non-slash text is treated as ordinary chat; it is not sent to a workflow Agent CLI. Unknown slash commands are acknowledged with an unknown-command reply.
+When the connection is active, send a message in the Feishu group. Deterministic slash commands are handled by code. Non-slash text is treated as ordinary chat and is sent to the active local Agent CLI once the group has a working directory binding. Unknown slash commands are acknowledged with an unknown-command reply.
 
 Example command:
 
@@ -218,13 +252,25 @@ the adapter parses it into:
 
 ## Current Feishu Conversation Model
 
-The project includes platform-neutral cards rendered by the Feishu adapter:
+The project includes platform-neutral cards rendered by the Feishu adapter, plus Feishu-native workbench cards for forms:
 
 - Shared update cards use `update_multi: true`
 - Workflow progress snapshots can be rendered as Feishu cards and patched in place
 - Requirement status cards can show multiple repositories
 - Review buttons emit shared `act:/prototype approve ...`, `act:/plan confirm ...`, and `act:/requirement cancel ...` values
 - Push buttons are scoped per repository and emit `act:/push repo <repositoryId>` values
+- Directory setup cards collect an agent provider, a configured workspace shortcut, or a manually typed local path
+- Plan review cards keep the full plan in uploaded markdown files and only show compact review actions in chat
+
+Group workspace bindings are stored in the local runtime SQLite database under `~/.feegle/feegle.db`. If a group sends natural-language text before a directory is bound, Feegle replies with a directory setup card instead of invoking the agent. After the card is submitted, Feegle validates that the selected or typed path is a readable directory, saves it for that group, and resumes the original message.
+
+Long implementation plans are written under:
+
+```text
+~/.feegle/artifacts/plans/<plan_id>/plan-v<N>.md
+```
+
+Feegle uploads the markdown file to the Feishu group and sends a compact confirmation card. If the user requests changes, the revision form collects multiline feedback and creates a new version such as `plan-v2.md`; earlier versions remain on disk.
 
 The OpenAPI client supports:
 
@@ -234,7 +280,7 @@ The OpenAPI client supports:
 - `updateInteractiveCard(messageId, card)`
 - `updateProgress(messageId, progressSnapshot)`
 
-Shared contracts live under `src/platform`. Feishu-specific event shapes, card rendering, OpenAPI calls, and long-connection runtime code live under `src/feishu`. Future adapters such as enterprise WeChat should implement their own renderer/client/runtime while reusing the platform card, action, message, session, and progress contracts.
+Shared contracts live under `src/platform`. Feishu-specific event shapes, card rendering, OpenAPI calls, and long-connection runtime code live under `src/feishu`. Runtime workbench state and artifact services live under `src/workbench`. Future adapters such as enterprise WeChat should implement their own renderer/client/runtime while reusing the platform card, action, message, session, and progress contracts where those abstractions fit.
 
 ## What Is Not Wired Yet
 
@@ -248,7 +294,7 @@ The runnable Feishu entrypoint does not yet execute the full product workflow. I
 - Push Git branches when the Feishu card button is clicked
 - Report CI/browser verification back into Feishu
 
-Those pieces exist as separate domain/service boundaries or planned workflow steps. The Feishu entrypoint does not send natural-language text to the Agent CLI; workflow actions need explicit slash commands before they are wired into the runtime.
+Those pieces exist as separate domain/service boundaries or planned workflow steps. Natural-language chat is wired to the active local Agent CLI, but the full product workflow actions still need explicit slash commands or workbench callbacks before they are wired into the runtime.
 
 ## Useful Commands
 
