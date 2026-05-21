@@ -64,6 +64,43 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
+  it("dispatches workbench directory submissions before slash handling", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(),
+      workbench: {
+        handleDirectorySubmit: async (input) => {
+          calls.push(input);
+          return { kind: "text", text: "已保存目录，正在继续处理原请求。" };
+        }
+      }
+    });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_card",
+      sender: { platform: "feishu", userId: "ou_alice" },
+      command: {
+        type: "workbench_directory_submit",
+        interactionId: "pi_1",
+        provider: "codex",
+        manualPath: "/repo/feegle"
+      }
+    });
+
+    expect(calls).toEqual([
+      expect.objectContaining({
+        chatId: "oc_1",
+        messageId: "om_card",
+        sender: { platform: "feishu", userId: "ou_alice" },
+        command: expect.objectContaining({ interactionId: "pi_1", manualPath: "/repo/feegle" })
+      })
+    ]);
+    expect(replies).toEqual([{ messageId: "om_card", text: "已保存目录，正在继续处理原请求。" }]);
+  });
+
   it("dispatches cmd: card actions through the slash command registry", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });

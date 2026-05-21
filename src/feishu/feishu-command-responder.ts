@@ -11,6 +11,7 @@ import {
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
+import type { DirectorySetupSubmitHandler } from "../workbench/directory-setup-service.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -36,6 +37,7 @@ export interface FeishuCommandResponderOptions {
   configStore?: { get(): { failureTarget: unknown } };
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
   userDirectory?: FeishuUserDirectory;
+  workbench?: DirectorySetupSubmitHandler;
 }
 
 interface DispatchInput {
@@ -110,6 +112,8 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchSlashCommand(input, command.definition.id, extractSlashCommandArgs(command.raw, command.definition.command));
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
+      case "workbench_directory_submit":
+        return this.dispatchWorkbenchDirectorySubmit(input, command);
       case "chat":
         return undefined;
       case "repo_select":
@@ -122,11 +126,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
           kind: "text",
           text: `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`
         };
-      case "workbench_directory_submit":
-        return {
-          kind: "text",
-          text: "已收到工作目录设置，当前入口还没有接入保存执行器。"
-        };
       case "unknown":
         return { kind: "text", text: `未知命令：${command.raw}` };
       default: {
@@ -134,6 +133,21 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return _exhaustive;
       }
     }
+  }
+
+  private async dispatchWorkbenchDirectorySubmit(
+    input: DispatchInput,
+    command: Extract<FeishuCommand, { type: "workbench_directory_submit" }>
+  ): Promise<SlashCommandReply | undefined> {
+    if (!this.options.workbench) {
+      return { kind: "text", text: "已收到工作目录设置，当前入口还没有接入保存执行器。" };
+    }
+    return this.options.workbench.handleDirectorySubmit({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      ...(input.sender ? { sender: input.sender } : {}),
+      command
+    });
   }
 
   private async dispatchSlashCommand(

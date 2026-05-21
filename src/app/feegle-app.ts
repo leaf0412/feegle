@@ -1,4 +1,5 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
+import { join } from "node:path";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
 import { ProviderStore } from "../agent/provider-store.js";
@@ -35,6 +36,10 @@ import { acquireFeegleLock } from "./feegle-lock.js";
 import { HookManager } from "./hooks.js";
 import { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterModule } from "./notification-adapter-module.js";
+import { openRuntimeDb, type RuntimeDb } from "./runtime-db.js";
+import { ChatWorkspaceStore } from "../workbench/chat-workspace-store.js";
+import { PendingInteractionStore } from "../workbench/pending-interaction-store.js";
+import { DirectorySetupService } from "../workbench/directory-setup-service.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -64,6 +69,7 @@ export class FeegleApp {
   private scheduler?: Startable;
   private runtime?: Startable;
   private hooks?: HookManager;
+  private runtimeDb?: RuntimeDb;
 
   constructor(private readonly deps: FeegleAppDeps) {
     this.hooks = deps.hooks;
@@ -72,6 +78,9 @@ export class FeegleApp {
   async start(): Promise<void> {
     this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
     const configStore = await (this.deps.loadConfigStore ?? ConfigStore.load)(this.deps.feegleHome);
+    this.runtimeDb = openRuntimeDb(join(this.deps.feegleHome, "feegle.db"));
+    const chatWorkspaceStore = new ChatWorkspaceStore(this.runtimeDb);
+    const pendingInteractionStore = new PendingInteractionStore(this.runtimeDb);
     const providerStore = await ProviderStore.load(this.deps.feegleHome);
     const config = configStore.get();
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
@@ -156,7 +165,15 @@ export class FeegleApp {
       history: chatHistory,
       sessionStore,
       workspaceStore,
-      chatBindingStore
+      chatBindingStore,
+      chatWorkspaceStore,
+      pendingInteractions: pendingInteractionStore,
+      configuredWorkspaces: config.workspaces
+    });
+    const workbench = new DirectorySetupService({
+      chatWorkspaces: chatWorkspaceStore,
+      pendingInteractions: pendingInteractionStore,
+      chatHandler
     });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
       registry,
@@ -164,7 +181,8 @@ export class FeegleApp {
       trace: logFeishuCommandTrace,
       configStore,
       taskRegistry,
-      userDirectory
+      userDirectory,
+      workbench
     });
     this.runtime = this.deps.runtimeFactory(responder);
     await this.runtime.start();
@@ -173,6 +191,7 @@ export class FeegleApp {
   async stop(): Promise<void> {
     await this.runtime?.stop?.();
     await this.scheduler?.stop?.();
+    this.runtimeDb?.close();
     this.hooks?.emit({ event: "scheduler.stopped" });
     await this.lockfileRelease?.();
   }

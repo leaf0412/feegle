@@ -137,6 +137,58 @@ describe("FeishuChatHandler", () => {
     expect(seenCwd).toBe("/Users/yb/Desktop/code/personal/feegle");
   });
 
+  it("opens a directory setup card instead of running the agent when no group workspace is bound", async () => {
+    const client = trackingClient();
+    const providers = new AgentProviderRegistry();
+    const chat = vi.fn(async () => "done");
+    const agent = stubAgent({ chat });
+    providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
+    providers.setActive("codex");
+    const pending: unknown[] = [];
+    const handler = new FeishuChatHandler({
+      client,
+      providers,
+      history: new ChatHistoryStore(),
+      chatWorkspaceStore: {
+        get: () => undefined
+      },
+      pendingInteractions: {
+        put: async (input: unknown) => {
+          pending.push(input);
+          return input;
+        }
+      },
+      configuredWorkspaces: {
+        feegle: "/repo/feegle"
+      },
+      interactionIdFactory: () => "pi_1",
+      now: () => Date.parse("2026-05-21T00:00:00.000Z")
+    });
+
+    const result = await handler.handle({
+      chatId: "oc_1",
+      triggerMessageId: "om_1",
+      sessionKey: "feishu:oc_1:channel",
+      userText: "inspect this repo"
+    });
+
+    expect(result).toEqual({ status: "awaiting_workspace", interactionId: "pi_1" });
+    expect(client.cards.start).toHaveLength(1);
+    expect(JSON.stringify(client.cards.start[0]?.card)).toContain("选择工作目录");
+    expect(JSON.stringify(client.cards.start[0]?.card)).toContain("act:/workbench directory submit");
+    expect(pending).toEqual([
+      expect.objectContaining({
+        interactionId: "pi_1",
+        chatId: "oc_1",
+        messageId: "om_1",
+        kind: "directory_setup",
+        payload: { sessionKey: "feishu:oc_1:channel", userText: "inspect this repo" },
+        expiresAt: "2026-05-22T00:00:00.000Z"
+      })
+    ]);
+    expect(chat).not.toHaveBeenCalled();
+  });
+
   it("falls into the error status when the agent throws and updates the card to red", async () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
@@ -159,7 +211,9 @@ describe("FeishuChatHandler", () => {
       userText: "hi"
     });
 
-    expect(result.status).toBe("failed");
+    if (result.status !== "failed") {
+      throw new Error(`expected failed result, got ${result.status}`);
+    }
     expect(result.reason).toBe("boom");
     const lastUpdate = JSON.stringify(client.cards.update.at(-1));
     expect(lastUpdate).toContain("red");

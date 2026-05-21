@@ -17,6 +17,8 @@ import {
 import type { PlatformProgressToolStep } from "../platform/progress.js";
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { WorkspaceStore } from "../repositories/workspace-store.js";
+import { buildDirectorySetupCard } from "./feishu-workbench-cards.js";
+import { ulid } from "ulid";
 
 export interface FeishuChatHandlerDeps {
   client: FeishuClientPort;
@@ -25,7 +27,26 @@ export interface FeishuChatHandlerDeps {
   sessionStore?: SessionStore;
   workspaceStore?: WorkspaceStore;
   chatBindingStore?: ChatBindingStore;
+  chatWorkspaceStore?: ChatWorkspaceReadStore;
+  pendingInteractions?: PendingInteractionWriteStore;
+  configuredWorkspaces?: Record<string, string>;
+  interactionIdFactory?: () => string;
   now?: () => number;
+}
+
+export interface ChatWorkspaceReadStore {
+  get(chatId: string): { workspacePath: string; defaultProvider?: string } | undefined;
+}
+
+export interface PendingInteractionWriteStore {
+  put(input: {
+    interactionId: string;
+    chatId: string;
+    messageId: string;
+    kind: string;
+    payload: Record<string, unknown>;
+    expiresAt: string;
+  }): unknown | Promise<unknown>;
 }
 
 export interface FeishuChatRequest {
@@ -35,10 +56,11 @@ export interface FeishuChatRequest {
   userText: string;
 }
 
-export interface FeishuChatResult {
-  status: "delivered" | "no_provider" | "failed";
-  reason?: string;
-}
+export type FeishuChatResult =
+  | { status: "delivered" }
+  | { status: "awaiting_workspace"; interactionId: string }
+  | { status: "no_provider" }
+  | { status: "failed"; reason: string };
 
 /**
  * Orchestrates a single chat turn:
@@ -55,7 +77,7 @@ export class FeishuChatHandler {
   }
 
   async handle(request: FeishuChatRequest): Promise<FeishuChatResult> {
-    const provider = this.deps.providers.active();
+    const provider = this.resolveProvider(request.chatId);
     if (!provider) {
       const available = this.deps.providers.available();
       const text =
@@ -64,6 +86,16 @@ export class FeishuChatHandler {
           : `已注册 ${available.map((p) => p.kind).join("、")}，但都未激活。运行 /provider use <kind> 激活一个。`;
       await this.deps.client.replyText(request.triggerMessageId, text);
       return { status: "no_provider" };
+    }
+
+    const cwd = resolveCwd(
+      request.chatId,
+      this.deps.chatWorkspaceStore,
+      this.deps.workspaceStore,
+      this.deps.chatBindingStore
+    );
+    if (!cwd && this.shouldCollectWorkspace()) {
+      return this.openDirectorySetup(request);
     }
 
     const agent: AgentCli = provider.buildAgent();
@@ -75,8 +107,6 @@ export class FeishuChatHandler {
         console.warn("session store touch failed", errorMessage(error));
       }
     }
-
-    const cwd = resolveCwd(request.chatId, this.deps.workspaceStore, this.deps.chatBindingStore);
 
     this.deps.history.append(request.sessionKey, { role: "user", content: request.userText });
     const messages = this.deps.history.get(request.sessionKey);
@@ -113,6 +143,45 @@ export class FeishuChatHandler {
     renderState.answer = answer;
     await this.safeFinish(preview, renderState, "done", false);
     return { status: "delivered" };
+  }
+
+  private resolveProvider(chatId: string): ReturnType<AgentProviderRegistry["active"]> {
+    const binding = this.deps.chatWorkspaceStore?.get(chatId);
+    if (binding?.defaultProvider) {
+      return this.deps.providers.resolve(binding.defaultProvider);
+    }
+    return this.deps.providers.active();
+  }
+
+  private shouldCollectWorkspace(): boolean {
+    return Boolean(this.deps.chatWorkspaceStore && this.deps.pendingInteractions);
+  }
+
+  private async openDirectorySetup(request: FeishuChatRequest): Promise<FeishuChatResult> {
+    if (!this.deps.pendingInteractions) {
+      throw new Error("pending interactions store is required to collect workspace setup");
+    }
+    const interactionId = this.deps.interactionIdFactory?.() ?? ulid();
+    await this.deps.pendingInteractions.put({
+      interactionId,
+      chatId: request.chatId,
+      messageId: request.triggerMessageId,
+      kind: "directory_setup",
+      payload: {
+        sessionKey: request.sessionKey,
+        userText: request.userText
+      },
+      expiresAt: new Date(this.now() + 24 * 60 * 60 * 1000).toISOString()
+    });
+    await this.deps.client.replyInteractiveCard(
+      request.triggerMessageId,
+      buildDirectorySetupCard({
+        interactionId,
+        providers: this.deps.providers.available().map((provider) => provider.kind),
+        workspaces: Object.entries(this.deps.configuredWorkspaces ?? {}).map(([label, path]) => ({ label, path }))
+      })
+    );
+    return { status: "awaiting_workspace", interactionId };
   }
 
   private async safeUpdate(
@@ -232,9 +301,12 @@ function errorMessage(error: unknown): string {
 
 function resolveCwd(
   chatId: string,
+  chatWorkspaceStore?: ChatWorkspaceReadStore,
   workspaceStore?: WorkspaceStore,
   chatBindingStore?: ChatBindingStore
 ): string | undefined {
+  const chatWorkspace = chatWorkspaceStore?.get(chatId);
+  if (chatWorkspace?.workspacePath) return chatWorkspace.workspacePath;
   if (!workspaceStore || !chatBindingStore) return undefined;
   const binding = chatBindingStore.get(chatId);
   if (!binding?.workspaceId) return undefined;
