@@ -17,6 +17,7 @@
     "execa": "^9.6.0",
     "fs-extra": "^11.3.0",
     "iconv-lite": "^0.7.2",
+    "jsonc-parser": "^3.3.1",
     "proper-lockfile": "^4.1.2",
     "read-last-lines": "^1.8.0",
     "ulid": "^3.0.2",

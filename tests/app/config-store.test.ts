@@ -24,6 +24,33 @@ describe("ConfigStore", () => {
     expect(reloaded.get().failureTarget).toEqual({ platform: "feishu", chatId: "oc_ops" });
   });
 
+  it("loads config.jsonc before config.json so operators can use comments", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-config-"));
+    await writeFile(join(home, "config.json"), JSON.stringify({ schemaVersion: 1, failureTarget: null }));
+    await writeFile(
+      join(home, "config.jsonc"),
+      `{
+        // preferred file
+        "schemaVersion": 1,
+        "failureTarget": null,
+        "agent": {
+          "default": "codex",
+          "providers": {
+            "codex": { "command": "codex", "sandbox": "workspace-write" }
+          }
+        },
+        "workspaces": {
+          "feegle": "/Users/yb/Desktop/code/personal/feegle",
+        },
+      }`
+    );
+
+    const store = await ConfigStore.load(home);
+
+    expect(store.get().agent?.default).toBe("codex");
+    expect(store.get().workspaces?.feegle).toBe("/Users/yb/Desktop/code/personal/feegle");
+  });
+
   it("rejects incompatible schema versions instead of silently migrating", async () => {
     const home = await mkdtemp(join(tmpdir(), "feegle-config-"));
     await writeFile(join(home, "config.json"), JSON.stringify({ schemaVersion: 2, failureTarget: null }));
