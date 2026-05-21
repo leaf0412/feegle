@@ -42,8 +42,13 @@ import { PendingInteractionStore } from "../workbench/pending-interaction-store.
 import { DirectorySetupService } from "../workbench/directory-setup-service.js";
 import { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
 import { PlanArtifactService } from "../workbench/plan-artifact-service.js";
-import { buildPlanRevisionRequestCard } from "../feishu/feishu-workbench-cards.js";
+import {
+  buildPlanExecutionRevisionCard,
+  buildPlanRevisionRequestCard
+} from "../feishu/feishu-workbench-cards.js";
 import type { ProvidersFile, ProviderStorePort } from "../agent/provider-store.js";
+import { GitService } from "../git/git-service.js";
+import { PlanExecutionService } from "../workbench/plan-execution-service.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -187,6 +192,17 @@ export class FeegleApp {
       cloudDoc: this.deps.cloudDoc,
       store: planArtifactStore
     });
+    const planExecution = new PlanExecutionService({
+      feegleHome: this.deps.feegleHome,
+      client: this.deps.feishuClient,
+      store: planArtifactStore,
+      git: new GitService(),
+      agent: agentProviders.resolveActiveAgent() ?? {
+        runDevelopmentTask: async () => {
+          throw new Error("no active agent provider configured for plan execution");
+        }
+      }
+    });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
       registry,
       chatHandler,
@@ -215,7 +231,28 @@ export class FeegleApp {
             agent: provider.buildAgent()
           });
           return { kind: "text", text: `已生成计划 v${artifact.version}，请查看新文件和确认卡。` };
-        }
+        },
+        handlePlanApprove: (input) => planExecution.approve(input.command.planId),
+        handlePlanCancel: (input) => planExecution.cancel(input.command.planId),
+        handlePlanReject: (input) => planExecution.cancel(input.command.planId),
+        handlePlanPush: (input) => planExecution.push(input.command.planId),
+        handlePlanCleanup: (input) => planExecution.cleanup(input.command.planId),
+        handlePlanBaseBranchSubmit: (input) =>
+          planExecution.submitBaseBranch({
+            planId: input.command.planId,
+            baseBranch: input.command.baseBranch,
+            ...(input.command.headBranch ? { headBranch: input.command.headBranch } : {})
+          }),
+        handlePlanReviseExecution: async (input) => ({
+          kind: "feishu_card",
+          card: buildPlanExecutionRevisionCard({
+            planId: input.command.planId,
+            version: planArtifactStore.latest(input.command.planId)?.version ?? input.command.version,
+            iteration: planArtifactStore.latest(input.command.planId)?.executionIteration ?? 1
+          })
+        }),
+        handlePlanReviseExecutionSubmit: (input) =>
+          planExecution.reviseExecution(input.command.planId, input.command.note)
       }
     });
     this.runtime = this.deps.runtimeFactory(responder);
