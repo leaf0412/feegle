@@ -15,6 +15,12 @@ export type FeishuCommand =
       workspacePath?: string;
       manualPath?: string;
     }
+  | {
+      type: "workbench_plan_revision_submit";
+      planId: string;
+      version: number;
+      revisionNote: string;
+    }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -73,6 +79,28 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
     };
   }
 
+  if (value.action === "act:/workbench plan revise submit") {
+    const planId = value.plan_id;
+    const version = parsePositiveInteger(value.version);
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    const revisionNote = formValue.revision_note;
+    if (
+      typeof planId !== "string" ||
+      planId === "" ||
+      version === undefined ||
+      typeof revisionNote !== "string" ||
+      revisionNote === ""
+    ) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return {
+      type: "workbench_plan_revision_submit",
+      planId,
+      version,
+      revisionNote
+    };
+  }
+
   if (typeof value.action === "string") {
     const action = parsePlatformAction(value.action);
     if (action.kind !== "unknown") {
@@ -93,6 +121,14 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
   }
 
   return { type: "unknown", raw: stringifyUnknown(value) };
+}
+
+function parsePositiveInteger(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
 }
 
 function optionalString(

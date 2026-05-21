@@ -114,6 +114,11 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchPlatformAction(input, command);
       case "workbench_directory_submit":
         return this.dispatchWorkbenchDirectorySubmit(input, command);
+      case "workbench_plan_revision_submit":
+        return {
+          kind: "text",
+          text: "已收到计划修改意见，当前入口还没有接入计划修订执行器。"
+        };
       case "chat":
         return undefined;
       case "repo_select":

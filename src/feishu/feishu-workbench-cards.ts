@@ -23,6 +23,11 @@ export interface PlanReviewSummary {
   risks: string[];
 }
 
+export interface PlanRevisionRequestCardInput {
+  planId: string;
+  version: number;
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -61,6 +66,7 @@ type FeishuFormElement =
       name: string;
       label: FeishuPlainText;
       placeholder: FeishuPlainText;
+      input_type?: "multiline";
     };
 
 interface FeishuSelectOption {
@@ -172,6 +178,51 @@ export function buildPlanReviewCard(input: PlanReviewCardInput): FeishuWorkbench
             planActionButton("要求修改", "default", "act:/workbench plan revise", input),
             planActionButton("取消", "danger", "act:/workbench plan cancel", input)
           ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: {
+      wide_screen_mode: true,
+      update_multi: true
+    },
+    header: {
+      template: "orange",
+      title: plainText(`修改计划 · v${input.version}`)
+    },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: "请输入需要调整的内容。提交后会生成新的计划文件版本。"
+        },
+        {
+          tag: "form",
+          name: "workbench_plan_revision",
+          elements: [
+            {
+              tag: "input",
+              name: "revision_note",
+              label: plainText("修改意见"),
+              placeholder: plainText("例如：补充 Playwright 验证；拆小数据库迁移步骤"),
+              input_type: "multiline"
+            }
+          ],
+          submit: {
+            tag: "button",
+            text: plainText("生成新版本"),
+            type: "primary",
+            value: {
+              action: "act:/workbench plan revise submit",
+              plan_id: input.planId,
+              version: String(input.version)
+            }
+          }
         }
       ]
     }

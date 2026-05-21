@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildDirectorySetupCard, buildPlanReviewCard } from "../../src/feishu/feishu-workbench-cards.js";
+import {
+  buildDirectorySetupCard,
+  buildPlanReviewCard,
+  buildPlanRevisionRequestCard
+} from "../../src/feishu/feishu-workbench-cards.js";
 
 describe("buildDirectorySetupCard", () => {
   it("renders a directory setup form with workspace select and manual path input", () => {
@@ -37,5 +41,17 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("act:/workbench plan cancel");
     expect(json).toContain("\"plan_id\":\"plan_1\"");
     expect(json).toContain("\"version\":\"1\"");
+  });
+
+  it("renders a multiline plan revision request form", () => {
+    const card = buildPlanRevisionRequestCard({ planId: "plan_1", version: 1 });
+
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("form");
+    expect(json).toContain("input");
+    expect(json).toContain("revision_note");
+    expect(json).toContain("multiline");
+    expect(json).toContain("act:/workbench plan revise submit");
   });
 });

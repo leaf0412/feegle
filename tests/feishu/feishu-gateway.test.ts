@@ -125,4 +125,22 @@ describe("parseFeishuCommand", () => {
       manualPath: "/repo/manual"
     });
   });
+
+  it("parses workbench plan revision submissions", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan revise submit",
+        plan_id: "plan_1",
+        version: "2",
+        form_value: {
+          revision_note: "Add Playwright verification\nCall out deployment risk"
+        }
+      })
+    ).toEqual({
+      type: "workbench_plan_revision_submit",
+      planId: "plan_1",
+      version: 2,
+      revisionNote: "Add Playwright verification\nCall out deployment risk"
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -62,7 +62,62 @@ describe("PlanArtifactService", () => {
     expect(JSON.stringify(sentCards[0]?.card)).toContain("act:/workbench plan approve");
     expect(JSON.stringify(sentCards[0]?.card)).toContain("unknown env");
   });
+
+  it("creates v2 from multiline revision feedback without overwriting v1", async () => {
+    const sentFiles: Array<{ chatId: string; filePath: string }> = [];
+    const sentCards: Array<{ chatId: string; card: unknown }> = [];
+    const prompts: string[] = [];
+    const client = fakeClient(sentFiles, sentCards);
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-21T00:00:00.000Z"));
+    const service = new PlanArtifactService({
+      feegleHome: home,
+      client,
+      store,
+      planIdFactory: () => "plan_1"
+    });
+    const v1 = await service.createInitialPlan({
+      chatId: "oc_1",
+      sourceMessageId: "om_1",
+      provider: "codex",
+      workspacePath: home,
+      title: "Fix startup",
+      content: "# Plan\n\n- Step 1",
+      summary: { steps: 1, risks: [] }
+    });
+
+    const v2 = await service.revisePlan({
+      planId: v1.planId,
+      revisionNote: "Add Playwright verification\nCall out deployment risk",
+      agent: {
+        chat: async (messages) => {
+          prompts.push(messages[0]?.content ?? "");
+          return "# Plan v2\n\n- Step 1\n- Add Playwright verification\n- Risk: deployment env";
+        }
+      }
+    });
+
+    expect(v2.version).toBe(2);
+    expect(v2.filePath).toBe(join(home, "artifacts", "plans", "plan_1", "plan-v2.md"));
+    expect(await pathExists(v1.filePath)).toBe(true);
+    expect(await readFile(v2.filePath, "utf8")).toContain("Plan v2");
+    expect(prompts[0]).toContain("Add Playwright verification");
+    expect(prompts[0]).toContain("# Plan\n\n- Step 1");
+    expect(sentFiles.map((file) => file.filePath)).toEqual([v1.filePath, v2.filePath]);
+    expect(store.latest("plan_1")).toMatchObject({
+      version: 2,
+      revisionNote: "Add Playwright verification\nCall out deployment risk"
+    });
+  });
 });
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function fakeClient(
   sentFiles: Array<{ chatId: string; filePath: string }>,
