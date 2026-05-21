@@ -34,4 +34,32 @@ export class GitService {
   async push(localPath: string, branchName: string): Promise<void> {
     await this.runner("git", ["-C", localPath, "push", "-u", "origin", branchName]);
   }
+
+  async getRepoRoot(path: string): Promise<string> {
+    const result = await this.runner("git", ["-C", path, "rev-parse", "--show-toplevel"]);
+    return result.stdout.trim();
+  }
+
+  async getBranchSha(repoPath: string, branch: string): Promise<string> {
+    const result = await this.runner("git", ["-C", repoPath, "rev-parse", branch]);
+    return result.stdout.trim();
+  }
+
+  async branchExists(repoPath: string, branch: string): Promise<boolean> {
+    try {
+      await this.runner("git", ["-C", repoPath, "rev-parse", "--verify", `refs/heads/${branch}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async listRemoteBranches(repoPath: string): Promise<string[]> {
+    const result = await this.runner("git", ["-C", repoPath, "branch", "-r"]);
+    return result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.includes("->"))
+      .map((line) => line.replace(/^origin\//, ""));
+  }
 }

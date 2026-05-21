@@ -121,4 +121,49 @@ describe("GitService", () => {
       ["git", "-C", "/tmp/work/web", "push", "-u", "origin", "yb/feat/req_retry"]
     ]);
   });
+
+  it("returns the git repo root for a path inside the working tree", async () => {
+    const runner: CommandRunner = async () => ({
+      stdout: "/Users/yb/code/project\n",
+      stderr: ""
+    });
+    const service = new GitService(runner);
+
+    expect(await service.getRepoRoot("/Users/yb/code/project/sub")).toBe("/Users/yb/code/project");
+  });
+
+  it("returns the sha of a branch", async () => {
+    const calls: string[][] = [];
+    const runner: CommandRunner = async (command, args) => {
+      calls.push([command, ...args]);
+      return { stdout: "abc1234567\n", stderr: "" };
+    };
+    const service = new GitService(runner);
+
+    expect(await service.getBranchSha("/tmp/repo", "main")).toBe("abc1234567");
+    expect(calls).toEqual([["git", "-C", "/tmp/repo", "rev-parse", "main"]]);
+  });
+
+  it("returns true when a local branch exists, false otherwise", async () => {
+    const runner: CommandRunner = async (_command, args) => {
+      if (args.includes("refs/heads/main")) {
+        return { stdout: "abc\n", stderr: "" };
+      }
+      throw new Error("fatal: ambiguous argument 'refs/heads/missing'");
+    };
+    const service = new GitService(runner);
+
+    expect(await service.branchExists("/tmp/repo", "main")).toBe(true);
+    expect(await service.branchExists("/tmp/repo", "missing")).toBe(false);
+  });
+
+  it("lists remote branches without origin/ prefix or HEAD pointer", async () => {
+    const runner: CommandRunner = async () => ({
+      stdout: "  origin/HEAD -> origin/main\n  origin/main\n  origin/beta\n  origin/feature/x\n",
+      stderr: ""
+    });
+    const service = new GitService(runner);
+
+    expect(await service.listRemoteBranches("/tmp/repo")).toEqual(["main", "beta", "feature/x"]);
+  });
 });
