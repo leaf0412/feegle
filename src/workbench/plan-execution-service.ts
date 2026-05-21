@@ -159,6 +159,17 @@ export class PlanExecutionService {
     return undefined;
   }
 
+  async reviseExecution(planId: string, note: string): Promise<PlanExecutionReply | undefined> {
+    const plan = this.deps.store.latest(planId);
+    if (!plan) return { kind: "text", text: `计划不存在：${planId}` };
+    if (plan.status !== "completed") {
+      return { kind: "text", text: `当前状态不允许继续调整（status=${plan.status}）` };
+    }
+    this.deps.store.bumpIteration(planId, "completed", "executing");
+    void this.runIteration(planId, note);
+    return undefined;
+  }
+
   private composeWorktreePath(repoRoot: string, planId: string): string {
     const repoName = repoRoot.split("/").filter(Boolean).pop() ?? "repo";
     return `${this.deps.feegleHome}/worktrees/${repoName}/${planId}`;

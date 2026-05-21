@@ -353,3 +353,141 @@ describe("PlanExecutionService.runIteration (first execution)", () => {
     expect(latest?.errorMessage).toContain("working tree dirty");
   });
 });
+
+describe("PlanExecutionService.reviseExecution", () => {
+  let home: string;
+  let db: RuntimeDb;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "feegle-plan-exec-"));
+    db = openRuntimeDb(join(home, "feegle.db"));
+  });
+
+  afterEach(async () => {
+    db.close();
+    await rm(home, { recursive: true, force: true });
+  });
+
+  it("on completed: bumps iteration, runs agent again, appends note, returns to completed", async () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-22T00:00:00.000Z"));
+    store.createVersion({
+      planId: "plan_r",
+      chatId: "oc_r",
+      sourceMessageId: "om_r",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: join(home, "plan_r.md"),
+      status: "pending_review"
+    });
+    await writeFile(join(home, "plan_r.md"), "# Plan\n\n- s", "utf8");
+
+    store.setStatus("plan_r", { status: "pending_base", expectedStatus: "pending_review" });
+    store.setBaseBranch("plan_r", {
+      baseBranch: "main",
+      headBranch: "yb/feat/r",
+      expectedStatus: "pending_base"
+    });
+    store.setStatus("plan_r", { status: "approved", expectedStatus: "pending_base" });
+    store.setExecution("plan_r", {
+      baseSha: "base",
+      headBranch: "yb/feat/r",
+      worktreePath: "/tmp/wt/plan_r",
+      progressCardMessageId: "msg",
+      status: "executing",
+      expectedStatus: "approved"
+    });
+    store.appendIterationNote("plan_r", {
+      iteration: 1,
+      note: null,
+      headShaBefore: null,
+      headShaAfter: "sha1",
+      commitCountDelta: 1,
+      filesChangedDelta: 1,
+      startedAt: "x",
+      completedAt: "y"
+    });
+    store.setHeadInfo("plan_r", {
+      headSha: "sha1",
+      commitCount: 1,
+      filesChanged: 1,
+      status: "completed",
+      expectedStatus: "executing"
+    });
+
+    const agentPrompts: string[] = [];
+
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: {
+        sendInteractiveCard: async () => "msg",
+        updateInteractiveCard: async () => undefined
+      },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => ["main"],
+        getBranchSha: async () => "sha2",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async () => undefined,
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 3, filesChanged: 4 }),
+        push: async () => undefined
+      } as any,
+      agent: {
+        runDevelopmentTask: async (_req: unknown, _repo: unknown, task: string) => {
+          agentPrompts.push(task);
+          return "done";
+        }
+      } as any
+    });
+
+    await service.reviseExecution("plan_r", "增加错误处理");
+    await new Promise((r) => setTimeout(r, 50));
+
+    const latest = store.latest("plan_r");
+    expect(latest?.status).toBe("completed");
+    expect(latest?.executionIteration).toBe(2);
+    expect(latest?.iterationNotes).toHaveLength(2);
+    expect(latest?.iterationNotes[1]).toMatchObject({
+      iteration: 2,
+      note: "增加错误处理",
+      headShaBefore: "sha1",
+      headShaAfter: "sha2",
+      commitCountDelta: 2,
+      filesChangedDelta: 3
+    });
+    expect(agentPrompts[0]).toContain("Adjustment request:");
+    expect(agentPrompts[0]).toContain("增加错误处理");
+  });
+
+  it("on non-completed status: rejects with text reply", async () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-22T00:00:00.000Z"));
+    store.createVersion({
+      planId: "plan_x",
+      chatId: "oc_x",
+      sourceMessageId: "om_x",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: "/tmp/ws/plan.md",
+      status: "pending_review"
+    });
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: {
+        sendInteractiveCard: async () => "x",
+        updateInteractiveCard: async () => undefined
+      },
+      store,
+      git: {} as any,
+      agent: {} as any
+    });
+
+    const reply = await service.reviseExecution("plan_x", "note");
+
+    expect((reply as any).kind).toBe("text");
+    expect((reply as any).text).toContain("当前状态不允许");
+  });
+});
