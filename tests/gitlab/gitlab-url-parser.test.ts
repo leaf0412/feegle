@@ -45,6 +45,16 @@ describe("parseGitLabIssueUrl", () => {
     expect(() => parseGitLabIssueUrl("https://gitlab.com/proj/-/issues/14abc")).toThrow(/invalid issue IID/);
   });
 
+  it("parses lejuhub deeply nested URL", () => {
+    const result = parseGitLabIssueUrl("https://www.lejuhub.com/highlydynamic/kuavodevlab/-/issues/3040");
+    expect(result).toEqual({
+      host: "www.lejuhub.com",
+      namespace: "highlydynamic",
+      project: "kuavodevlab",
+      issueIid: 3040
+    });
+  });
+
   it("handles trailing slashes and fragments", () => {
     const result = parseGitLabIssueUrl("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14/");
     expect(result.issueIid).toBe(14);
