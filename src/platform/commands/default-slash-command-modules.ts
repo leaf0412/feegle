@@ -1,5 +1,6 @@
 import type { SlashCommandModule } from "../slash-command-module.js";
 import { agentCommandModule } from "./agent-command-module.js";
+import { glsumCommandModule } from "./glsum/glsum-command-module.js";
 import { providerCommandModule } from "./provider-command-module.js";
 import { repoCommandModule } from "./repo-command-module.js";
 import { schedulerCommandModule } from "./scheduler-command-module.js";
@@ -14,7 +15,8 @@ const defaultModuleFactories = [
   agentCommandModule,
   repoCommandModule,
   schedulerCommandModule,
-  providerCommandModule
+  providerCommandModule,
+  glsumCommandModule
 ];
 
 export function defaultSlashCommandModules(): SlashCommandModule[] {
