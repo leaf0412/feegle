@@ -42,6 +42,25 @@ export interface BaseBranchPromptCardInput {
   candidates: string[];
 }
 
+export type PlanProgressStage =
+  | "prepared"
+  | "creating_worktree"
+  | "executing"
+  | "verifying"
+  | "completed"
+  | "failed";
+
+export interface PlanProgressCardInput {
+  planId: string;
+  version: number;
+  title: string;
+  headBranch?: string;
+  iteration: number;
+  stage: PlanProgressStage;
+  recentEvents: string[];
+  errorMessage?: string;
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -308,6 +327,50 @@ export function buildBaseBranchPromptCard(input: BaseBranchPromptCardInput): Fei
             },
             baseBranchSubmitButton(input)
           ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildPlanProgressCard(input: PlanProgressCardInput): FeishuWorkbenchCard {
+  const stageLabels: Record<PlanProgressStage, string> = {
+    prepared: "准备就绪",
+    creating_worktree: "创建 worktree...",
+    executing: "执行中...",
+    verifying: "校验工作区...",
+    completed: "已完成",
+    failed: "失败"
+  };
+  const headerTemplate: FeishuCardColor = input.stage === "failed" ? "red" : "blue";
+  const eventBlock =
+    input.recentEvents.length === 0
+      ? "_尚无事件_"
+      : input.recentEvents
+          .slice(-5)
+          .map((line) => `- ${line}`)
+          .join("\n");
+
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: headerTemplate, title: plainText(`${input.title} · 执行中`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `**计划版本**：v${input.version}`,
+            `**迭代**：迭代 ${input.iteration}`,
+            `**分支**：${input.headBranch ?? "_（尚未创建）_"}`,
+            `**阶段**：${stageLabels[input.stage]} (${input.stage})`,
+            input.errorMessage ? `**错误**：${input.errorMessage}` : "",
+            "",
+            "**最近事件**：",
+            eventBlock
+          ]
+            .filter(Boolean)
+            .join("\n")
         }
       ]
     }

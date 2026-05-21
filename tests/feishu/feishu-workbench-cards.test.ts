@@ -4,6 +4,7 @@ import {
   buildDirectorySavedCard,
   buildDirectorySetupCard,
   buildBaseBranchPromptCard,
+  buildPlanProgressCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
 } from "../../src/feishu/feishu-workbench-cards.js";
@@ -164,6 +165,27 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("main");
     expect(json).toContain("beta");
     expect(json).toContain("feature/auth");
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds a plan progress card with stage and recent events", () => {
+    const card = buildPlanProgressCard({
+      planId: "plan_1",
+      version: 1,
+      title: "Fix startup",
+      headBranch: "yb/feat/fix_startup",
+      iteration: 2,
+      stage: "executing",
+      recentEvents: ["reading src/app/feegle-app.ts", "editing tests/git/git-service.test.ts"]
+    });
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("Fix startup");
+    expect(json).toContain("yb/feat/fix_startup");
+    expect(json).toContain("迭代 2");
+    expect(json).toContain("executing");
+    expect(json).toContain("reading src/app/feegle-app.ts");
+    expect(card.body.elements.some((el) => el.tag === "action")).toBe(false);
     assertValidFeishuWorkbenchCard(card);
   });
 });
