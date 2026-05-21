@@ -6,6 +6,7 @@ import { SessionStore } from "../agent/session-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
 import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
+import type { FeishuCloudDocClientPort } from "../feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runtime.js";
 import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
@@ -53,6 +54,7 @@ export interface FeegleAppDeps {
   feegleHome: string;
   ownerEmails: ReadonlySet<string>;
   feishuClient: FeishuClientPort;
+  cloudDoc: FeishuCloudDocClientPort;
   agentProviders?: AgentProviderRegistry;
   loadAgentProviders?: (feegleHome: string) => Promise<AgentProviderRegistry>;
   runtimeFactory: (handler: FeishuCommandHandler) => Startable;
@@ -182,6 +184,7 @@ export class FeegleApp {
     const planArtifacts = new PlanArtifactService({
       feegleHome: this.deps.feegleHome,
       client: this.deps.feishuClient,
+      cloudDoc: this.deps.cloudDoc,
       store: planArtifactStore
     });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {

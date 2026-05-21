@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
 import { FeegleApp } from "../../src/app/feegle-app.js";
+import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../../src/feishu/feishu-long-connection-runtime.js";
 
@@ -14,6 +15,7 @@ describe("FeegleApp", () => {
       feegleHome: "/tmp/feegle-app-test",
       ownerEmails: new Set(["alice@example.com"]),
       feishuClient: {} as FeishuClientPort,
+      cloudDoc: fakeCloudDoc(),
       agentProviders: new AgentProviderRegistry(),
       acquireLock: async () => {
         events.push("lock");
@@ -76,6 +78,7 @@ describe("FeegleApp", () => {
         feegleHome: home,
         ownerEmails: new Set(["alice@example.com"]),
         feishuClient: {} as FeishuClientPort,
+        cloudDoc: fakeCloudDoc(),
         acquireLock: async () => async () => {},
         loadConfigStore: async () => ({
           get: () => ({
@@ -120,6 +123,7 @@ describe("FeegleApp", () => {
         feegleHome: home,
         ownerEmails: new Set(["alice@example.com"]),
         feishuClient: {} as FeishuClientPort,
+        cloudDoc: fakeCloudDoc(),
         acquireLock: async () => async () => {},
         loadConfigStore: async () => ({
           get: () => ({ schemaVersion: 1 as const, failureTarget: null }),
@@ -141,3 +145,16 @@ describe("FeegleApp", () => {
     }
   });
 });
+
+function fakeCloudDoc(): FeishuCloudDocClientPort {
+  return {
+    async createDoc() {
+      return { documentId: "doc_test" };
+    },
+    async writeMarkdown() {},
+    async deleteDoc() {},
+    buildDocUrl(documentId: string) {
+      return `https://feishu.cn/docx/${documentId}`;
+    }
+  };
+}

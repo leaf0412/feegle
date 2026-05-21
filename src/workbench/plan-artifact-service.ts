@@ -2,13 +2,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ulid } from "ulid";
 import type { AgentCli } from "../agent/agent-cli.js";
+import type { FeishuCloudDocClientPort } from "../feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import { buildPlanReviewCard, type PlanReviewSummary } from "../feishu/feishu-workbench-cards.js";
 import type { PlanArtifact, PlanArtifactStore } from "./plan-artifact-store.js";
 
 export interface PlanArtifactServiceDeps {
   feegleHome: string;
-  client: Pick<FeishuClientPort, "sendFile" | "sendInteractiveCard">;
+  client: Pick<FeishuClientPort, "sendInteractiveCard">;
+  cloudDoc: FeishuCloudDocClientPort;
   store: Pick<PlanArtifactStore, "createVersion" | "latest">;
   planIdFactory?: () => string;
 }
@@ -91,10 +93,9 @@ export class PlanArtifactService {
     await mkdir(planDir, { recursive: true });
     await writeFile(filePath, input.content, "utf8");
 
-    const feishuFileMessageId = await this.deps.client.sendFile(input.chatId, filePath);
-    if (!feishuFileMessageId) {
-      throw new Error("Feishu plan file upload did not return message id");
-    }
+    const { documentId } = await this.deps.cloudDoc.createDoc({ title: input.title });
+    await this.deps.cloudDoc.writeMarkdown({ documentId, markdown: input.content });
+    const docUrl = this.deps.cloudDoc.buildDocUrl(documentId);
 
     const artifact = this.deps.store.createVersion({
       planId: input.planId,
@@ -104,7 +105,8 @@ export class PlanArtifactService {
       workspacePath: input.workspacePath,
       version: input.version,
       filePath,
-      feishuFileMessageId,
+      docToken: documentId,
+      docUrl,
       status: "pending_review",
       ...(input.revisionNote ? { revisionNote: input.revisionNote } : {})
     });
@@ -115,7 +117,8 @@ export class PlanArtifactService {
         planId: input.planId,
         title: input.title,
         version: input.version,
-        summary: input.summary
+        summary: input.summary,
+        docUrl
       })
     );
     return artifact;

@@ -1,5 +1,6 @@
 import * as lark from "@larksuiteoapi/node-sdk";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
+import { HttpFeishuCloudDocClient } from "./feishu-cloud-doc-client.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { parseFeishuPlatformConfig } from "./feishu-platform-config.js";
 import { FeegleApp } from "../app/feegle-app.js";
@@ -25,16 +26,24 @@ const config = parseFeishuPlatformConfig({
   replyToTrigger: readBooleanEnv("FEISHU_REPLY_TO_TRIGGER"),
   progressStyle: process.env.FEISHU_PROGRESS_STYLE
 });
-const feishuClient: FeishuClientPort = new LarkFeishuClient(
-  new lark.Client({
-    appId: config.appId,
-    appSecret: config.appSecret
-  })
-);
+const feishuOpenApiClient = new lark.Client({
+  appId: config.appId,
+  appSecret: config.appSecret
+});
+const feishuClient: FeishuClientPort = new LarkFeishuClient(feishuOpenApiClient);
+const cloudDoc = new HttpFeishuCloudDocClient({
+  request: (payload) => {
+    if (!feishuOpenApiClient.request) {
+      throw new Error("Feishu open-api client missing raw request(); cloud doc API unavailable");
+    }
+    return feishuOpenApiClient.request(payload);
+  }
+});
 const app = new FeegleApp({
   feegleHome: resolveFeegleHome(process.env),
   ownerEmails: parseOwnerEmails(process.env.FEEGLE_OWNER_EMAILS),
   feishuClient,
+  cloudDoc,
   runtimeFactory: (handler) => new FeishuLongConnectionRuntime(config, lark, handler)
 });
 
