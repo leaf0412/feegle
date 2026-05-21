@@ -62,4 +62,57 @@ export class GitService {
       .filter((line) => line && !line.includes("->"))
       .map((line) => line.replace(/^origin\//, ""));
   }
+
+  async createWorktree(input: {
+    repoPath: string;
+    worktreePath: string;
+    baseBranch: string;
+    newBranch: string;
+  }): Promise<void> {
+    await this.runner("git", [
+      "-C",
+      input.repoPath,
+      "worktree",
+      "add",
+      "-b",
+      input.newBranch,
+      input.worktreePath,
+      input.baseBranch
+    ]);
+  }
+
+  async removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
+    await this.runner("git", ["-C", repoPath, "worktree", "remove", worktreePath]);
+  }
+
+  async isClean(worktreePath: string): Promise<boolean> {
+    const result = await this.runner("git", ["-C", worktreePath, "status", "--porcelain"]);
+    return result.stdout.trim() === "";
+  }
+
+  async diffStats(worktreePath: string, baseSha: string): Promise<{ commitCount: number; filesChanged: number }> {
+    const countResult = await this.runner("git", [
+      "-C",
+      worktreePath,
+      "rev-list",
+      "--count",
+      `${baseSha}..HEAD`
+    ]);
+    const filesResult = await this.runner("git", [
+      "-C",
+      worktreePath,
+      "diff",
+      "--name-only",
+      `${baseSha}..HEAD`
+    ]);
+    const commitCount = Number.parseInt(countResult.stdout.trim(), 10);
+    if (!Number.isFinite(commitCount)) {
+      throw new Error(`unexpected rev-list output: ${countResult.stdout}`);
+    }
+    const filesChanged = filesResult.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean).length;
+    return { commitCount, filesChanged };
+  }
 }

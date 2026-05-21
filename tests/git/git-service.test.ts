@@ -166,4 +166,64 @@ describe("GitService", () => {
 
     expect(await service.listRemoteBranches("/tmp/repo")).toEqual(["main", "beta", "feature/x"]);
   });
+
+  it("creates a worktree from a base branch with a new head branch", async () => {
+    const calls: string[][] = [];
+    const runner: CommandRunner = async (command, args) => {
+      calls.push([command, ...args]);
+      return { stdout: "", stderr: "" };
+    };
+    const service = new GitService(runner);
+
+    await service.createWorktree({
+      repoPath: "/tmp/repo",
+      worktreePath: "/tmp/wt/plan_1",
+      baseBranch: "main",
+      newBranch: "yb/feat/plan_1"
+    });
+
+    expect(calls).toEqual([
+      ["git", "-C", "/tmp/repo", "worktree", "add", "-b", "yb/feat/plan_1", "/tmp/wt/plan_1", "main"]
+    ]);
+  });
+
+  it("removes a worktree by path", async () => {
+    const calls: string[][] = [];
+    const runner: CommandRunner = async (command, args) => {
+      calls.push([command, ...args]);
+      return { stdout: "", stderr: "" };
+    };
+    const service = new GitService(runner);
+
+    await service.removeWorktree("/tmp/repo", "/tmp/wt/plan_1");
+
+    expect(calls).toEqual([["git", "-C", "/tmp/repo", "worktree", "remove", "/tmp/wt/plan_1"]]);
+  });
+
+  it("treats empty git-status porcelain output as clean", async () => {
+    let stdout = "";
+    const runner: CommandRunner = async () => ({ stdout, stderr: "" });
+    const service = new GitService(runner);
+
+    expect(await service.isClean("/tmp/wt")).toBe(true);
+    stdout = " M src/a.ts\n";
+    expect(await service.isClean("/tmp/wt")).toBe(false);
+  });
+
+  it("returns commit count and changed file count between base sha and HEAD", async () => {
+    const responses: Record<string, string> = {
+      "rev-list": "3\n",
+      diff: "src/a.ts\nsrc/b.ts\ntests/c.test.ts\n"
+    };
+    const runner: CommandRunner = async (_command, args) => {
+      if (args.includes("rev-list")) return { stdout: responses["rev-list"]!, stderr: "" };
+      return { stdout: responses.diff!, stderr: "" };
+    };
+    const service = new GitService(runner);
+
+    expect(await service.diffStats("/tmp/wt", "base_sha_abc")).toEqual({
+      commitCount: 3,
+      filesChanged: 3
+    });
+  });
 });
