@@ -165,7 +165,7 @@ function previewLine(markdown: string): string {
 
 function buildFooter(input: BuildRichCardInput): Record<string, unknown> | null {
   const elapsed = input.elapsedMs ?? 0;
-  if (elapsed <= 0) {
+  if (!input.streaming && elapsed <= 0) {
     return null;
   }
   const text = input.streaming

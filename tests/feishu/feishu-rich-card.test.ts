@@ -91,6 +91,20 @@ describe("buildRichCard", () => {
     expect(footerText.startsWith("⏱ 运行中")).toBe(true);
   });
 
+  it("shows a running timer immediately when the streaming card starts", () => {
+    const json = buildRichCard({
+      status: "working",
+      steps: [],
+      markdown: "Codex 正在思考…",
+      streaming: true,
+      elapsedMs: 0,
+      thinkingVerbSec: 0
+    });
+    const card = JSON.parse(json) as { body: { elements: Array<Record<string, unknown>> } };
+    const footer = card.body.elements[card.body.elements.length - 1];
+    expect((footer.text as { content: string }).content).toBe("⏱ 运行中 0.0 秒...");
+  });
+
   it("uses Done header template and elapsed footer when completed", () => {
     const json = buildRichCard({
       status: "done",
