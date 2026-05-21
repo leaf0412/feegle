@@ -41,6 +41,10 @@ describe("parseGitLabIssueUrl", () => {
     expect(() => parseGitLabIssueUrl("https://gitlab.com/proj/-/issues/abc")).toThrow(/invalid issue IID/);
   });
 
+  it("throws for IIDs with trailing letters", () => {
+    expect(() => parseGitLabIssueUrl("https://gitlab.com/proj/-/issues/14abc")).toThrow(/invalid issue IID/);
+  });
+
   it("handles trailing slashes and fragments", () => {
     const result = parseGitLabIssueUrl("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14/");
     expect(result.issueIid).toBe(14);

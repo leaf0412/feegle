@@ -12,11 +12,13 @@ export function parseGitLabIssueUrl(raw: string): GitLabIssueUrl {
 
   const host = match[1]!;
   const fullPath = match[2]!;
-  const issueIid = parseInt(match[3]!, 10);
+  const iidStr = match[3]!;
 
-  if (isNaN(issueIid)) {
+  if (!/^\d+$/.test(iidStr)) {
     throw new Error(`invalid issue IID in URL: ${trimmed}`);
   }
+
+  const issueIid = parseInt(iidStr, 10);
 
   const segments = fullPath.split("/");
   const project = segments.pop()!;
