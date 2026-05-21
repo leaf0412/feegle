@@ -70,4 +70,46 @@ describe("PlanArtifactStore", () => {
 
     expect(store.latest("plan_1")?.status).toBe("approved");
   });
+
+  it("persists docToken and docUrl on createVersion and returns them via latest", () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-21T00:00:00.000Z"));
+
+    store.createVersion({
+      planId: "plan_doc_1",
+      chatId: "oc_1",
+      sourceMessageId: "om_1",
+      provider: "codex",
+      workspacePath: "/repo",
+      version: 1,
+      filePath: "/tmp/plan-v1.md",
+      docToken: "doxcn_abc",
+      docUrl: "https://feishu.cn/docx/doxcn_abc",
+      status: "pending_review"
+    });
+
+    const latest = store.latest("plan_doc_1");
+
+    expect(latest?.docToken).toBe("doxcn_abc");
+    expect(latest?.docUrl).toBe("https://feishu.cn/docx/doxcn_abc");
+  });
+
+  it("treats docToken and docUrl as optional for backwards compatibility", () => {
+    const store = new PlanArtifactStore(db);
+
+    store.createVersion({
+      planId: "plan_doc_2",
+      chatId: "oc_1",
+      sourceMessageId: "om_1",
+      provider: "codex",
+      workspacePath: "/repo",
+      version: 1,
+      filePath: "/tmp/plan-v1.md",
+      status: "pending_review"
+    });
+
+    const latest = store.latest("plan_doc_2");
+
+    expect(latest?.docToken).toBeUndefined();
+    expect(latest?.docUrl).toBeUndefined();
+  });
 });

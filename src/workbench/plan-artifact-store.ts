@@ -11,6 +11,8 @@ export interface PlanArtifact {
   version: number;
   filePath: string;
   feishuFileMessageId?: string;
+  docToken?: string;
+  docUrl?: string;
   status: PlanArtifactStatus;
   revisionNote?: string;
   createdAt: string;
@@ -26,6 +28,8 @@ export interface CreatePlanArtifactVersionInput {
   version: number;
   filePath: string;
   feishuFileMessageId?: string;
+  docToken?: string;
+  docUrl?: string;
   status: PlanArtifactStatus;
   revisionNote?: string;
 }
@@ -39,6 +43,8 @@ interface PlanArtifactRow {
   version: number;
   file_path: string;
   feishu_file_message_id: string | null;
+  doc_token: string | null;
+  doc_url: string | null;
   status: PlanArtifactStatus;
   revision_note: string | null;
   created_at: string;
@@ -57,10 +63,10 @@ export class PlanArtifactStore {
       .prepare(
         `insert into plan_artifacts
           (plan_id, chat_id, source_message_id, provider, workspace_path, version,
-           file_path, feishu_file_message_id, status, revision_note, created_at, updated_at)
+           file_path, feishu_file_message_id, doc_token, doc_url, status, revision_note, created_at, updated_at)
          values
           (@planId, @chatId, @sourceMessageId, @provider, @workspacePath, @version,
-           @filePath, @feishuFileMessageId, @status, @revisionNote, @createdAt, @updatedAt)`
+           @filePath, @feishuFileMessageId, @docToken, @docUrl, @status, @revisionNote, @createdAt, @updatedAt)`
       )
       .run({
         planId: input.planId,
@@ -71,6 +77,8 @@ export class PlanArtifactStore {
         version: input.version,
         filePath: input.filePath,
         feishuFileMessageId: input.feishuFileMessageId ?? null,
+        docToken: input.docToken ?? null,
+        docUrl: input.docUrl ?? null,
         status: input.status,
         revisionNote: input.revisionNote ?? null,
         createdAt: nowIso,
@@ -121,6 +129,8 @@ function fromRow(row: PlanArtifactRow): PlanArtifact {
     version: row.version,
     filePath: row.file_path,
     ...(row.feishu_file_message_id ? { feishuFileMessageId: row.feishu_file_message_id } : {}),
+    ...(row.doc_token ? { docToken: row.doc_token } : {}),
+    ...(row.doc_url ? { docUrl: row.doc_url } : {}),
     status: row.status,
     ...(row.revision_note ? { revisionNote: row.revision_note } : {}),
     createdAt: row.created_at,
