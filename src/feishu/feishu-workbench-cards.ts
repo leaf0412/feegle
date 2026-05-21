@@ -11,7 +11,19 @@ export interface DirectorySetupWorkspace {
   path: string;
 }
 
-export interface FeishuDirectorySetupCard {
+export interface PlanReviewCardInput {
+  planId: string;
+  title: string;
+  version: number;
+  summary: PlanReviewSummary;
+}
+
+export interface PlanReviewSummary {
+  steps: number;
+  risks: string[];
+}
+
+export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
     wide_screen_mode: true;
@@ -28,6 +40,7 @@ export interface FeishuDirectorySetupCard {
 
 type FeishuWorkbenchCardElement =
   | { tag: "markdown"; content: string }
+  | { tag: "action"; actions: FeishuButtonElement[] }
   | {
       tag: "form";
       name: string;
@@ -59,13 +72,17 @@ interface FeishuFormSubmitButton {
   tag: "button";
   text: FeishuPlainText;
   type: "primary";
-  value: {
-    action: "act:/workbench directory submit";
-    interaction_id: string;
-  };
+  value: Record<string, string>;
 }
 
-export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuDirectorySetupCard {
+interface FeishuButtonElement {
+  tag: "button";
+  text: FeishuPlainText;
+  type: "default" | "primary" | "danger";
+  value: Record<string, string>;
+}
+
+export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuWorkbenchCard {
   return {
     schema: "2.0",
     config: {
@@ -123,6 +140,64 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuD
       ]
     }
   };
+}
+
+export function buildPlanReviewCard(input: PlanReviewCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: {
+      wide_screen_mode: true,
+      update_multi: true
+    },
+    header: {
+      template: "blue",
+      title: plainText(`${input.title} · 计划待确认`)
+    },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `**计划版本**：v${input.version}`,
+            `**步骤数**：${input.summary.steps}`,
+            `**风险点**：${renderRisks(input.summary.risks)}`,
+            "",
+            "完整计划已作为文件发送到群里。"
+          ].join("\n")
+        },
+        {
+          tag: "action",
+          actions: [
+            planActionButton("确认计划", "primary", "act:/workbench plan approve", input),
+            planActionButton("要求修改", "default", "act:/workbench plan revise", input),
+            planActionButton("取消", "danger", "act:/workbench plan cancel", input)
+          ]
+        }
+      ]
+    }
+  };
+}
+
+function planActionButton(
+  text: string,
+  type: FeishuButtonElement["type"],
+  action: string,
+  input: Pick<PlanReviewCardInput, "planId" | "version">
+): FeishuButtonElement {
+  return {
+    tag: "button",
+    text: plainText(text),
+    type,
+    value: {
+      action,
+      plan_id: input.planId,
+      version: String(input.version)
+    }
+  };
+}
+
+function renderRisks(risks: string[]): string {
+  return risks.length > 0 ? risks.join("；") : "暂无";
 }
 
 function plainText(content: string): FeishuPlainText {
