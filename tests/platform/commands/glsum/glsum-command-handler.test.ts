@@ -68,6 +68,7 @@ describe("GlsumCommandHandler", () => {
     const text = (reply as { kind: "text"; text: string }).text;
     expect(text).toContain("Test");
     expect(text).toContain("yebao");
+    expect(text).toContain("总结已写入");
     expect(client.getIssue).toHaveBeenCalled();
     expect(client.postNote).toHaveBeenCalled();
   });
@@ -97,5 +98,48 @@ describe("GlsumCommandHandler", () => {
     const chatCall = agent.chat as ReturnType<typeof vi.fn>;
     const promptArg = chatCall.mock.calls[0]?.[0]?.[0]?.content as string;
     expect(promptArg).toContain("https://project.feishu.cn/test/issue/detail/123");
+  });
+
+  it("handles agent chat failure gracefully in collectQaInfo", async () => {
+    const client = stubGitLabClient({
+      getNotes: vi.fn().mockResolvedValue([
+        { id: 1, body: "飞书缺陷地址: https://project.feishu.cn/test/issue/detail/123", created_at: "2026-05-21T00:00:00Z", system: false, author: { id: 1, username: "test", name: "测试" } }
+      ])
+    });
+    const agent = stubAgent("");
+    (agent.chat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("agent timeout"));
+    const handler = new GlsumCommandHandler(client, agent);
+
+    const reply = await handler.execute(makeContext("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14"));
+
+    expect(reply.kind).toBe("text");
+    const text1 = (reply as { kind: "text"; text: string }).text;
+    expect(text1).toContain("(抓取失败)");
+  });
+
+  it("handles agent chat failure gracefully in generateAiSummary", async () => {
+    const client = stubGitLabClient();
+    const agent = stubAgent("");
+    (agent.chat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("agent timeout"));
+    const handler = new GlsumCommandHandler(client, agent);
+
+    const reply = await handler.execute(makeContext("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14"));
+
+    expect(reply.kind).toBe("text");
+    const text2 = (reply as { kind: "text"; text: string }).text;
+    expect(text2).toContain("Test");
+  });
+
+  it("handles postNote rejection gracefully", async () => {
+    const client = stubGitLabClient({
+      postNote: vi.fn().mockRejectedValue(new Error("post failed"))
+    });
+    const handler = new GlsumCommandHandler(client, undefined);
+
+    const reply = await handler.execute(makeContext("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14"));
+
+    expect(reply.kind).toBe("text");
+    const text3 = (reply as { kind: "text"; text: string }).text;
+    expect(text3).toContain("Test");
   });
 });

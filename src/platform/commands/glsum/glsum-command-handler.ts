@@ -94,8 +94,8 @@ export class GlsumCommandHandler implements SlashCommandHandler {
       const result = await this.agent.chat([{ role: "user", content: prompt }]);
       const parsed = this.extractJson(result);
       if (Array.isArray(parsed)) return parsed;
-    } catch {
-      // fall through to returning URLs with placeholder info
+    } catch (err) {
+      console.error("Failed to collect QA info via agent:", err);
     }
     return urls.map((url) => ({ url, title: "(抓取失败)", status: "未知", reporter: "未知" }));
   }
@@ -126,20 +126,28 @@ export class GlsumCommandHandler implements SlashCommandHandler {
 
     try {
       return await this.agent.chat(messages);
-    } catch {
+    } catch (err) {
+      console.error("Failed to generate AI summary via agent:", err);
       return null;
     }
   }
 
   private extractJson(text: string): unknown {
-    const match = text.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        return null;
+    const match = text.match(/\[[\s\S]*?\]/);
+    if (!match) return null;
+    try {
+      const parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (item: unknown) =>
+            item != null &&
+            typeof item === "object" &&
+            typeof (item as Record<string, unknown>).url === "string"
+        );
       }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   }
 }
