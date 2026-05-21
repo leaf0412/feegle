@@ -10,6 +10,7 @@ import type { AliasStore } from "./commands/alias-store.js";
 import type { SchedulerCommandDeps } from "./commands/scheduler-command-deps.js";
 import type { RepositoryListSource } from "./commands/repo-list-command.js";
 import type { SlashCommandRegistry } from "./slash-command-handler.js";
+import type { PipelineHooks } from "./pipeline-hooks.js";
 
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
@@ -31,6 +32,7 @@ export interface SlashCommandRegistryDeps {
   sessionStore?: SessionStore;
   chatHistory?: ChatHistoryStore;
   aliasStore?: AliasStore;
+  pipelineHooks?: PipelineHooks;
 }
 
 export interface SlashCommandModule {

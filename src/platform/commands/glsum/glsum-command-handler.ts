@@ -1,17 +1,26 @@
 import type { AgentCli, AgentChatMessage } from "../../../agent/agent-cli.js";
 import type { GitLabClient } from "../../../gitlab/gitlab-client.js";
-import type { GitLabIssueUrl } from "../../../gitlab/gitlab-types.js";
+import type { GitLabIssue, GitLabIssueUrl, GitLabNote } from "../../../gitlab/gitlab-types.js";
 import { parseGitLabIssueUrl } from "../../../gitlab/gitlab-url-parser.js";
 import type { SlashCommandContext, SlashCommandHandler, SlashCommandReply } from "../../slash-command-handler.js";
+import type { PipelineHooks } from "../../pipeline-hooks.js";
 import { assembleSummary, buildSummarySections } from "./build-summary.js";
 import { scanQaUrls } from "./scan-qa-urls.js";
+
+export interface QaPageResult {
+  url: string;
+  title: string;
+  status: string;
+  reporter: string;
+}
 
 export class GlsumCommandHandler implements SlashCommandHandler {
   readonly id = "glsum";
 
   constructor(
     private readonly client: GitLabClient,
-    private readonly agent?: AgentCli
+    private readonly agent: AgentCli | undefined,
+    private readonly hooks: PipelineHooks = {}
   ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
@@ -19,6 +28,7 @@ export class GlsumCommandHandler implements SlashCommandHandler {
       return await this.doExecute(context);
     } catch (err) {
       const message = err instanceof Error ? err.message : "未知错误";
+      this.hooks.onAgentError?.(this.id, err);
       return { kind: "text", text: message };
     }
   }
@@ -72,7 +82,7 @@ export class GlsumCommandHandler implements SlashCommandHandler {
     return [...new Set(allUrls)];
   }
 
-  private async collectQaInfo(urls: string[]): Promise<{ url: string; title: string; status: string; reporter: string }[]> {
+  private async collectQaInfo(urls: string[]): Promise<QaPageResult[]> {
     if (urls.length === 0) return [];
     if (!this.agent) {
       return urls.map((url) => ({ url, title: "(需 Agent 抓取)", status: "未知", reporter: "未知" }));
@@ -90,12 +100,15 @@ export class GlsumCommandHandler implements SlashCommandHandler {
       "请以 JSON 数组格式返回，每个元素包含 url, title, status, reporter 字段。只返回 JSON，不要其他文字。"
     ].join("\n");
 
+    this.hooks.onAgentPrompt?.(this.id, prompt);
+
     try {
       const result = await this.agent.chat([{ role: "user", content: prompt }]);
+      this.hooks.onAgentResponse?.(this.id, result);
       const parsed = this.extractJson(result);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return parsed as QaPageResult[];
     } catch (err) {
-      console.error("Failed to collect QA info via agent:", err);
+      this.hooks.onAgentError?.(this.id, err);
     }
     return urls.map((url) => ({ url, title: "(抓取失败)", status: "未知", reporter: "未知" }));
   }
@@ -111,23 +124,24 @@ export class GlsumCommandHandler implements SlashCommandHandler {
       ? "暂无评论"
       : notes.map((n) => `@${n.author.username}: ${n.body.slice(0, 200)}`).join("\n");
 
-    const messages: AgentChatMessage[] = [{
-      role: "user",
-      content: [
-        "请对以下 GitLab issue 做一份简短的中文总结（150字以内），涵盖：",
-        "",
-        `**Issue 标题**：${issue.title}`,
-        `**Issue 描述**：${issue.description ?? "无"}`,
-        "**评论内容**：",
-        notesSummary,
-        qaUrls.length > 0 ? `\n**QA 链接**：\n${qaUrls.join("\n")}` : "",
-      ].join("\n")
-    }];
+    const prompt = [
+      "请对以下 GitLab issue 做一份简短的中文总结（150字以内），涵盖：",
+      "",
+      `**Issue 标题**：${issue.title}`,
+      `**Issue 描述**：${issue.description ?? "无"}`,
+      "**评论内容**：",
+      notesSummary,
+      qaUrls.length > 0 ? `\n**QA 链接**：\n${qaUrls.join("\n")}` : "",
+    ].join("\n");
+
+    this.hooks.onAgentPrompt?.(this.id, prompt);
 
     try {
-      return await this.agent.chat(messages);
+      const result = await this.agent.chat([{ role: "user", content: prompt }]);
+      this.hooks.onAgentResponse?.(this.id, result);
+      return result;
     } catch (err) {
-      console.error("Failed to generate AI summary via agent:", err);
+      this.hooks.onAgentError?.(this.id, err);
       return null;
     }
   }

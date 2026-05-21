@@ -1,6 +1,7 @@
 import type { SlashCommandModule } from "../../slash-command-module.js";
 import { defineSlashCommand } from "../../slash-command-catalog.js";
 import { GitLabClient, readGitLabToken } from "../../../gitlab/gitlab-client.js";
+import { consolePipelineHooks } from "../../pipeline-hooks.js";
 import { GlsumCommandHandler } from "./glsum-command-handler.js";
 
 const glsumDefinition = defineSlashCommand(
@@ -19,10 +20,11 @@ export function glsumCommandModule(): SlashCommandModule {
         const token = readGitLabToken();
         const client = new GitLabClient(token);
         const agent = deps.providers?.resolveActiveAgent();
+        const hooks = deps.pipelineHooks ?? consolePipelineHooks;
 
         registry.registerCommand(
           glsumDefinition,
-          new GlsumCommandHandler(client, agent)
+          new GlsumCommandHandler(client, agent, hooks)
         );
       } catch {
         registry.declarePlanned(glsumDefinition);
