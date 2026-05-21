@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertValidFeishuWorkbenchCard,
+  buildDirectorySavedCard,
   buildDirectorySetupCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
@@ -99,6 +100,22 @@ describe("buildDirectorySetupCard", () => {
     expect(() => assertValidFeishuWorkbenchCard(invalidCard)).toThrow(
       "Invalid Feishu workbench card: form elements must not include label; form must not include submit"
     );
+  });
+
+  it("renders a read-only saved directory card after the setup form is submitted", () => {
+    const card = buildDirectorySavedCard({
+      provider: "codex",
+      workspacePath: "/repo/feegle"
+    });
+
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("已保存工作目录");
+    expect(json).toContain("/repo/feegle");
+    expect(json).toContain("codex");
+    expect(json).not.toContain("form_submit");
+    expect(json).not.toContain("select_static");
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 });
 

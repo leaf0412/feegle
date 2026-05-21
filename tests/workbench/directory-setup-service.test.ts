@@ -63,7 +63,9 @@ describe("DirectorySetupService", () => {
       sessionKey: "feishu:oc_1:channel",
       userText: "inspect repo"
     });
-    expect(reply).toEqual({ kind: "text", text: "已保存目录，正在继续处理原请求。" });
+    expect(reply).toMatchObject({ kind: "feishu_card_update" });
+    expect(JSON.stringify(reply)).toContain("已保存工作目录");
+    expect(JSON.stringify(reply)).not.toContain("form_submit");
   });
 
   it("rejects unreadable workspace paths without consuming the pending request", async () => {
@@ -90,6 +92,35 @@ describe("DirectorySetupService", () => {
     expect(reply && "text" in reply ? reply.text : "").toContain("工作目录不可读取或不是目录");
     expect(upsert).not.toHaveBeenCalled();
     expect(take).not.toHaveBeenCalled();
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale directory setup submissions without changing the group binding", async () => {
+    const workspacePath = join(home, "workspace");
+    await mkdir(workspacePath);
+    const upsert = vi.fn();
+    const take = vi.fn(() => undefined);
+    const handle = vi.fn();
+    const service = new DirectorySetupService({
+      chatWorkspaces: { upsert },
+      pendingInteractions: { take },
+      chatHandler: { handle }
+    });
+
+    const reply = await service.handleDirectorySubmit({
+      chatId: "oc_1",
+      messageId: "om_card",
+      command: {
+        type: "workbench_directory_submit",
+        interactionId: "pi_consumed",
+        provider: "codex",
+        workspacePath
+      }
+    });
+
+    expect(reply).toEqual({ kind: "text", text: "目录选择已过期或已处理。请重新发送需求。" });
+    expect(take).toHaveBeenCalledWith("pi_consumed");
+    expect(upsert).not.toHaveBeenCalled();
     expect(handle).not.toHaveBeenCalled();
   });
 });

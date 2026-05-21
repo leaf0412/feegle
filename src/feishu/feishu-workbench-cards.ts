@@ -11,6 +11,11 @@ export interface DirectorySetupWorkspace {
   path: string;
 }
 
+export interface DirectorySavedCardInput {
+  provider?: string;
+  workspacePath: string;
+}
+
 export interface PlanReviewCardInput {
   planId: string;
   title: string;
@@ -137,6 +142,33 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuW
             },
             directorySubmitButton(input.interactionId)
           ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildDirectorySavedCard(input: DirectorySavedCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: {
+      wide_screen_mode: true,
+      update_multi: true
+    },
+    header: {
+      template: "green",
+      title: plainText("已保存工作目录")
+    },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `**工作目录**：\`${input.workspacePath}\``,
+            ...(input.provider ? [`**Agent**：${input.provider}`] : []),
+            "",
+            "这次选择已确认，原请求正在继续处理。"
+          ].join("\n")
         }
       ]
     }
