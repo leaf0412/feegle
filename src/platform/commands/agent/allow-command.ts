@@ -1,5 +1,5 @@
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { ProviderKind, ProviderStore } from "../../../agent/provider-store.js";
+import type { ProviderKind, ProviderStorePort } from "../../../agent/provider-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,
@@ -8,7 +8,7 @@ import type {
 
 export interface AllowCommandDeps {
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
 }
 
 export class AllowCommandHandler implements SlashCommandHandler {

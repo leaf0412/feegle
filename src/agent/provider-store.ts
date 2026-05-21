@@ -53,13 +53,21 @@ export const ProvidersFileSchema = z.object({
 
 export type ProvidersFile = z.infer<typeof ProvidersFileSchema>;
 
+export interface ProviderStorePort {
+  snapshot(): Readonly<ProvidersFile>;
+  upsert(record: ProviderRecord): Promise<void>;
+  setActive(kind: ProviderKind | null): Promise<void>;
+  updateSettings(kind: ProviderKind, patch: Record<string, unknown>): Promise<ProviderRecord>;
+  remove(kind: ProviderKind): Promise<{ activeCleared: boolean }>;
+}
+
 const DEFAULT: ProvidersFile = {
   schemaVersion: 1,
   providers: [],
   activeKind: null
 };
 
-export class ProviderStore {
+export class ProviderStore implements ProviderStorePort {
   private constructor(
     private readonly filePath: string,
     private data: ProvidersFile

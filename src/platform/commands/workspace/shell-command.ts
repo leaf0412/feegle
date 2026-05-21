@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { ProviderStore } from "../../../agent/provider-store.js";
+import type { ProviderStorePort } from "../../../agent/provider-store.js";
 import { isOwner } from "../../owner-access.js";
 import type {
   SlashCommandContext,
@@ -10,7 +10,7 @@ import type {
 
 export interface ShellCommandDeps {
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
   ownerEmails?: ReadonlySet<string>;
   timeoutMs?: number;
 }

@@ -1,7 +1,7 @@
 import type { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
-import type { ProviderStore } from "../agent/provider-store.js";
+import type { ProviderStorePort } from "../agent/provider-store.js";
 import type { SessionStore } from "../agent/session-store.js";
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
@@ -28,7 +28,7 @@ export interface SlashCommandRegistryDeps {
   scheduler?: SchedulerCommandDeps["scheduler"];
   runsLog?: SchedulerCommandDeps["runsLog"];
   providers?: AgentProviderRegistry;
-  providerStore?: ProviderStore;
+  providerStore?: ProviderStorePort;
   sessionStore?: SessionStore;
   chatHistory?: ChatHistoryStore;
   aliasStore?: AliasStore;

@@ -2,7 +2,7 @@ import type { AgentProviderRegistry } from "../../../agent/agent-provider-regist
 import {
   REASONING_EFFORTS,
   type ProviderKind,
-  type ProviderStore,
+  type ProviderStorePort,
   type ReasoningEffort
 } from "../../../agent/provider-store.js";
 import type {
@@ -13,7 +13,7 @@ import type {
 
 export interface ReasoningCommandDeps {
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
 }
 
 export class ReasoningCommandHandler implements SlashCommandHandler {

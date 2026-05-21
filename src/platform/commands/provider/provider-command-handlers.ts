@@ -9,7 +9,7 @@ import {
   ProviderRecordSchema,
   type ProviderKind,
   type ProviderRecord,
-  type ProviderStore
+  type ProviderStorePort
 } from "../../../agent/provider-store.js";
 import type {
   SlashCommandContext,
@@ -22,7 +22,7 @@ import { parseProviderArgs } from "./parse-provider-args.js";
 export interface ProviderCommandDeps {
   ownerEmails: ReadonlySet<string>;
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
 }
 
 const CODEX_FIELDS = new Set(["cwd", "command", "sandbox", "approvalPolicy", "timeoutMs"]);

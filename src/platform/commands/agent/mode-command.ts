@@ -3,7 +3,7 @@ import {
   CLAUDE_PERMISSION_MODES,
   type ClaudePermissionMode,
   type ProviderKind,
-  type ProviderStore
+  type ProviderStorePort
 } from "../../../agent/provider-store.js";
 import type {
   SlashCommandContext,
@@ -13,7 +13,7 @@ import type {
 
 export interface ModeCommandDeps {
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
 }
 
 export class ModeCommandHandler implements SlashCommandHandler {

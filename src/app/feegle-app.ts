@@ -2,7 +2,6 @@ import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js"
 import { join } from "node:path";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
-import { ProviderStore } from "../agent/provider-store.js";
 import { SessionStore } from "../agent/session-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
 import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
@@ -43,6 +42,7 @@ import { DirectorySetupService } from "../workbench/directory-setup-service.js";
 import { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
 import { PlanArtifactService } from "../workbench/plan-artifact-service.js";
 import { buildPlanRevisionRequestCard } from "../feishu/feishu-workbench-cards.js";
+import type { ProvidersFile, ProviderStorePort } from "../agent/provider-store.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -85,8 +85,8 @@ export class FeegleApp {
     const chatWorkspaceStore = new ChatWorkspaceStore(this.runtimeDb);
     const pendingInteractionStore = new PendingInteractionStore(this.runtimeDb);
     const planArtifactStore = new PlanArtifactStore(this.runtimeDb);
-    const providerStore = await ProviderStore.load(this.deps.feegleHome);
     const config = configStore.get();
+    const providerStoreReadView: ProviderStorePort = new EmptyProviderStoreReadView();
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
     const chatHistory = new ChatHistoryStore();
     const aliasStore = await AliasStore.load(this.deps.feegleHome);
@@ -97,7 +97,7 @@ export class FeegleApp {
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
         ? await this.deps.loadAgentProviders(this.deps.feegleHome)
-        : buildAgentProviderRegistry({ store: providerStore, config: config.agent }));
+        : buildAgentProviderRegistry({ store: providerStoreReadView, config: requireAgentConfig(config) }));
     const stockStore = await StockStore.load(this.deps.feegleHome);
     const dedupStore = await DedupStore.load(this.deps.feegleHome);
     const runsLog = await RunsLog.open(this.deps.feegleHome);
@@ -157,7 +157,7 @@ export class FeegleApp {
       scheduler: this.scheduler as TaskScheduler,
       runsLog,
       providers: agentProviders,
-      providerStore,
+      providerStore: providerStoreReadView,
       sessionStore,
       chatHistory,
       aliasStore,
@@ -225,6 +225,39 @@ export class FeegleApp {
     this.runtimeDb?.close();
     this.hooks?.emit({ event: "scheduler.stopped" });
     await this.lockfileRelease?.();
+  }
+}
+
+function requireAgentConfig(
+  config: Readonly<ReturnType<ConfigStorePort["get"]>>
+): NonNullable<ReturnType<ConfigStorePort["get"]>["agent"]> {
+  if (!config.agent) {
+    throw new Error("agent config is required. Add ~/.feegle/config.jsonc with agent.default and agent.providers.");
+  }
+  return config.agent;
+}
+
+class EmptyProviderStoreReadView implements ProviderStorePort {
+  snapshot(): Readonly<ProvidersFile> {
+    return {
+      schemaVersion: 1,
+      providers: [],
+      activeKind: null
+    };
+  }
+
+  async setActive(_kind: ProvidersFile["activeKind"]): Promise<void> {}
+
+  async upsert(): Promise<void> {
+    throw new Error("provider register is disabled when agent providers are configured in config.jsonc");
+  }
+
+  async updateSettings(): Promise<never> {
+    throw new Error("provider settings are disabled when agent providers are configured in config.jsonc");
+  }
+
+  async remove(): Promise<never> {
+    throw new Error("provider unregister is disabled when agent providers are configured in config.jsonc");
   }
 }
 

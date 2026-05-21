@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { ProviderStore } from "../../../agent/provider-store.js";
+import type { ProviderStorePort } from "../../../agent/provider-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,
@@ -10,7 +10,7 @@ import type {
 
 export interface MemoryCommandDeps {
   providers: AgentProviderRegistry;
-  providerStore: ProviderStore;
+  providerStore: ProviderStorePort;
 }
 
 export class MemoryCommandHandler implements SlashCommandHandler {
