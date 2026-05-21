@@ -3,6 +3,7 @@ import {
   assertValidFeishuWorkbenchCard,
   buildDirectorySavedCard,
   buildDirectorySetupCard,
+  buildBaseBranchPromptCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
 } from "../../src/feishu/feishu-workbench-cards.js";
@@ -145,6 +146,25 @@ describe("buildDirectorySetupCard", () => {
     expect(json).not.toContain("form_submit");
     expect(json).not.toContain("select_static");
     expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
+  });
+
+  it("builds a base branch prompt card with remote candidates", () => {
+    const card = buildBaseBranchPromptCard({
+      planId: "plan_1",
+      version: 1,
+      title: "Fix startup",
+      defaultHeadBranch: "yb/feat/fix_startup",
+      candidates: ["main", "beta", "feature/auth"]
+    });
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("act:/workbench plan base_branch_submit");
+    expect(json).toContain("plan_1");
+    expect(json).toContain("yb/feat/fix_startup");
+    expect(json).toContain("main");
+    expect(json).toContain("beta");
+    expect(json).toContain("feature/auth");
+    assertValidFeishuWorkbenchCard(card);
   });
 });
 

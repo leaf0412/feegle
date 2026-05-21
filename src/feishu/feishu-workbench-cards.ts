@@ -34,6 +34,14 @@ export interface PlanRevisionRequestCardInput {
   version: number;
 }
 
+export interface BaseBranchPromptCardInput {
+  planId: string;
+  version: number;
+  title: string;
+  defaultHeadBranch: string;
+  candidates: string[];
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -259,6 +267,53 @@ export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput
   };
 }
 
+export function buildBaseBranchPromptCard(input: BaseBranchPromptCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "yellow", title: plainText(`${input.title} · 选择基线分支`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            "本次执行需要一个**基线分支**，新分支会从它派生。",
+            "",
+            "**基线分支**：从下方候选选择，或手填一个本地 / 远程已有的分支名。",
+            "**新分支名**：默认从计划标题派生，可在下方编辑。"
+          ].join("\n")
+        },
+        {
+          tag: "form",
+          name: "workbench_plan_base_branch",
+          elements: [
+            {
+              tag: "select_static",
+              name: "base_branch",
+              placeholder: plainText("选择基线分支"),
+              options: input.candidates.map((branch) => ({
+                text: plainText(branch),
+                value: branch
+              }))
+            },
+            {
+              tag: "input",
+              name: "base_branch_manual",
+              placeholder: plainText("或手填：main / beta / develop ...")
+            },
+            {
+              tag: "input",
+              name: "head_branch",
+              placeholder: plainText(input.defaultHeadBranch)
+            },
+            baseBranchSubmitButton(input)
+          ]
+        }
+      ]
+    }
+  };
+}
+
 export function assertValidFeishuWorkbenchCard(card: unknown): asserts card is FeishuWorkbenchCard {
   const violations: string[] = [];
   for (const form of formElements(card)) {
@@ -315,6 +370,21 @@ function planRevisionSubmitButton(input: PlanRevisionRequestCardInput): FeishuFo
     name: "submit_revision",
     value: {
       action: "act:/workbench plan revise submit",
+      plan_id: input.planId,
+      version: String(input.version)
+    }
+  };
+}
+
+function baseBranchSubmitButton(input: BaseBranchPromptCardInput): FeishuFormSubmitButton {
+  return {
+    tag: "button",
+    text: plainText("开始执行"),
+    type: "primary",
+    action_type: "form_submit",
+    name: "submit_base_branch",
+    value: {
+      action: "act:/workbench plan base_branch_submit",
       plan_id: input.planId,
       version: String(input.version)
     }

@@ -19,7 +19,7 @@ export interface FeishuInteractiveCard {
   elements?: FeishuCardElement[];
 }
 
-export type FeishuCardColor = "blue" | "green" | "red" | "orange" | "grey";
+export type FeishuCardColor = "blue" | "green" | "red" | "orange" | "yellow" | "grey";
 
 export interface FeishuPlainText {
   tag: "plain_text";
