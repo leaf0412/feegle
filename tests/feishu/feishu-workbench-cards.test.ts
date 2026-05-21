@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertValidFeishuWorkbenchCard,
   buildDirectorySetupCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
@@ -35,6 +36,7 @@ describe("buildDirectorySetupCard", () => {
         })
       })
     );
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
   it("renders a compact plan review card with approval actions", () => {
@@ -54,6 +56,7 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("act:/workbench plan cancel");
     expect(json).toContain("\"plan_id\":\"plan_1\"");
     expect(json).toContain("\"version\":\"1\"");
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
   it("renders a multiline plan revision request form", () => {
@@ -79,6 +82,22 @@ describe("buildDirectorySetupCard", () => {
           version: "1"
         })
       })
+    );
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
+  });
+
+  it("rejects known Feishu card fields that fail only at send time", () => {
+    const invalidCard = buildDirectorySetupCard({
+      interactionId: "pi_1",
+      providers: ["codex"],
+      workspaces: [{ label: "feegle", path: "/repo/feegle" }]
+    }) as unknown as Record<string, unknown>;
+    const forms = formContainers(invalidCard);
+    forms[0].submit = { tag: "button" };
+    formElements(invalidCard)[0].label = { tag: "plain_text", content: "Agent" };
+
+    expect(() => assertValidFeishuWorkbenchCard(invalidCard)).toThrow(
+      "Invalid Feishu workbench card: form elements must not include label; form must not include submit"
     );
   });
 });

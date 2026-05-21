@@ -214,6 +214,25 @@ export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput
   };
 }
 
+export function assertValidFeishuWorkbenchCard(card: unknown): asserts card is FeishuWorkbenchCard {
+  const violations: string[] = [];
+  for (const form of formElements(card)) {
+    if (hasOwnProperty(form, "submit")) {
+      violations.push("form must not include submit");
+    }
+    const elements = Array.isArray(form.elements) ? form.elements.filter(isRecord) : [];
+    for (const element of elements) {
+      if (hasOwnProperty(element, "label")) {
+        violations.push("form elements must not include label");
+      }
+    }
+  }
+
+  if (violations.length > 0) {
+    throw new Error(`Invalid Feishu workbench card: ${Array.from(new Set(violations)).sort().join("; ")}`);
+  }
+}
+
 function directorySubmitButton(interactionId: string): FeishuFormSubmitButton {
   return {
     tag: "button",
@@ -267,4 +286,19 @@ function renderRisks(risks: string[]): string {
 
 function plainText(content: string): FeishuPlainText {
   return { tag: "plain_text", content };
+}
+
+function formElements(card: unknown): Array<Record<string, unknown>> {
+  if (!isRecord(card) || !isRecord(card.body) || !Array.isArray(card.body.elements)) {
+    return [];
+  }
+  return card.body.elements.filter(isRecord).filter((element) => element.tag === "form");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOwnProperty(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
