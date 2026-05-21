@@ -43,9 +43,20 @@ function migrate(db: RuntimeDb): void {
       feishu_file_message_id text,
       status text not null,
       revision_note text,
+      doc_token text,
+      doc_url text,
       created_at text not null,
       updated_at text not null,
       primary key (plan_id, version)
     );
   `);
+  ensureColumn(db, "plan_artifacts", "doc_token", "text");
+  ensureColumn(db, "plan_artifacts", "doc_url", "text");
+}
+
+function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
+  const rows = db.prepare(`pragma table_info(${table})`).all() as Array<{ name: string }>;
+  if (!rows.some((row) => row.name === column)) {
+    db.exec(`alter table ${table} add column ${column} ${type}`);
+  }
 }
