@@ -230,6 +230,61 @@ describe("createCodexCliPromptRunner", () => {
     ]);
   });
 
+  it("maps Codex command_execution events to progress steps", async () => {
+    const runner = createCodexCliPromptRunner(
+      { command: "codex", cwd: "/tmp/workspace" },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "I will inspect the project first." }
+          }),
+          JSON.stringify({
+            type: "item.started",
+            item: {
+              type: "command_execution",
+              command: "/bin/zsh -lc \"pwd\"",
+              aggregated_output: "",
+              exit_code: null,
+              status: "in_progress"
+            }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: {
+              type: "command_execution",
+              command: "/bin/zsh -lc \"pwd\"",
+              aggregated_output: "/tmp/workspace\n",
+              exit_code: 0,
+              status: "completed"
+            }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "Final answer." }
+          }),
+          JSON.stringify({ type: "turn.completed" })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const updates: unknown[] = [];
+
+    await expect(
+      runner("hello agent", {
+        onProgress(update) {
+          updates.push(update);
+        }
+      })
+    ).resolves.toBe("Final answer.");
+
+    expect(updates).toEqual([
+      { kind: "thinking", text: "I will inspect the project first." },
+      { kind: "tool_use", tool: "Command", text: '/bin/zsh -lc "pwd"' },
+      { kind: "tool_result", tool: "Command", text: "exit: 0\n/tmp/workspace" }
+    ]);
+  });
+
   it("waits for each async progress callback before emitting the next update", async () => {
     const runner = createCodexCliPromptRunner(
       { command: "codex", cwd: "/tmp/workspace" },

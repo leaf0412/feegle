@@ -104,7 +104,7 @@ async function parseCodexJsonLine(line: string, parser: AgentStreamParser): Prom
   if (event.type === "turn.completed") {
     return;
   }
-  if (event.type !== "item.completed") {
+  if (event.type !== "item.completed" && event.type !== "item.started") {
     return;
   }
   const item = readRecord(event.item);
@@ -113,14 +113,23 @@ async function parseCodexJsonLine(line: string, parser: AgentStreamParser): Prom
     await parser.assistantMessage(extractItemText(item));
     return;
   }
-  await emitCodexProgress(itemType, item, parser);
+  await emitCodexProgress(readString(event.type), itemType, item, parser);
 }
 
 async function emitCodexProgress(
+  eventType: string,
   itemType: string,
   item: Record<string, unknown>,
   parser: AgentStreamParser
 ): Promise<void> {
+  if (itemType === "command_execution") {
+    if (eventType === "item.started") {
+      await parser.toolUse("Command", readString(item.command) || stringifyRecord(item));
+      return;
+    }
+    await parser.toolResult("Command", commandExecutionResultText(item));
+    return;
+  }
   if (itemType === "tool_call" || itemType === "function_call") {
     await parser.toolUse(
       readString(item.name) || readString(item.tool_name) || "Tool",
@@ -141,6 +150,19 @@ async function emitCodexProgress(
       await parser.reasoning(text);
     }
   }
+}
+
+function commandExecutionResultText(item: Record<string, unknown>): string {
+  const lines: string[] = [];
+  const exitCode = readNumber(item.exit_code);
+  if (exitCode !== undefined) {
+    lines.push(`exit: ${exitCode}`);
+  }
+  const output = readString(item.aggregated_output).trim();
+  if (output) {
+    lines.push(output);
+  }
+  return lines.length > 0 ? lines.join("\n") : stringifyRecord(item);
 }
 
 function parseCodexEvent(line: string): Record<string, unknown> {
@@ -209,6 +231,10 @@ function readRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
 }
 
 function stringifyRecord(value: Record<string, unknown>): string {
