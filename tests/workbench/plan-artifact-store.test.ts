@@ -112,4 +112,100 @@ describe("PlanArtifactStore", () => {
     expect(latest?.docToken).toBeUndefined();
     expect(latest?.docUrl).toBeUndefined();
   });
+
+  it("persists execution columns and reads them back", () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-22T00:00:00.000Z"));
+    const created = store.createVersion({
+      planId: "plan_x",
+      chatId: "oc_x",
+      sourceMessageId: "om_x",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: "/tmp/ws/plan.md",
+      status: "pending_review"
+    });
+
+    expect(created.executionIteration).toBe(1);
+    expect(created.iterationNotes).toEqual([]);
+
+    store.setBaseBranch("plan_x", {
+      baseBranch: "main",
+      headBranch: "yb/feat/x",
+      expectedStatus: "pending_review"
+    });
+    store.setExecution("plan_x", {
+      baseSha: "base_sha",
+      headBranch: "yb/feat/x",
+      worktreePath: "/tmp/wt",
+      status: "executing",
+      expectedStatus: "pending_review"
+    });
+
+    expect(store.latest("plan_x")).toMatchObject({
+      baseBranch: "main",
+      headBranch: "yb/feat/x",
+      baseSha: "base_sha",
+      worktreePath: "/tmp/wt",
+      status: "executing"
+    });
+  });
+
+  it("rejects status transitions that don't match expected status (first-wins guard)", () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-22T00:00:00.000Z"));
+    store.createVersion({
+      planId: "plan_g",
+      chatId: "oc_g",
+      sourceMessageId: "om_g",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: "/tmp/ws/plan.md",
+      status: "pending_review"
+    });
+
+    expect(() =>
+      store.setStatus("plan_g", { status: "executing", expectedStatus: "approved" })
+    ).toThrow(/state conflict/);
+  });
+
+  it("appends iteration notes as an ordered JSON array", () => {
+    const store = new PlanArtifactStore(db, () => new Date("2026-05-22T00:00:00.000Z"));
+    store.createVersion({
+      planId: "plan_i",
+      chatId: "oc_i",
+      sourceMessageId: "om_i",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: "/tmp/ws/plan.md",
+      status: "pending_review"
+    });
+    store.appendIterationNote("plan_i", {
+      iteration: 1,
+      note: null,
+      headShaBefore: null,
+      headShaAfter: "sha1",
+      commitCountDelta: 2,
+      filesChangedDelta: 4,
+      startedAt: "2026-05-22T01:00:00.000Z",
+      completedAt: "2026-05-22T01:05:00.000Z"
+    });
+    store.appendIterationNote("plan_i", {
+      iteration: 2,
+      note: "增加错误处理",
+      headShaBefore: "sha1",
+      headShaAfter: "sha2",
+      commitCountDelta: 1,
+      filesChangedDelta: 2,
+      startedAt: "2026-05-22T01:30:00.000Z",
+      completedAt: "2026-05-22T01:32:00.000Z"
+    });
+
+    expect(store.latest("plan_i")?.iterationNotes).toEqual([
+      expect.objectContaining({ iteration: 1, note: null }),
+      expect.objectContaining({ iteration: 2, note: "增加错误处理" })
+    ]);
+    expect(store.latest("plan_i")?.executionIteration).toBe(2);
+  });
 });

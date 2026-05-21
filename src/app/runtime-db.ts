@@ -52,6 +52,17 @@ function migrate(db: RuntimeDb): void {
   `);
   ensureColumn(db, "plan_artifacts", "doc_token", "text");
   ensureColumn(db, "plan_artifacts", "doc_url", "text");
+  ensureColumn(db, "plan_artifacts", "base_branch", "text");
+  ensureColumn(db, "plan_artifacts", "base_sha", "text");
+  ensureColumn(db, "plan_artifacts", "head_branch", "text");
+  ensureColumn(db, "plan_artifacts", "head_sha", "text");
+  ensureColumn(db, "plan_artifacts", "worktree_path", "text");
+  ensureColumn(db, "plan_artifacts", "commit_count", "integer");
+  ensureColumn(db, "plan_artifacts", "files_changed", "integer");
+  ensureColumn(db, "plan_artifacts", "execution_iteration", "integer not null default 1");
+  ensureColumn(db, "plan_artifacts", "iteration_notes", "text");
+  ensureColumn(db, "plan_artifacts", "progress_card_message_id", "text");
+  ensureColumn(db, "plan_artifacts", "error_message", "text");
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
