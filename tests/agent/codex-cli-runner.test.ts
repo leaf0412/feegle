@@ -192,6 +192,44 @@ describe("createCodexCliPromptRunner", () => {
     expect(updates).toEqual([{ kind: "tool_use", tool: "Bash", text: "npm test" }]);
   });
 
+  it("treats assistant messages before more work as progress and the last assistant message as the answer", async () => {
+    const runner = createCodexCliPromptRunner(
+      { command: "codex", cwd: "/tmp/workspace" },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "I am checking the relevant files." }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "tool_call", name: "Read", arguments: "src/agent/prompt-agent-adapter.ts" }
+          }),
+          JSON.stringify({
+            type: "item.completed",
+            item: { type: "agent_message", text: "Final answer." }
+          }),
+          JSON.stringify({ type: "turn.completed" })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const updates: unknown[] = [];
+
+    await expect(
+      runner("hello agent", {
+        onProgress(update) {
+          updates.push(update);
+        }
+      })
+    ).resolves.toBe("Final answer.");
+
+    expect(updates).toEqual([
+      { kind: "thinking", text: "I am checking the relevant files." },
+      { kind: "tool_use", tool: "Read", text: "src/agent/prompt-agent-adapter.ts" }
+    ]);
+  });
+
   it("waits for each async progress callback before emitting the next update", async () => {
     const runner = createCodexCliPromptRunner(
       { command: "codex", cwd: "/tmp/workspace" },

@@ -1,9 +1,7 @@
 import { execa } from "execa";
-import { createInterface } from "node:readline";
-import type { Readable } from "node:stream";
 import type { PromptRunner } from "./codex-agent-adapter.js";
-import type { AgentRunOptions } from "./agent-cli.js";
-import { emitAgentProgress } from "./agent-progress.js";
+import { AgentStreamParser } from "./agent-stream-parser.js";
+import { consumeStdoutLines } from "./stdout-line-consumer.js";
 
 export interface CodexCliRunnerOptions {
   command?: string;
@@ -48,18 +46,18 @@ export function createCodexCliPromptRunner(
     if (!cwd) {
       throw new Error("未设置工作目录。请运行 /dir use <workspace> 来设置。");
     }
-    const parseState = createCodexJsonParseState();
+    const parser = new AgentStreamParser(runOptions);
     const result = await runner(options.command ?? "codex", buildCodexArgs(options, cwd), {
       cwd,
       input: prompt,
       timeout: options.timeoutMs ?? 300_000,
       onStdoutLine: async (line) => {
-        await parseCodexJsonLine(line, parseState, runOptions);
+        await parseCodexJsonLine(line, parser);
       }
     });
 
-    await parseCodexJsonOutput(result.stdout, parseState, runOptions);
-    return finalizeCodexJsonOutput(parseState);
+    await parseCodexJsonOutput(result.stdout, parser);
+    return parser.finalize();
   };
 }
 
@@ -87,99 +85,60 @@ function buildCodexArgs(options: CodexCliRunnerOptions, cwd: string): string[] {
   return args;
 }
 
-interface CodexJsonParseState {
-  messages: string[];
-}
-
-function createCodexJsonParseState(): CodexJsonParseState {
-  return { messages: [] };
-}
-
-async function parseCodexJsonOutput(
-  stdout: string,
-  state: CodexJsonParseState,
-  options?: AgentRunOptions
-): Promise<void> {
+async function parseCodexJsonOutput(stdout: string, parser: AgentStreamParser): Promise<void> {
   for (const line of stdout.split(/\r?\n/)) {
-    await parseCodexJsonLine(line, state, options);
+    await parseCodexJsonLine(line, parser);
   }
 }
 
-async function parseCodexJsonLine(line: string, state: CodexJsonParseState, options?: AgentRunOptions): Promise<void> {
+async function parseCodexJsonLine(line: string, parser: AgentStreamParser): Promise<void> {
   const trimmed = line.trim();
   if (!trimmed) {
     return;
   }
   const event = parseCodexEvent(trimmed);
   if (event.type === "turn.failed") {
-    await emitAgentProgress(options, { kind: "error", text: readTurnFailureMessage(event) });
+    await parser.error(readTurnFailureMessage(event));
     throw new Error(readTurnFailureMessage(event));
+  }
+  if (event.type === "turn.completed") {
+    return;
   }
   if (event.type !== "item.completed") {
     return;
   }
   const item = readRecord(event.item);
   const itemType = readString(item.type);
-  await emitCodexProgress(itemType, item, options);
-  if (itemType !== "agent_message" && itemType !== "message") {
+  if (itemType === "agent_message" || itemType === "message") {
+    await parser.assistantMessage(extractItemText(item));
     return;
   }
-  const text = extractItemText(item);
-  if (text) {
-    state.messages.push(text);
-  }
-}
-
-function finalizeCodexJsonOutput(state: CodexJsonParseState): string {
-  const response = state.messages.join("\n\n").trim();
-  if (!response) {
-    throw new Error("Codex completed without an agent message");
-  }
-  return response;
-}
-
-async function consumeStdoutLines(
-  stdout: Readable | null | undefined,
-  onStdoutLine: ((line: string) => Promise<void>) | undefined
-): Promise<void> {
-  if (!stdout || !onStdoutLine) {
-    return;
-  }
-
-  const lines = createInterface({ input: stdout, crlfDelay: Infinity });
-  for await (const line of lines) {
-    await onStdoutLine(line);
-  }
+  await emitCodexProgress(itemType, item, parser);
 }
 
 async function emitCodexProgress(
   itemType: string,
   item: Record<string, unknown>,
-  options?: AgentRunOptions
+  parser: AgentStreamParser
 ): Promise<void> {
-  if (!options?.onProgress) {
-    return;
-  }
   if (itemType === "tool_call" || itemType === "function_call") {
-    await emitAgentProgress(options, {
-      kind: "tool_use",
-      tool: readString(item.name) || readString(item.tool_name) || "Tool",
-      text: readString(item.arguments) || readString(item.input) || stringifyRecord(item)
-    });
+    await parser.toolUse(
+      readString(item.name) || readString(item.tool_name) || "Tool",
+      readString(item.arguments) || readString(item.input) || stringifyRecord(item)
+    );
     return;
   }
   if (itemType === "tool_result" || itemType === "function_call_output") {
-    await emitAgentProgress(options, {
-      kind: "tool_result",
-      tool: readString(item.name) || readString(item.tool_name) || undefined,
-      text: readString(item.output) || readString(item.result) || stringifyRecord(item)
-    });
+    await parser.toolResult(
+      readString(item.name) || readString(item.tool_name) || undefined,
+      readString(item.output) || readString(item.result) || stringifyRecord(item)
+    );
     return;
   }
   if (itemType === "reasoning" || itemType === "reasoning_summary") {
     const text = extractReasoningText(item);
     if (text) {
-      await emitAgentProgress(options, { kind: "thinking", text });
+      await parser.reasoning(text);
     }
   }
 }

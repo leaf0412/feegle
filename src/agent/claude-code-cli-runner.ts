@@ -1,6 +1,6 @@
 import { execa } from "execa";
-import type { AgentRunOptions } from "./agent-cli.js";
-import { emitAgentProgress } from "./agent-progress.js";
+import { AgentStreamParser } from "./agent-stream-parser.js";
+import { consumeStdoutLines } from "./stdout-line-consumer.js";
 import type { PromptRunner } from "./prompt-agent-adapter.js";
 
 export interface ClaudeCodeCliRunnerOptions {
@@ -20,16 +20,19 @@ export interface ClaudeCodeCliCommandResult {
 export type ClaudeCodeCliCommandRunner = (
   command: string,
   args: string[],
-  options: { cwd: string; input: string; timeout: number }
+  options: { cwd: string; input: string; timeout: number; onStdoutLine?: (line: string) => Promise<void> }
 ) => Promise<ClaudeCodeCliCommandResult>;
 
 const defaultRunner: ClaudeCodeCliCommandRunner = async (command, args, options) => {
-  const result = await execa(command, args, {
+  const subprocess = execa(command, args, {
     cwd: options.cwd,
     input: options.input,
     timeout: options.timeout
   });
-  return { stdout: result.stdout, stderr: result.stderr };
+  const stdoutLineConsumption = consumeStdoutLines(subprocess.stdout, options.onStdoutLine);
+  const result = await subprocess;
+  await stdoutLineConsumption;
+  return { stdout: options.onStdoutLine ? "" : result.stdout, stderr: result.stderr };
 };
 
 export function createClaudeCodeCliPromptRunner(
@@ -41,17 +44,21 @@ export function createClaudeCodeCliPromptRunner(
     if (!cwd) {
       throw new Error("未设置工作目录。请运行 /dir use <workspace> 来设置。");
     }
+    const parser = new AgentStreamParser(runOptions);
     try {
       const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(options), {
         cwd,
         input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
-        timeout: options.timeoutMs ?? 300_000
+        timeout: options.timeoutMs ?? 300_000,
+        onStdoutLine: async (line) => {
+          await parseClaudeLine(line, parser);
+        }
       });
-      return parseSuccessfulResult(result.stdout, runOptions);
+      return parseSuccessfulResult(result.stdout, parser);
     } catch (error) {
       const stdout = readErrorStdout(error);
       if (stdout) {
-        throw new Error((await parseFinalResult(stdout, runOptions)).text);
+        throw new Error((await parseFinalResult(stdout, parser)).text);
       }
       throw error;
     }
@@ -89,78 +96,73 @@ function buildUserMessage(prompt: string): unknown {
   };
 }
 
-async function parseSuccessfulResult(stdout: string, options?: AgentRunOptions): Promise<string> {
-  const result = await parseFinalResult(stdout, options);
+async function parseSuccessfulResult(stdout: string, parser: AgentStreamParser): Promise<string> {
+  const result = await parseFinalResult(stdout, parser);
   if (result.isError) {
     throw new Error(result.text);
   }
   return result.text;
 }
 
-async function parseFinalResult(stdout: string, options?: AgentRunOptions): Promise<{ text: string; isError: boolean }> {
-  for (const line of stdout.trim().split("\n").reverse()) {
-    if (!line.trim()) {
-      continue;
+async function parseFinalResult(stdout: string, parser: AgentStreamParser): Promise<{ text: string; isError: boolean }> {
+  let result: { text: string; isError: boolean } | undefined;
+  for (const line of stdout.trim().split("\n")) {
+    const parsed = await parseClaudeLine(line, parser);
+    if (parsed) {
+      result = parsed;
     }
-    const event = JSON.parse(line) as unknown;
-    if (isRecord(event) && event.type === "result" && typeof event.result === "string") {
-      await emitClaudeProgress(stdout, options);
-      if (event.is_error === true) {
-        await emitAgentProgress(options, { kind: "error", text: event.result });
-      }
-      return {
-        text: event.result.trim(),
-        isError: event.is_error === true
-      };
-    }
+  }
+  if (result) {
+    return result;
   }
   throw new Error("Claude Code did not emit a result event");
 }
 
-async function emitClaudeProgress(stdout: string, options?: AgentRunOptions): Promise<void> {
-  if (!options?.onProgress) {
-    return;
+async function parseClaudeLine(
+  line: string,
+  parser: AgentStreamParser
+): Promise<{ text: string; isError: boolean } | undefined> {
+  if (!line.trim()) {
+    return undefined;
   }
-
-  for (const line of stdout.trim().split("\n")) {
-    if (!line.trim()) {
-      continue;
-    }
-    const event = JSON.parse(line) as unknown;
-    if (!isRecord(event) || event.type === "result") {
-      continue;
-    }
-    const message = event.message;
-    if (!isRecord(message) || !Array.isArray(message.content)) {
-      continue;
-    }
-    for (const part of message.content) {
-      await emitClaudeContentPart(part, options);
-    }
+  const event = JSON.parse(line) as unknown;
+  if (!isRecord(event)) {
+    return undefined;
   }
+  if (event.type === "result" && typeof event.result === "string") {
+    await parser.finalResult(event.result);
+    if (event.is_error === true) {
+      await parser.error(event.result);
+    }
+    return {
+      text: event.result.trim(),
+      isError: event.is_error === true
+    };
+  }
+  const message = event.message;
+  if (!isRecord(message) || !Array.isArray(message.content)) {
+    return undefined;
+  }
+  for (const part of message.content) {
+    await emitClaudeContentPart(part, parser);
+  }
+  return undefined;
 }
 
-async function emitClaudeContentPart(part: unknown, options: AgentRunOptions): Promise<void> {
+async function emitClaudeContentPart(part: unknown, parser: AgentStreamParser): Promise<void> {
   if (!isRecord(part)) {
     return;
   }
   if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
-    await emitAgentProgress(options, { kind: "thinking", text: part.text.trim() });
+    await parser.assistantMessage(part.text);
     return;
   }
   if (part.type === "tool_use") {
-    await emitAgentProgress(options, {
-      kind: "tool_use",
-      tool: typeof part.name === "string" ? part.name : "Tool",
-      text: stringifyUnknown(part.input)
-    });
+    await parser.toolUse(typeof part.name === "string" ? part.name : "Tool", stringifyUnknown(part.input));
     return;
   }
   if (part.type === "tool_result") {
-    await emitAgentProgress(options, {
-      kind: "tool_result",
-      text: stringifyUnknown(part.content)
-    });
+    await parser.toolResult(undefined, stringifyUnknown(part.content));
   }
 }
 
