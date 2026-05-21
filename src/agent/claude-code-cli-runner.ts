@@ -157,6 +157,10 @@ async function emitClaudeContentPart(part: unknown, parser: AgentStreamParser): 
     await parser.assistantMessage(part.text);
     return;
   }
+  if (part.type === "thinking" && typeof part.thinking === "string" && part.thinking.trim()) {
+    await parser.reasoning(part.thinking);
+    return;
+  }
   if (part.type === "tool_use") {
     await parser.toolUse(typeof part.name === "string" ? part.name : "Tool", stringifyUnknown(part.input));
     return;

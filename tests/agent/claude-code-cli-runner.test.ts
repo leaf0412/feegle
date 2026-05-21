@@ -127,6 +127,42 @@ describe("createClaudeCodeCliPromptRunner", () => {
     ]);
   });
 
+  it("emits non-empty Claude thinking content as progress without exposing signatures", async () => {
+    const runner = createClaudeCodeCliPromptRunner(
+      {
+        command: "claude",
+        cwd: "/tmp/workspace"
+      },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              content: [{ type: "thinking", thinking: "I should inspect the project structure.", signature: "opaque" }]
+            }
+          }),
+          JSON.stringify({
+            type: "result",
+            result: "done"
+          })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const updates: unknown[] = [];
+
+    await expect(
+      runner("hello claude", {
+        onProgress(update) {
+          updates.push(update);
+        }
+      })
+    ).resolves.toBe("done");
+
+    expect(updates).toEqual([{ kind: "thinking", text: "I should inspect the project structure." }]);
+    expect(JSON.stringify(updates)).not.toContain("opaque");
+  });
+
   it("does not treat the final result as progress when assistant text already described the process", async () => {
     const runner = createClaudeCodeCliPromptRunner(
       {
