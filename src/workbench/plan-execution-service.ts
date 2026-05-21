@@ -1,9 +1,15 @@
+import { readFile } from "node:fs/promises";
 import type { AgentCli } from "../agent/agent-cli.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
-import { buildBaseBranchPromptCard, buildPlanProgressCard } from "../feishu/feishu-workbench-cards.js";
+import {
+  buildBaseBranchPromptCard,
+  buildPlanCompletedCard,
+  buildPlanProgressCard,
+  type PlanProgressStage
+} from "../feishu/feishu-workbench-cards.js";
 import type { GitService } from "../git/git-service.js";
 import type { PlanArtifact, PlanArtifactStatus, PlanArtifactStore } from "./plan-artifact-store.js";
-import { deriveSlug } from "./plan-execution-helpers.js";
+import { buildIterationPrompt, deriveSlug } from "./plan-execution-helpers.js";
 
 const TERMINAL_STATUSES: PlanArtifactStatus[] = ["pushed", "cancelled", "cleaned", "failed"];
 
@@ -158,15 +164,115 @@ export class PlanExecutionService {
     return `${this.deps.feegleHome}/worktrees/${repoName}/${planId}`;
   }
 
-  private async runIteration(planId: string, _note: string | null): Promise<void> {
+  private async runIteration(planId: string, note: string | null): Promise<void> {
     const plan = this.deps.store.latest(planId);
-    if (!plan?.worktreePath || !plan.headBranch) return;
-    await this.deps.agent.runDevelopmentTask(
-      { requirementId: planId, title: plan.planId, requirementText: "" },
-      { repositoryId: planId, localPath: plan.worktreePath, branchName: plan.headBranch },
-      "",
-      { cwd: plan.worktreePath }
-    );
+    if (!plan?.worktreePath || !plan.headBranch || !plan.baseSha) return;
+
+    const cardBaseInput = {
+      planId,
+      version: plan.version,
+      title: plan.planId,
+      headBranch: plan.headBranch,
+      iteration: plan.executionIteration
+    };
+    const recent: string[] = [];
+    const now = this.deps.now ?? (() => new Date());
+    const startedAt = now().toISOString();
+    const headShaBefore = plan.headSha ?? null;
+    const planContent = await readFile(plan.filePath, "utf8");
+    const updateProgress = throttle(async (stage: PlanProgressStage) => {
+      if (!plan.progressCardMessageId) return;
+      await this.deps.client.updateInteractiveCard(
+        plan.progressCardMessageId,
+        buildPlanProgressCard({
+          ...cardBaseInput,
+          stage,
+          recentEvents: recent.slice(-5)
+        })
+      );
+    }, 2000);
+
+    const onProgress = (event: { kind: string; text: string }) => {
+      recent.push(`[${event.kind}] ${event.text}`);
+      void updateProgress("executing");
+    };
+
+    try {
+      await updateProgress.flushNow("executing");
+      await this.deps.agent.runDevelopmentTask(
+        { requirementId: planId, title: plan.planId, requirementText: planContent },
+        { repositoryId: planId, localPath: plan.worktreePath, branchName: plan.headBranch },
+        buildIterationPrompt(planContent, note),
+        { cwd: plan.worktreePath, onProgress }
+      );
+
+      await updateProgress.flushNow("verifying");
+      const clean = await this.deps.git.isClean(plan.worktreePath);
+      if (!clean) {
+        this.deps.store.setStatus(planId, {
+          status: "failed",
+          expectedStatus: "executing",
+          errorMessage: "agent exited but working tree dirty (violates auto-commit)"
+        });
+        await updateProgress.flushNow("failed");
+        return;
+      }
+
+      const headSha = await this.deps.git.getBranchSha(plan.worktreePath, "HEAD");
+      const { commitCount, filesChanged } = await this.deps.git.diffStats(plan.worktreePath, plan.baseSha);
+      const completedAt = now().toISOString();
+
+      this.deps.store.appendIterationNote(planId, {
+        iteration: plan.executionIteration,
+        note,
+        headShaBefore,
+        headShaAfter: headSha,
+        commitCountDelta: commitCount - (plan.commitCount ?? 0),
+        filesChangedDelta: filesChanged - (plan.filesChanged ?? 0),
+        startedAt,
+        completedAt
+      });
+      this.deps.store.setHeadInfo(planId, {
+        headSha,
+        commitCount,
+        filesChanged,
+        status: "completed",
+        expectedStatus: "executing"
+      });
+
+      const refreshed = this.deps.store.latest(planId);
+      if (refreshed && plan.progressCardMessageId && refreshed.headBranch && refreshed.worktreePath) {
+        await this.deps.client.updateInteractiveCard(
+          plan.progressCardMessageId,
+          buildPlanCompletedCard({
+            planId,
+            version: plan.version,
+            title: plan.planId,
+            headBranch: refreshed.headBranch,
+            worktreePath: refreshed.worktreePath,
+            iteration: refreshed.executionIteration,
+            commitCount: refreshed.commitCount ?? 0,
+            filesChanged: refreshed.filesChanged ?? 0,
+            iterationNotes: refreshed.iterationNotes.map((entry) => ({
+              iteration: entry.iteration,
+              note: entry.note
+            }))
+          })
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        this.deps.store.setStatus(planId, {
+          status: "failed",
+          expectedStatus: "executing",
+          errorMessage: message
+        });
+      } catch {
+        return;
+      }
+      await updateProgress.flushNow("failed");
+    }
   }
 }
 
@@ -182,4 +288,34 @@ function sanitizeHeadBranch(value: string | undefined): string | undefined {
     throw new Error(`invalid head branch (alphanum/underscore/slash only, no hyphen): ${value}`);
   }
   return trimmed;
+}
+
+interface ThrottledUpdate {
+  (stage: PlanProgressStage): Promise<void>;
+  flushNow(stage: PlanProgressStage): Promise<void>;
+}
+
+function throttle(fn: (stage: PlanProgressStage) => Promise<void>, intervalMs: number): ThrottledUpdate {
+  let lastRun = 0;
+  let inFlight: Promise<void> = Promise.resolve();
+
+  const invoke = async (stage: PlanProgressStage) => {
+    lastRun = Date.now();
+    inFlight = fn(stage);
+    await inFlight;
+  };
+
+  const wrapped: ThrottledUpdate = (async (stage: PlanProgressStage) => {
+    const now = Date.now();
+    if (now - lastRun >= intervalMs) {
+      await invoke(stage);
+    }
+  }) as ThrottledUpdate;
+
+  wrapped.flushNow = async (stage: PlanProgressStage) => {
+    await inFlight;
+    await invoke(stage);
+  };
+
+  return wrapped;
 }
