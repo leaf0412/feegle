@@ -31,6 +31,7 @@ export interface FeishuChatHandlerDeps {
   pendingInteractions?: PendingInteractionWriteStore;
   configuredWorkspaces?: Record<string, string>;
   interactionIdFactory?: () => string;
+  progressHeartbeatMs?: number;
   now?: () => number;
 }
 
@@ -128,17 +129,20 @@ export class FeishuChatHandler {
         await this.safeUpdate(preview, renderState, "working", true);
       }
     };
+    const stopHeartbeat = this.startProgressHeartbeat(preview, renderState);
 
     let answer: string;
     try {
       answer = (await agent.chat(messages, options)).trim();
     } catch (error) {
+      stopHeartbeat();
       const reason = errorMessage(error);
       renderState.errorMessage = reason;
       await this.safeUpdate(preview, renderState, "error", false);
       return { status: "failed", reason };
     }
 
+    stopHeartbeat();
     this.deps.history.append(request.sessionKey, { role: "assistant", content: answer });
     renderState.answer = answer;
     await this.safeFinish(preview, renderState, "done", false);
@@ -211,6 +215,14 @@ export class FeishuChatHandler {
     } catch (error) {
       console.warn("Feishu chat preview finish failed", errorMessage(error));
     }
+  }
+
+  private startProgressHeartbeat(preview: FeishuPreviewSession, state: PreviewRenderState): () => void {
+    const heartbeatMs = this.deps.progressHeartbeatMs ?? 15_000;
+    const timer = setInterval(() => {
+      void this.safeUpdate(preview, state, "working", true);
+    }, heartbeatMs);
+    return () => clearInterval(timer);
   }
 }
 
