@@ -84,6 +84,15 @@ export interface PlanExecutionRevisionCardInput {
   iteration: number;
 }
 
+export interface PlanPushResultCardInput {
+  planId: string;
+  version: number;
+  title: string;
+  headBranch: string;
+  success: boolean;
+  stderr?: string;
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -470,6 +479,89 @@ export function buildPlanExecutionRevisionCard(input: PlanExecutionRevisionCardI
               name: "submit_execution_revision",
               value: {
                 action: "act:/workbench plan revise_execution_submit",
+                plan_id: input.planId,
+                version: String(input.version)
+              }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildPlanPushResultCard(input: PlanPushResultCardInput): FeishuWorkbenchCard {
+  if (input.success) {
+    return {
+      schema: "2.0",
+      config: { wide_screen_mode: true, update_multi: true },
+      header: { template: "green", title: plainText(`${input.title} · 已推送`) },
+      body: {
+        elements: [
+          {
+            tag: "markdown",
+            content: [
+              `**分支**：\`${input.headBranch}\``,
+              "",
+              "已推送到 origin。worktree 仍保留在本地，下次需要可直接进入；或点下方按钮清理。"
+            ].join("\n")
+          },
+          {
+            tag: "action",
+            actions: [
+              {
+                tag: "button",
+                text: plainText("清理 worktree"),
+                type: "default",
+                value: {
+                  action: "act:/workbench plan cleanup",
+                  plan_id: input.planId,
+                  version: String(input.version)
+                }
+              }
+            ]
+          }
+        ]
+      }
+    };
+  }
+
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "red", title: plainText(`${input.title} · 推送失败`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `**分支**：\`${input.headBranch}\``,
+            "",
+            "**stderr**：",
+            "```",
+            (input.stderr ?? "(empty)").trim(),
+            "```"
+          ].join("\n")
+        },
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: plainText("重试推送"),
+              type: "primary",
+              value: {
+                action: "act:/workbench plan push",
+                plan_id: input.planId,
+                version: String(input.version)
+              }
+            },
+            {
+              tag: "button",
+              text: plainText("继续调整"),
+              type: "default",
+              value: {
+                action: "act:/workbench plan revise_execution",
                 plan_id: input.planId,
                 version: String(input.version)
               }

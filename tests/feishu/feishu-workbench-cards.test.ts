@@ -7,6 +7,7 @@ import {
   buildPlanCompletedCard,
   buildPlanExecutionRevisionCard,
   buildPlanProgressCard,
+  buildPlanPushResultCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
 } from "../../src/feishu/feishu-workbench-cards.js";
@@ -226,6 +227,41 @@ describe("buildDirectorySetupCard", () => {
 
     expect(json).toContain("act:/workbench plan revise_execution_submit");
     expect(json).toContain("plan_1");
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds a green push success card with cleanup button", () => {
+    const card = buildPlanPushResultCard({
+      planId: "plan_1",
+      version: 1,
+      title: "Fix startup",
+      headBranch: "yb/feat/fix_startup",
+      success: true
+    });
+    const json = JSON.stringify(card);
+
+    expect(card.header.template).toBe("green");
+    expect(json).toContain("已推送");
+    expect(json).toContain("act:/workbench plan cleanup");
+    expect(json).not.toContain("act:/workbench plan push");
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds a red push failure card with retry button and stderr", () => {
+    const card = buildPlanPushResultCard({
+      planId: "plan_1",
+      version: 1,
+      title: "Fix startup",
+      headBranch: "yb/feat/fix_startup",
+      success: false,
+      stderr: "remote: error: hook declined\n"
+    });
+    const json = JSON.stringify(card);
+
+    expect(card.header.template).toBe("red");
+    expect(json).toContain("hook declined");
+    expect(json).toContain("act:/workbench plan push");
+    expect(json).toContain("act:/workbench plan revise_execution");
     assertValidFeishuWorkbenchCard(card);
   });
 });
