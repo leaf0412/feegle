@@ -22,6 +22,7 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("provider");
     expect(json).toContain("workspace_path");
     expect(json).toContain("manual_path");
+    expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
   });
 
   it("renders a compact plan review card with approval actions", () => {
@@ -53,5 +54,24 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("revision_note");
     expect(json).toContain("multiline");
     expect(json).toContain("act:/workbench plan revise submit");
+    expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
   });
 });
+
+function formElements(card: unknown): Array<Record<string, unknown>> {
+  if (!isRecord(card) || !isRecord(card.body) || !Array.isArray(card.body.elements)) {
+    return [];
+  }
+  return card.body.elements
+    .filter(isRecord)
+    .filter((element) => element.tag === "form")
+    .flatMap((form) => (Array.isArray(form.elements) ? form.elements.filter(isRecord) : []));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOwnProperty(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}

@@ -57,14 +57,12 @@ type FeishuFormElement =
   | {
       tag: "select_static";
       name: string;
-      label: FeishuPlainText;
       placeholder: FeishuPlainText;
       options: FeishuSelectOption[];
     }
   | {
       tag: "input";
       name: string;
-      label: FeishuPlainText;
       placeholder: FeishuPlainText;
       input_type?: "multiline";
     };
@@ -103,7 +101,13 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuW
       elements: [
         {
           tag: "markdown",
-          content: "这个群还没有绑定工作目录。请选择常用目录，或直接输入一个本机目录。"
+          content: [
+            "这个群还没有绑定工作目录。请选择常用目录，或直接输入一个本机目录。",
+            "",
+            "**Agent**：选择本次使用的本地 agent。",
+            "**常用目录**：来自 `~/.feegle/config.jsonc` 的快捷项。",
+            "**手动输入目录**：会优先于常用目录。"
+          ].join("\n")
         },
         {
           tag: "form",
@@ -112,14 +116,12 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuW
             {
               tag: "select_static",
               name: "provider",
-              label: plainText("Agent"),
               placeholder: plainText("选择 Agent"),
               options: input.providers.map((provider) => ({ text: plainText(provider), value: provider }))
             },
             {
               tag: "select_static",
               name: "workspace_path",
-              label: plainText("常用目录"),
               placeholder: plainText("选择常用目录"),
               options: input.workspaces.map((workspace) => ({
                 text: plainText(workspace.label),
@@ -129,7 +131,6 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuW
             {
               tag: "input",
               name: "manual_path",
-              label: plainText("手动输入目录"),
               placeholder: plainText("/Users/yb/Desktop/code/project")
             }
           ],
@@ -199,7 +200,7 @@ export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput
       elements: [
         {
           tag: "markdown",
-          content: "请输入需要调整的内容。提交后会生成新的计划文件版本。"
+          content: "请输入需要调整的内容。提交后会生成新的计划文件版本。\n\n**修改意见**：支持多行输入。"
         },
         {
           tag: "form",
@@ -208,7 +209,6 @@ export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput
             {
               tag: "input",
               name: "revision_note",
-              label: plainText("修改意见"),
               placeholder: plainText("例如：补充 Playwright 验证；拆小数据库迁移步骤"),
               input_type: "multiline"
             }
