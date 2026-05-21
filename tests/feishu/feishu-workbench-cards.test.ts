@@ -60,6 +60,35 @@ describe("buildDirectorySetupCard", () => {
     expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
+  it("renders a URL button opening the cloud doc when docUrl is provided", () => {
+    const card = buildPlanReviewCard({
+      planId: "plan_1",
+      title: "Fix startup",
+      version: 1,
+      summary: { steps: 3, risks: [] },
+      docUrl: "https://feishu.cn/docx/doxcn_xyz"
+    });
+
+    const json = JSON.stringify(card);
+    expect(json).toContain("打开云文档");
+    expect(json).toContain("https://feishu.cn/docx/doxcn_xyz");
+    const docButtonIdx = json.indexOf("打开云文档");
+    const approveButtonIdx = json.indexOf("确认计划");
+    expect(docButtonIdx).toBeGreaterThan(-1);
+    expect(approveButtonIdx).toBeGreaterThan(docButtonIdx);
+  });
+
+  it("omits the doc button when docUrl is not provided", () => {
+    const card = buildPlanReviewCard({
+      planId: "plan_1",
+      title: "Fix startup",
+      version: 1,
+      summary: { steps: 3, risks: [] }
+    });
+
+    expect(JSON.stringify(card)).not.toContain("打开云文档");
+  });
+
   it("renders a multiline plan revision request form", () => {
     const card = buildPlanRevisionRequestCard({ planId: "plan_1", version: 1 });
 

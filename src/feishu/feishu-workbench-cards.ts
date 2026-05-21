@@ -21,6 +21,7 @@ export interface PlanReviewCardInput {
   title: string;
   version: number;
   summary: PlanReviewSummary;
+  docUrl?: string;
 }
 
 export interface PlanReviewSummary {
@@ -90,7 +91,13 @@ interface FeishuButtonElement {
   tag: "button";
   text: FeishuPlainText;
   type: "default" | "primary" | "danger";
-  value: Record<string, string>;
+  value?: Record<string, string>;
+  multi_url?: {
+    url: string;
+    pc_url: string;
+    ios_url: string;
+    android_url: string;
+  };
 }
 
 export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuWorkbenchCard {
@@ -176,6 +183,16 @@ export function buildDirectorySavedCard(input: DirectorySavedCardInput): FeishuW
 }
 
 export function buildPlanReviewCard(input: PlanReviewCardInput): FeishuWorkbenchCard {
+  const actions: FeishuButtonElement[] = [];
+  if (input.docUrl) {
+    actions.push(docUrlButton(input.docUrl));
+  }
+  actions.push(
+    planActionButton("确认计划", "primary", "act:/workbench plan approve", input),
+    planActionButton("要求修改", "default", "act:/workbench plan revise", input),
+    planActionButton("取消", "danger", "act:/workbench plan cancel", input)
+  );
+
   return {
     schema: "2.0",
     config: {
@@ -195,16 +212,12 @@ export function buildPlanReviewCard(input: PlanReviewCardInput): FeishuWorkbench
             `**步骤数**：${input.summary.steps}`,
             `**风险点**：${renderRisks(input.summary.risks)}`,
             "",
-            "完整计划已作为文件发送到群里。"
+            input.docUrl ? "点击下方按钮打开飞书云文档查看完整计划。" : "完整计划已作为文件发送到群里。"
           ].join("\n")
         },
         {
           tag: "action",
-          actions: [
-            planActionButton("确认计划", "primary", "act:/workbench plan approve", input),
-            planActionButton("要求修改", "default", "act:/workbench plan revise", input),
-            planActionButton("取消", "danger", "act:/workbench plan cancel", input)
-          ]
+          actions
         }
       ]
     }
@@ -275,6 +288,20 @@ function directorySubmitButton(interactionId: string): FeishuFormSubmitButton {
     value: {
       action: "act:/workbench directory submit",
       interaction_id: interactionId
+    }
+  };
+}
+
+function docUrlButton(docUrl: string): FeishuButtonElement {
+  return {
+    tag: "button",
+    text: plainText("打开云文档"),
+    type: "primary",
+    multi_url: {
+      url: docUrl,
+      pc_url: docUrl,
+      ios_url: docUrl,
+      android_url: docUrl
     }
   };
 }
