@@ -50,7 +50,6 @@ type FeishuWorkbenchCardElement =
       tag: "form";
       name: string;
       elements: FeishuFormElement[];
-      submit: FeishuFormSubmitButton;
     };
 
 type FeishuFormElement =
@@ -65,7 +64,8 @@ type FeishuFormElement =
       name: string;
       placeholder: FeishuPlainText;
       input_type?: "multiline";
-    };
+    }
+  | FeishuFormSubmitButton;
 
 interface FeishuSelectOption {
   text: FeishuPlainText;
@@ -76,6 +76,8 @@ interface FeishuFormSubmitButton {
   tag: "button";
   text: FeishuPlainText;
   type: "primary";
+  action_type: "form_submit";
+  name: string;
   value: Record<string, string>;
 }
 
@@ -132,17 +134,9 @@ export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuW
               tag: "input",
               name: "manual_path",
               placeholder: plainText("/Users/yb/Desktop/code/project")
-            }
-          ],
-          submit: {
-            tag: "button",
-            text: plainText("保存并继续"),
-            type: "primary",
-            value: {
-              action: "act:/workbench directory submit",
-              interaction_id: input.interactionId
-            }
-          }
+            },
+            directorySubmitButton(input.interactionId)
+          ]
         }
       ]
     }
@@ -211,20 +205,40 @@ export function buildPlanRevisionRequestCard(input: PlanRevisionRequestCardInput
               name: "revision_note",
               placeholder: plainText("例如：补充 Playwright 验证；拆小数据库迁移步骤"),
               input_type: "multiline"
-            }
-          ],
-          submit: {
-            tag: "button",
-            text: plainText("生成新版本"),
-            type: "primary",
-            value: {
-              action: "act:/workbench plan revise submit",
-              plan_id: input.planId,
-              version: String(input.version)
-            }
-          }
+            },
+            planRevisionSubmitButton(input)
+          ]
         }
       ]
+    }
+  };
+}
+
+function directorySubmitButton(interactionId: string): FeishuFormSubmitButton {
+  return {
+    tag: "button",
+    text: plainText("保存并继续"),
+    type: "primary",
+    action_type: "form_submit",
+    name: "submit_directory",
+    value: {
+      action: "act:/workbench directory submit",
+      interaction_id: interactionId
+    }
+  };
+}
+
+function planRevisionSubmitButton(input: PlanRevisionRequestCardInput): FeishuFormSubmitButton {
+  return {
+    tag: "button",
+    text: plainText("生成新版本"),
+    type: "primary",
+    action_type: "form_submit",
+    name: "submit_revision",
+    value: {
+      action: "act:/workbench plan revise submit",
+      plan_id: input.planId,
+      version: String(input.version)
     }
   };
 }

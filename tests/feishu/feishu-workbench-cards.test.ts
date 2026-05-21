@@ -22,7 +22,19 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("provider");
     expect(json).toContain("workspace_path");
     expect(json).toContain("manual_path");
+    expect(formContainers(card).some((form) => hasOwnProperty(form, "submit"))).toBe(false);
     expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
+    expect(formElements(card)).toContainEqual(
+      expect.objectContaining({
+        tag: "button",
+        action_type: "form_submit",
+        name: "submit_directory",
+        value: expect.objectContaining({
+          action: "act:/workbench directory submit",
+          interaction_id: "pi_1"
+        })
+      })
+    );
   });
 
   it("renders a compact plan review card with approval actions", () => {
@@ -54,17 +66,32 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("revision_note");
     expect(json).toContain("multiline");
     expect(json).toContain("act:/workbench plan revise submit");
+    expect(formContainers(card).some((form) => hasOwnProperty(form, "submit"))).toBe(false);
     expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
+    expect(formElements(card)).toContainEqual(
+      expect.objectContaining({
+        tag: "button",
+        action_type: "form_submit",
+        name: "submit_revision",
+        value: expect.objectContaining({
+          action: "act:/workbench plan revise submit",
+          plan_id: "plan_1",
+          version: "1"
+        })
+      })
+    );
   });
 });
 
-function formElements(card: unknown): Array<Record<string, unknown>> {
+function formContainers(card: unknown): Array<Record<string, unknown>> {
   if (!isRecord(card) || !isRecord(card.body) || !Array.isArray(card.body.elements)) {
     return [];
   }
-  return card.body.elements
-    .filter(isRecord)
-    .filter((element) => element.tag === "form")
+  return card.body.elements.filter(isRecord).filter((element) => element.tag === "form");
+}
+
+function formElements(card: unknown): Array<Record<string, unknown>> {
+  return formContainers(card)
     .flatMap((form) => (Array.isArray(form.elements) ? form.elements.filter(isRecord) : []));
 }
 
