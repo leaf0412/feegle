@@ -491,3 +491,235 @@ describe("PlanExecutionService.reviseExecution", () => {
     expect((reply as any).text).toContain("当前状态不允许");
   });
 });
+
+describe("PlanExecutionService.push / cancel / cleanup", () => {
+  let home: string;
+  let db: RuntimeDb;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "feegle-plan-exec-"));
+    db = openRuntimeDb(join(home, "feegle.db"));
+  });
+
+  afterEach(async () => {
+    db.close();
+    await rm(home, { recursive: true, force: true });
+  });
+
+  it("push success transitions completed -> pushed and updates with success card", async () => {
+    const store = new PlanArtifactStore(db, () => new Date());
+    seedCompleted(store, "plan_p1");
+
+    const updates: unknown[] = [];
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: {
+        sendInteractiveCard: async () => "msg",
+        updateInteractiveCard: async (_messageId, card) => {
+          updates.push(card);
+        }
+      },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => ["main"],
+        getBranchSha: async () => "x",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async () => undefined,
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 1, filesChanged: 1 }),
+        push: async () => undefined
+      } as any,
+      agent: {} as any
+    });
+
+    await service.push("plan_p1");
+
+    expect(store.latest("plan_p1")?.status).toBe("pushed");
+    const json = JSON.stringify(updates.at(-1));
+    expect(json).toContain("已推送");
+    expect(json).toContain("act:/workbench plan cleanup");
+  });
+
+  it("push failure keeps status completed and renders failure card", async () => {
+    const store = new PlanArtifactStore(db, () => new Date());
+    seedCompleted(store, "plan_p2");
+    const updates: unknown[] = [];
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: {
+        sendInteractiveCard: async () => "msg",
+        updateInteractiveCard: async (_messageId, card) => {
+          updates.push(card);
+        }
+      },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => ["main"],
+        getBranchSha: async () => "x",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async () => undefined,
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 0, filesChanged: 0 }),
+        push: async () => {
+          throw new Error("remote: error: hook declined\n");
+        }
+      } as any,
+      agent: {} as any
+    });
+
+    await service.push("plan_p2");
+
+    expect(store.latest("plan_p2")?.status).toBe("completed");
+    expect(JSON.stringify(updates.at(-1))).toContain("hook declined");
+  });
+
+  it("cancel on pending_review just flips status, no removeWorktree", async () => {
+    const store = new PlanArtifactStore(db, () => new Date());
+    store.createVersion({
+      planId: "plan_c",
+      chatId: "oc",
+      sourceMessageId: "om",
+      provider: "codex",
+      workspacePath: "/tmp/ws",
+      version: 1,
+      filePath: "/tmp/ws/plan.md",
+      status: "pending_review"
+    });
+    let removeCalled = false;
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: { sendInteractiveCard: async () => "m", updateInteractiveCard: async () => undefined },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => [],
+        getBranchSha: async () => "x",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async () => {
+          removeCalled = true;
+        },
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 0, filesChanged: 0 }),
+        push: async () => undefined
+      } as any,
+      agent: {} as any
+    });
+
+    await service.cancel("plan_c");
+
+    expect(store.latest("plan_c")?.status).toBe("cancelled");
+    expect(removeCalled).toBe(false);
+  });
+
+  it("cancel on completed runs removeWorktree", async () => {
+    const store = new PlanArtifactStore(db, () => new Date());
+    seedCompleted(store, "plan_c2");
+    let removedAt = "";
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: { sendInteractiveCard: async () => "m", updateInteractiveCard: async () => undefined },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => [],
+        getBranchSha: async () => "x",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async (_repo: string, path: string) => {
+          removedAt = path as string;
+        },
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 0, filesChanged: 0 }),
+        push: async () => undefined
+      } as any,
+      agent: {} as any
+    });
+
+    await service.cancel("plan_c2");
+
+    expect(store.latest("plan_c2")?.status).toBe("cancelled");
+    expect(removedAt).toBe("/tmp/wt/p");
+  });
+
+  it("cleanup on pushed transitions to cleaned and runs removeWorktree", async () => {
+    const store = new PlanArtifactStore(db, () => new Date());
+    seedCompleted(store, "plan_cl");
+    store.setStatus("plan_cl", { status: "pushed", expectedStatus: "completed" });
+
+    let removed = false;
+    const service = new PlanExecutionService({
+      feegleHome: home,
+      client: { sendInteractiveCard: async () => "m", updateInteractiveCard: async () => undefined },
+      store,
+      git: {
+        getRepoRoot: async () => "/tmp/ws",
+        listRemoteBranches: async () => [],
+        getBranchSha: async () => "x",
+        branchExists: async () => true,
+        createWorktree: async () => undefined,
+        removeWorktree: async () => {
+          removed = true;
+        },
+        isClean: async () => true,
+        diffStats: async () => ({ commitCount: 0, filesChanged: 0 }),
+        push: async () => undefined
+      } as any,
+      agent: {} as any
+    });
+
+    await service.cleanup("plan_cl");
+
+    expect(store.latest("plan_cl")?.status).toBe("cleaned");
+    expect(removed).toBe(true);
+  });
+});
+
+function seedCompleted(store: PlanArtifactStore, planId: string) {
+  store.createVersion({
+    planId,
+    chatId: "oc",
+    sourceMessageId: "om",
+    provider: "codex",
+    workspacePath: "/tmp/ws",
+    version: 1,
+    filePath: "/tmp/ws/plan.md",
+    status: "pending_review"
+  });
+  store.setStatus(planId, { status: "pending_base", expectedStatus: "pending_review" });
+  store.setBaseBranch(planId, {
+    baseBranch: "main",
+    headBranch: "yb/feat/p",
+    expectedStatus: "pending_base"
+  });
+  store.setStatus(planId, { status: "approved", expectedStatus: "pending_base" });
+  store.setExecution(planId, {
+    baseSha: "b",
+    headBranch: "yb/feat/p",
+    worktreePath: "/tmp/wt/p",
+    progressCardMessageId: "msg",
+    status: "executing",
+    expectedStatus: "approved"
+  });
+  store.appendIterationNote(planId, {
+    iteration: 1,
+    note: null,
+    headShaBefore: null,
+    headShaAfter: "h",
+    commitCountDelta: 1,
+    filesChangedDelta: 1,
+    startedAt: "a",
+    completedAt: "b"
+  });
+  store.setHeadInfo(planId, {
+    headSha: "h",
+    commitCount: 1,
+    filesChanged: 1,
+    status: "completed",
+    expectedStatus: "executing"
+  });
+}

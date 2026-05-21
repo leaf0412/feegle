@@ -5,6 +5,7 @@ import {
   buildBaseBranchPromptCard,
   buildPlanCompletedCard,
   buildPlanProgressCard,
+  buildPlanPushResultCard,
   type PlanProgressStage
 } from "../feishu/feishu-workbench-cards.js";
 import type { GitService } from "../git/git-service.js";
@@ -168,6 +169,109 @@ export class PlanExecutionService {
     this.deps.store.bumpIteration(planId, "completed", "executing");
     void this.runIteration(planId, note);
     return undefined;
+  }
+
+  async push(planId: string): Promise<PlanExecutionReply | undefined> {
+    const plan = this.deps.store.latest(planId);
+    if (!plan) return { kind: "text", text: `计划不存在：${planId}` };
+    if (plan.status !== "completed") {
+      return { kind: "text", text: `当前状态不允许推送（status=${plan.status}）` };
+    }
+    if (!plan.worktreePath || !plan.headBranch) {
+      return { kind: "text", text: "执行状态损坏：缺少 worktree / head branch" };
+    }
+
+    try {
+      await this.deps.git.push(plan.worktreePath, plan.headBranch);
+      this.deps.store.setStatus(planId, {
+        status: "pushed",
+        expectedStatus: "completed"
+      });
+      await this.renderPushResult(plan, true);
+      return undefined;
+    } catch (error) {
+      const stderr = error instanceof Error ? error.message : String(error);
+      await this.renderPushResult(plan, false, stderr);
+      return undefined;
+    }
+  }
+
+  async cancel(planId: string): Promise<PlanExecutionReply | undefined> {
+    const plan = this.deps.store.latest(planId);
+    if (!plan) return { kind: "text", text: `计划不存在：${planId}` };
+    if (TERMINAL_STATUSES.includes(plan.status)) {
+      return { kind: "text", text: `该计划已结束（status=${plan.status}）` };
+    }
+    if (plan.status === "executing") {
+      return { kind: "text", text: "执行中不能拒绝，请等待完成" };
+    }
+
+    if (plan.status === "completed" && plan.worktreePath) {
+      try {
+        await this.deps.git.removeWorktree(await this.deps.git.getRepoRoot(plan.workspacePath), plan.worktreePath);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.deps.store.setStatus(planId, {
+          status: "cancelled",
+          expectedStatus: "completed",
+          errorMessage: `cancelled with worktree-remove failure: ${msg}`
+        });
+        return { kind: "text", text: `已标记拒绝；worktree 删除失败：${msg}` };
+      }
+      this.deps.store.setStatus(planId, {
+        status: "cancelled",
+        expectedStatus: "completed"
+      });
+      return { kind: "text", text: "已拒绝；worktree 已删除，分支保留在主仓库 reflog 中" };
+    }
+
+    this.deps.store.setStatus(planId, {
+      status: "cancelled",
+      expectedStatus: plan.status
+    });
+    return { kind: "text", text: "已取消计划" };
+  }
+
+  async cleanup(planId: string): Promise<PlanExecutionReply | undefined> {
+    const plan = this.deps.store.latest(planId);
+    if (!plan) return { kind: "text", text: `计划不存在：${planId}` };
+    if (plan.status !== "completed" && plan.status !== "pushed") {
+      return { kind: "text", text: `当前状态不允许清理（status=${plan.status}）` };
+    }
+    if (!plan.worktreePath) {
+      this.deps.store.setStatus(planId, {
+        status: "cleaned",
+        expectedStatus: plan.status
+      });
+      return { kind: "text", text: "无 worktree 需要清理" };
+    }
+
+    const repoRoot = await this.deps.git.getRepoRoot(plan.workspacePath);
+    await this.deps.git.removeWorktree(repoRoot, plan.worktreePath);
+    this.deps.store.setStatus(planId, {
+      status: "cleaned",
+      expectedStatus: plan.status
+    });
+    return { kind: "text", text: "已清理 worktree" };
+  }
+
+  private async renderPushResult(
+    plan: Pick<PlanArtifact, "planId" | "version" | "headBranch" | "progressCardMessageId">,
+    success: boolean,
+    stderr?: string
+  ): Promise<void> {
+    if (!plan.progressCardMessageId || !plan.headBranch) return;
+    await this.deps.client.updateInteractiveCard(
+      plan.progressCardMessageId,
+      buildPlanPushResultCard({
+        planId: plan.planId,
+        version: plan.version,
+        title: plan.planId,
+        headBranch: plan.headBranch,
+        success,
+        ...(stderr ? { stderr } : {})
+      })
+    );
   }
 
   private composeWorktreePath(repoRoot: string, planId: string): string {
