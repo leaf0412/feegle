@@ -144,6 +144,15 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchWorkbenchPlanRevisionSubmit(input, command);
       case "workbench_plan_revise":
         return this.dispatchWorkbenchPlanRevise(input, command);
+      case "workbench_plan_approve":
+      case "workbench_plan_cancel":
+      case "workbench_plan_reject":
+      case "workbench_plan_push":
+      case "workbench_plan_cleanup":
+      case "workbench_plan_base_branch_submit":
+      case "workbench_plan_revise_execution":
+      case "workbench_plan_revise_execution_submit":
+        return { kind: "text", text: `计划 ${command.type} 处理器尚未接入` };
       case "chat":
         return undefined;
       case "repo_select":

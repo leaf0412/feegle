@@ -26,6 +26,25 @@ export type FeishuCommand =
       planId: string;
       version: number;
     }
+  | { type: "workbench_plan_approve"; planId: string; version: number }
+  | { type: "workbench_plan_cancel"; planId: string; version: number }
+  | { type: "workbench_plan_reject"; planId: string; version: number }
+  | { type: "workbench_plan_push"; planId: string; version: number }
+  | { type: "workbench_plan_cleanup"; planId: string; version: number }
+  | {
+      type: "workbench_plan_base_branch_submit";
+      planId: string;
+      version: number;
+      baseBranch: string;
+      headBranch?: string;
+    }
+  | { type: "workbench_plan_revise_execution"; planId: string; version: number }
+  | {
+      type: "workbench_plan_revise_execution_submit";
+      planId: string;
+      version: number;
+      note: string;
+    }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -116,6 +135,69 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       type: "workbench_plan_revise",
       planId,
       version
+    };
+  }
+
+  const simplePlanActions = {
+    "act:/workbench plan approve": "workbench_plan_approve",
+    "act:/workbench plan cancel": "workbench_plan_cancel",
+    "act:/workbench plan reject": "workbench_plan_reject",
+    "act:/workbench plan push": "workbench_plan_push",
+    "act:/workbench plan cleanup": "workbench_plan_cleanup",
+    "act:/workbench plan revise_execution": "workbench_plan_revise_execution"
+  } as const;
+  if (typeof value.action === "string" && value.action in simplePlanActions) {
+    const planId = value.plan_id;
+    const version = parsePositiveInteger(value.version);
+    if (typeof planId !== "string" || planId === "" || version === undefined) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return {
+      type: simplePlanActions[value.action as keyof typeof simplePlanActions],
+      planId,
+      version
+    };
+  }
+
+  if (value.action === "act:/workbench plan base_branch_submit") {
+    const planId = value.plan_id;
+    const version = parsePositiveInteger(value.version);
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    const manual = typeof formValue.base_branch_manual === "string" ? formValue.base_branch_manual.trim() : "";
+    const selected = typeof formValue.base_branch === "string" ? formValue.base_branch.trim() : "";
+    const baseBranch = manual || selected;
+    const headBranchRaw = typeof formValue.head_branch === "string" ? formValue.head_branch.trim() : "";
+    if (typeof planId !== "string" || planId === "" || version === undefined || baseBranch === "") {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return {
+      type: "workbench_plan_base_branch_submit",
+      planId,
+      version,
+      baseBranch,
+      ...(headBranchRaw ? { headBranch: headBranchRaw } : {})
+    };
+  }
+
+  if (value.action === "act:/workbench plan revise_execution_submit") {
+    const planId = value.plan_id;
+    const version = parsePositiveInteger(value.version);
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    const note = formValue.revision_note;
+    if (
+      typeof planId !== "string" ||
+      planId === "" ||
+      version === undefined ||
+      typeof note !== "string" ||
+      note.trim() === ""
+    ) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return {
+      type: "workbench_plan_revise_execution_submit",
+      planId,
+      version,
+      note
     };
   }
 

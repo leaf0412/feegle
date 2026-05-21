@@ -157,4 +157,107 @@ describe("parseFeishuCommand", () => {
       version: 1
     });
   });
+
+  it("parses approve action", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan approve",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_approve", planId: "plan_1", version: 1 });
+  });
+
+  it("parses cancel action (review-stage)", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan cancel",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_cancel", planId: "plan_1", version: 1 });
+  });
+
+  it("parses reject action (completed-stage)", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan reject",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_reject", planId: "plan_1", version: 1 });
+  });
+
+  it("parses push / cleanup actions", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan push",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_push", planId: "plan_1", version: 1 });
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan cleanup",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_cleanup", planId: "plan_1", version: 1 });
+  });
+
+  it("parses base_branch_submit with manual override + head_branch", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan base_branch_submit",
+        plan_id: "plan_1",
+        version: "1",
+        form_value: { base_branch: "main", base_branch_manual: "  ", head_branch: "yb/feat/x" }
+      })
+    ).toEqual({
+      type: "workbench_plan_base_branch_submit",
+      planId: "plan_1",
+      version: 1,
+      baseBranch: "main",
+      headBranch: "yb/feat/x"
+    });
+  });
+
+  it("base_branch_submit prefers manual input over select", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan base_branch_submit",
+        plan_id: "plan_1",
+        version: "1",
+        form_value: { base_branch: "main", base_branch_manual: "develop" }
+      })
+    ).toEqual({
+      type: "workbench_plan_base_branch_submit",
+      planId: "plan_1",
+      version: 1,
+      baseBranch: "develop"
+    });
+  });
+
+  it("parses revise_execution + revise_execution_submit", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan revise_execution",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({ type: "workbench_plan_revise_execution", planId: "plan_1", version: 1 });
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan revise_execution_submit",
+        plan_id: "plan_1",
+        version: "1",
+        form_value: { revision_note: "增加错误处理\n第二行" }
+      })
+    ).toEqual({
+      type: "workbench_plan_revise_execution_submit",
+      planId: "plan_1",
+      version: 1,
+      note: "增加错误处理\n第二行"
+    });
+  });
 });
