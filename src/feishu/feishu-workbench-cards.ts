@@ -61,6 +61,29 @@ export interface PlanProgressCardInput {
   errorMessage?: string;
 }
 
+export interface PlanCompletedCardIterationSummary {
+  iteration: number;
+  note: string | null;
+}
+
+export interface PlanCompletedCardInput {
+  planId: string;
+  version: number;
+  title: string;
+  headBranch: string;
+  worktreePath: string;
+  iteration: number;
+  commitCount: number;
+  filesChanged: number;
+  iterationNotes: PlanCompletedCardIterationSummary[];
+}
+
+export interface PlanExecutionRevisionCardInput {
+  planId: string;
+  version: number;
+  iteration: number;
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -377,6 +400,87 @@ export function buildPlanProgressCard(input: PlanProgressCardInput): FeishuWorkb
   };
 }
 
+export function buildPlanCompletedCard(input: PlanCompletedCardInput): FeishuWorkbenchCard {
+  const iterationLines = input.iterationNotes
+    .slice(-5)
+    .map((entry) =>
+      entry.note ? `- 迭代 ${entry.iteration}：${entry.note}` : `- 迭代 ${entry.iteration}：(首次执行)`
+    )
+    .join("\n");
+
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "green", title: plainText(`${input.title} · 执行完成`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `**分支**：\`${input.headBranch}\``,
+            `**Commits**：${input.commitCount}`,
+            `**修改文件**：${input.filesChanged}`,
+            `**迭代**：当前为迭代 ${input.iteration}`,
+            `**Worktree 路径**：\`${input.worktreePath}\``,
+            "",
+            "**历次意见**：",
+            iterationLines
+          ].join("\n")
+        },
+        {
+          tag: "action",
+          actions: [
+            completedActionButton("继续调整", "default", "act:/workbench plan revise_execution", input),
+            completedActionButton("推送", "primary", "act:/workbench plan push", input),
+            completedActionButton("拒绝", "danger", "act:/workbench plan reject", input),
+            completedActionButton("清理", "default", "act:/workbench plan cleanup", input)
+          ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildPlanExecutionRevisionCard(input: PlanExecutionRevisionCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "orange", title: plainText(`继续调整 · 迭代 ${input.iteration + 1}`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: "请输入需要 agent 在现有代码基础上调整的内容。提交后会生成新的 iteration。"
+        },
+        {
+          tag: "form",
+          name: "workbench_plan_execution_revision",
+          elements: [
+            {
+              tag: "input",
+              name: "revision_note",
+              placeholder: plainText("例如：补充错误处理；去掉不需要的 try/catch"),
+              input_type: "multiline"
+            },
+            {
+              tag: "button",
+              text: plainText("再跑一次"),
+              type: "primary",
+              action_type: "form_submit",
+              name: "submit_execution_revision",
+              value: {
+                action: "act:/workbench plan revise_execution_submit",
+                plan_id: input.planId,
+                version: String(input.version)
+              }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
 export function assertValidFeishuWorkbenchCard(card: unknown): asserts card is FeishuWorkbenchCard {
   const violations: string[] = [];
   for (const form of formElements(card)) {
@@ -448,6 +552,24 @@ function baseBranchSubmitButton(input: BaseBranchPromptCardInput): FeishuFormSub
     name: "submit_base_branch",
     value: {
       action: "act:/workbench plan base_branch_submit",
+      plan_id: input.planId,
+      version: String(input.version)
+    }
+  };
+}
+
+function completedActionButton(
+  text: string,
+  type: FeishuButtonElement["type"],
+  action: string,
+  input: Pick<PlanCompletedCardInput, "planId" | "version">
+): FeishuButtonElement {
+  return {
+    tag: "button",
+    text: plainText(text),
+    type,
+    value: {
+      action,
       plan_id: input.planId,
       version: String(input.version)
     }

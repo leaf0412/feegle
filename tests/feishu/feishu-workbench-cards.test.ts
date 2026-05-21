@@ -4,6 +4,8 @@ import {
   buildDirectorySavedCard,
   buildDirectorySetupCard,
   buildBaseBranchPromptCard,
+  buildPlanCompletedCard,
+  buildPlanExecutionRevisionCard,
   buildPlanProgressCard,
   buildPlanReviewCard,
   buildPlanRevisionRequestCard
@@ -186,6 +188,44 @@ describe("buildDirectorySetupCard", () => {
     expect(json).toContain("executing");
     expect(json).toContain("reading src/app/feegle-app.ts");
     expect(card.body.elements.some((el) => el.tag === "action")).toBe(false);
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds a plan completed card with branch / commit / files / worktree + 4 action buttons", () => {
+    const card = buildPlanCompletedCard({
+      planId: "plan_1",
+      version: 1,
+      title: "Fix startup",
+      headBranch: "yb/feat/fix_startup",
+      worktreePath: "/Users/yb/.feegle/worktrees/feegle/plan_1",
+      iteration: 2,
+      commitCount: 3,
+      filesChanged: 7,
+      iterationNotes: [
+        { iteration: 1, note: null },
+        { iteration: 2, note: "增加错误处理" }
+      ]
+    });
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("yb/feat/fix_startup");
+    expect(json).toContain("3");
+    expect(json).toContain("7");
+    expect(json).toContain("/Users/yb/.feegle/worktrees/feegle/plan_1");
+    expect(json).toContain("增加错误处理");
+    expect(json).toContain("act:/workbench plan revise_execution");
+    expect(json).toContain("act:/workbench plan push");
+    expect(json).toContain("act:/workbench plan reject");
+    expect(json).toContain("act:/workbench plan cleanup");
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds an execution revision request card", () => {
+    const card = buildPlanExecutionRevisionCard({ planId: "plan_1", version: 1, iteration: 2 });
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("act:/workbench plan revise_execution_submit");
+    expect(json).toContain("plan_1");
     assertValidFeishuWorkbenchCard(card);
   });
 });
