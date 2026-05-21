@@ -105,4 +105,24 @@ describe("parseFeishuCommand", () => {
       sessionKey: "feishu:oc_1:channel"
     });
   });
+
+  it("parses workbench directory setup form submissions", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench directory submit",
+        interaction_id: "pi_1",
+        form_value: {
+          provider: "codex",
+          workspace_path: "/repo/shortcut",
+          manual_path: "/repo/manual"
+        }
+      })
+    ).toEqual({
+      type: "workbench_directory_submit",
+      interactionId: "pi_1",
+      provider: "codex",
+      workspacePath: "/repo/shortcut",
+      manualPath: "/repo/manual"
+    });
+  });
 });

@@ -8,6 +8,13 @@ export type FeishuCommand =
   | { type: "chat"; raw: string }
   | { type: "repo_select"; repositoryIds: string[] }
   | { type: "push_repository"; requirementId: string; repositoryId: string }
+  | {
+      type: "workbench_directory_submit";
+      interactionId: string;
+      provider?: string;
+      workspacePath?: string;
+      manualPath?: string;
+    }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -50,6 +57,22 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
     return { type: "unknown", raw: stringifyUnknown(value) };
   }
 
+  if (value.action === "act:/workbench directory submit") {
+    const interactionId = value.interaction_id;
+    if (typeof interactionId !== "string" || interactionId === "") {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    return {
+      type: "workbench_directory_submit",
+      interactionId,
+      ...optionalString("provider", formValue.provider),
+      ...optionalString("workspacePath", formValue.workspace_path),
+      ...optionalString("manualPath", formValue.manual_path)
+    };
+  }
+
   if (typeof value.action === "string") {
     const action = parsePlatformAction(value.action);
     if (action.kind !== "unknown") {
@@ -70,6 +93,16 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
   }
 
   return { type: "unknown", raw: stringifyUnknown(value) };
+}
+
+function optionalString(
+  key: "provider" | "workspacePath" | "manualPath",
+  value: unknown
+): Record<typeof key, string> | Record<string, never> {
+  if (typeof value !== "string" || value === "") {
+    return {};
+  }
+  return { [key]: value } as Record<typeof key, string>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

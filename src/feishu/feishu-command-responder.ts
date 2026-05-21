@@ -122,6 +122,11 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
           kind: "text",
           text: `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`
         };
+      case "workbench_directory_submit":
+        return {
+          kind: "text",
+          text: "已收到工作目录设置，当前入口还没有接入保存执行器。"
+        };
       case "unknown":
         return { kind: "text", text: `未知命令：${command.raw}` };
       default: {
