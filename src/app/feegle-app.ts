@@ -73,6 +73,7 @@ export class FeegleApp {
     this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
     const configStore = await (this.deps.loadConfigStore ?? ConfigStore.load)(this.deps.feegleHome);
     const providerStore = await ProviderStore.load(this.deps.feegleHome);
+    const config = configStore.get();
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
     const chatHistory = new ChatHistoryStore();
     const aliasStore = await AliasStore.load(this.deps.feegleHome);
@@ -83,7 +84,7 @@ export class FeegleApp {
       this.deps.agentProviders ??
       (this.deps.loadAgentProviders
         ? await this.deps.loadAgentProviders(this.deps.feegleHome)
-        : buildAgentProviderRegistry({ store: providerStore }));
+        : buildAgentProviderRegistry({ store: providerStore, config: config.agent }));
     const stockStore = await StockStore.load(this.deps.feegleHome);
     const dedupStore = await DedupStore.load(this.deps.feegleHome);
     const runsLog = await RunsLog.open(this.deps.feegleHome);

@@ -18,7 +18,7 @@ export type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
 const CodexRecordSchema = z.object({
   kind: z.literal("codex"),
   command: z.string().min(1).optional(),
-  cwd: z.string().min(1),
+  cwd: z.string().min(1).optional(),
   sandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).optional(),
   approvalPolicy: z.enum(["untrusted", "on-request", "never"]).optional(),
   timeoutMs: z.number().positive().optional(),
@@ -30,7 +30,7 @@ const CodexRecordSchema = z.object({
 const ClaudeCodeRecordSchema = z.object({
   kind: z.literal("claude_code"),
   command: z.string().min(1).optional(),
-  cwd: z.string().min(1),
+  cwd: z.string().min(1).optional(),
   timeoutMs: z.number().positive().optional(),
   model: z.string().min(1).optional(),
   mode: z.enum(CLAUDE_PERMISSION_MODES).optional(),

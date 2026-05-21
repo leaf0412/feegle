@@ -76,14 +76,18 @@ export class ProviderRegisterCommandHandler extends ProviderCommand {
     } catch (error) {
       return textReply(errorMessage(error));
     }
+    const cwd = coerced.cwd;
+    if (!cwd) {
+      return textReply("cwd 是必填字段。用法：/provider register <kind> cwd=<path> [k=v...]");
+    }
 
     try {
-      const info = await stat(coerced.cwd);
+      const info = await stat(cwd);
       if (!info.isDirectory()) {
-        return textReply(`cwd 必须是目录: ${coerced.cwd}`);
+        return textReply(`cwd 必须是目录: ${cwd}`);
       }
     } catch {
-      return textReply(`cwd 路径不存在: ${coerced.cwd}`);
+      return textReply(`cwd 路径不存在: ${cwd}`);
     }
 
     try {

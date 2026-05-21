@@ -27,6 +27,9 @@ export class MemoryCommandHandler implements SlashCommandHandler {
     if (!record) {
       return textReply(`找不到 ${active.kind} 的 provider 记录，请重新 /provider register。`);
     }
+    if (!record.cwd) {
+      return textReply(`${active.displayName} 未设置工作目录，无项目级记忆文件。请运行 /dir use <workspace> 绑定。`);
+    }
     const projectFile = projectMemoryFile(active.kind, record.cwd);
     const globalFile = globalMemoryFile(active.kind);
     const lines: string[] = [`🧠 ${active.displayName} 记忆文件`];
