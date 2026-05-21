@@ -21,6 +21,11 @@ export type FeishuCommand =
       version: number;
       revisionNote: string;
     }
+  | {
+      type: "workbench_plan_revise";
+      planId: string;
+      version: number;
+    }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -98,6 +103,19 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       planId,
       version,
       revisionNote
+    };
+  }
+
+  if (value.action === "act:/workbench plan revise") {
+    const planId = value.plan_id;
+    const version = parsePositiveInteger(value.version);
+    if (typeof planId !== "string" || planId === "" || version === undefined) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return {
+      type: "workbench_plan_revise",
+      planId,
+      version
     };
   }
 

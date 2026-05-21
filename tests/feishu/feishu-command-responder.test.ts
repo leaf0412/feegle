@@ -101,6 +101,41 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([{ messageId: "om_card", text: "已保存目录，正在继续处理原请求。" }]);
   });
 
+  it("updates the current card for workbench plan revision requests", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
+      registry: testRegistry(),
+      workbench: {
+        handleDirectorySubmit: async () => undefined,
+        handlePlanRevise: async () => ({
+          kind: "feishu_card_update",
+          card: { body: { elements: [{ tag: "form", name: "workbench_plan_revision" }] } }
+        })
+      }
+    });
+
+    await responder.handleCommand({
+      source: "card",
+      chatId: "oc_1",
+      messageId: "om_card",
+      command: {
+        type: "workbench_plan_revise",
+        planId: "plan_1",
+        version: 1
+      }
+    });
+
+    expect(replies).toEqual([]);
+    expect(progress).toEqual([
+      {
+        kind: "updateCard",
+        messageId: "om_card",
+        card: { body: { elements: [{ tag: "form", name: "workbench_plan_revision" }] } }
+      }
+    ]);
+  });
+
   it("dispatches cmd: card actions through the slash command registry", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });

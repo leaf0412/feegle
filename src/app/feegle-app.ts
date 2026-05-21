@@ -40,6 +40,9 @@ import { openRuntimeDb, type RuntimeDb } from "./runtime-db.js";
 import { ChatWorkspaceStore } from "../workbench/chat-workspace-store.js";
 import { PendingInteractionStore } from "../workbench/pending-interaction-store.js";
 import { DirectorySetupService } from "../workbench/directory-setup-service.js";
+import { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
+import { PlanArtifactService } from "../workbench/plan-artifact-service.js";
+import { buildPlanRevisionRequestCard } from "../feishu/feishu-workbench-cards.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -81,6 +84,7 @@ export class FeegleApp {
     this.runtimeDb = openRuntimeDb(join(this.deps.feegleHome, "feegle.db"));
     const chatWorkspaceStore = new ChatWorkspaceStore(this.runtimeDb);
     const pendingInteractionStore = new PendingInteractionStore(this.runtimeDb);
+    const planArtifactStore = new PlanArtifactStore(this.runtimeDb);
     const providerStore = await ProviderStore.load(this.deps.feegleHome);
     const config = configStore.get();
     const sessionStore = await SessionStore.load(this.deps.feegleHome);
@@ -175,6 +179,11 @@ export class FeegleApp {
       pendingInteractions: pendingInteractionStore,
       chatHandler
     });
+    const planArtifacts = new PlanArtifactService({
+      feegleHome: this.deps.feegleHome,
+      client: this.deps.feishuClient,
+      store: planArtifactStore
+    });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
       registry,
       chatHandler,
@@ -182,7 +191,29 @@ export class FeegleApp {
       configStore,
       taskRegistry,
       userDirectory,
-      workbench
+      workbench: {
+        handleDirectorySubmit: (input) => workbench.handleDirectorySubmit(input),
+        handlePlanRevise: async (input) => ({
+          kind: "feishu_card_update",
+          card: buildPlanRevisionRequestCard(input.command)
+        }),
+        handlePlanRevisionSubmit: async (input) => {
+          const current = planArtifactStore.latest(input.command.planId);
+          if (!current) {
+            return { kind: "text", text: `计划不存在：${input.command.planId}` };
+          }
+          const provider = agentProviders.resolve(current.provider);
+          if (!provider) {
+            return { kind: "text", text: `计划使用的 agent provider 不存在：${current.provider}` };
+          }
+          const artifact = await planArtifacts.revisePlan({
+            planId: input.command.planId,
+            revisionNote: input.command.revisionNote,
+            agent: provider.buildAgent()
+          });
+          return { kind: "text", text: `已生成计划 v${artifact.version}，请查看新文件和确认卡。` };
+        }
+      }
     });
     this.runtime = this.deps.runtimeFactory(responder);
     await this.runtime.start();

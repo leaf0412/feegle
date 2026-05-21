@@ -143,4 +143,18 @@ describe("parseFeishuCommand", () => {
       revisionNote: "Add Playwright verification\nCall out deployment risk"
     });
   });
+
+  it("parses workbench plan revise requests", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/workbench plan revise",
+        plan_id: "plan_1",
+        version: "1"
+      })
+    ).toEqual({
+      type: "workbench_plan_revise",
+      planId: "plan_1",
+      version: 1
+    });
+  });
 });

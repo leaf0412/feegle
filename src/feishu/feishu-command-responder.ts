@@ -11,7 +11,10 @@ import {
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
-import type { DirectorySetupSubmitHandler } from "../workbench/directory-setup-service.js";
+import type {
+  DirectorySetupSubmitHandler,
+  DirectorySetupSubmitInput
+} from "../workbench/directory-setup-service.js";
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -37,7 +40,30 @@ export interface FeishuCommandResponderOptions {
   configStore?: { get(): { failureTarget: unknown } };
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
   userDirectory?: FeishuUserDirectory;
-  workbench?: DirectorySetupSubmitHandler;
+  workbench?: FeishuWorkbenchHandler;
+}
+
+export type FeishuWorkbenchReply =
+  | SlashCommandReply
+  | { kind: "feishu_card"; card: unknown }
+  | { kind: "feishu_card_update"; card: unknown };
+
+export interface FeishuWorkbenchHandler extends DirectorySetupSubmitHandler {
+  handlePlanRevise?(input: PlanReviseInput): Promise<FeishuWorkbenchReply | undefined>;
+  handlePlanRevisionSubmit?(input: PlanRevisionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
+}
+
+export interface PlanReviseInput {
+  chatId: string;
+  messageId: string;
+  command: Extract<FeishuCommand, { type: "workbench_plan_revise" }>;
+}
+
+export interface PlanRevisionSubmitInput {
+  chatId: string;
+  messageId: string;
+  sender?: DirectorySetupSubmitInput["sender"];
+  command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>;
 }
 
 interface DispatchInput {
@@ -96,7 +122,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     );
   }
 
-  private async computeReply(input: DispatchInput): Promise<SlashCommandReply | undefined> {
+  private async computeReply(input: DispatchInput): Promise<FeishuWorkbenchReply | undefined> {
     const command = input.command;
     switch (command.type) {
       case "help":
@@ -115,10 +141,9 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "workbench_directory_submit":
         return this.dispatchWorkbenchDirectorySubmit(input, command);
       case "workbench_plan_revision_submit":
-        return {
-          kind: "text",
-          text: "已收到计划修改意见，当前入口还没有接入计划修订执行器。"
-        };
+        return this.dispatchWorkbenchPlanRevisionSubmit(input, command);
+      case "workbench_plan_revise":
+        return this.dispatchWorkbenchPlanRevise(input, command);
       case "chat":
         return undefined;
       case "repo_select":
@@ -143,11 +168,40 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   private async dispatchWorkbenchDirectorySubmit(
     input: DispatchInput,
     command: Extract<FeishuCommand, { type: "workbench_directory_submit" }>
-  ): Promise<SlashCommandReply | undefined> {
+  ): Promise<FeishuWorkbenchReply | undefined> {
     if (!this.options.workbench) {
       return { kind: "text", text: "已收到工作目录设置，当前入口还没有接入保存执行器。" };
     }
     return this.options.workbench.handleDirectorySubmit({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      ...(input.sender ? { sender: input.sender } : {}),
+      command
+    });
+  }
+
+  private async dispatchWorkbenchPlanRevise(
+    input: DispatchInput,
+    command: Extract<FeishuCommand, { type: "workbench_plan_revise" }>
+  ): Promise<FeishuWorkbenchReply | undefined> {
+    if (!this.options.workbench?.handlePlanRevise) {
+      return { kind: "text", text: "已收到计划修改请求，当前入口还没有接入修改表单。" };
+    }
+    return this.options.workbench.handlePlanRevise({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      command
+    });
+  }
+
+  private async dispatchWorkbenchPlanRevisionSubmit(
+    input: DispatchInput,
+    command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>
+  ): Promise<FeishuWorkbenchReply | undefined> {
+    if (!this.options.workbench?.handlePlanRevisionSubmit) {
+      return { kind: "text", text: "已收到计划修改意见，当前入口还没有接入计划修订执行器。" };
+    }
+    return this.options.workbench.handlePlanRevisionSubmit({
       chatId: input.chatId,
       messageId: input.messageId,
       ...(input.sender ? { sender: input.sender } : {}),
@@ -260,7 +314,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     };
   }
 
-  private async deliver(input: DispatchInput, reply: SlashCommandReply): Promise<void> {
+  private async deliver(input: DispatchInput, reply: FeishuWorkbenchReply): Promise<void> {
     if (reply.kind === "text") {
       await this.traceAsync("reply_text", input, () => this.client.replyText(input.messageId, reply.text));
       return;
@@ -269,6 +323,14 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       await this.traceAsync("reply_card", input, () =>
         this.client.replyInteractiveCard(input.messageId, renderFeishuCard(reply.card))
       );
+      return;
+    }
+    if (reply.kind === "feishu_card") {
+      await this.traceAsync("reply_card", input, () => this.client.replyInteractiveCard(input.messageId, reply.card));
+      return;
+    }
+    if (reply.kind === "feishu_card_update") {
+      await this.traceAsync("update_card", input, () => this.client.updateInteractiveCard(input.messageId, reply.card));
       return;
     }
     await this.traceAsync("update_card", input, () =>
