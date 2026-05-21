@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import type { AgentRunOptions } from "./agent-cli.js";
+import { emitAgentProgress } from "./agent-progress.js";
 import type { PromptRunner } from "./prompt-agent-adapter.js";
 
 export interface ClaudeCodeCliRunnerOptions {
@@ -50,7 +51,7 @@ export function createClaudeCodeCliPromptRunner(
     } catch (error) {
       const stdout = readErrorStdout(error);
       if (stdout) {
-        throw new Error(parseFinalResult(stdout, runOptions).text);
+        throw new Error((await parseFinalResult(stdout, runOptions)).text);
       }
       throw error;
     }
@@ -88,24 +89,24 @@ function buildUserMessage(prompt: string): unknown {
   };
 }
 
-function parseSuccessfulResult(stdout: string, options?: AgentRunOptions): string {
-  const result = parseFinalResult(stdout, options);
+async function parseSuccessfulResult(stdout: string, options?: AgentRunOptions): Promise<string> {
+  const result = await parseFinalResult(stdout, options);
   if (result.isError) {
     throw new Error(result.text);
   }
   return result.text;
 }
 
-function parseFinalResult(stdout: string, options?: AgentRunOptions): { text: string; isError: boolean } {
+async function parseFinalResult(stdout: string, options?: AgentRunOptions): Promise<{ text: string; isError: boolean }> {
   for (const line of stdout.trim().split("\n").reverse()) {
     if (!line.trim()) {
       continue;
     }
     const event = JSON.parse(line) as unknown;
     if (isRecord(event) && event.type === "result" && typeof event.result === "string") {
-      emitClaudeProgress(stdout, options);
+      await emitClaudeProgress(stdout, options);
       if (event.is_error === true) {
-        options?.onProgress?.({ kind: "error", text: event.result });
+        await emitAgentProgress(options, { kind: "error", text: event.result });
       }
       return {
         text: event.result.trim(),
@@ -116,7 +117,7 @@ function parseFinalResult(stdout: string, options?: AgentRunOptions): { text: st
   throw new Error("Claude Code did not emit a result event");
 }
 
-function emitClaudeProgress(stdout: string, options?: AgentRunOptions): void {
+async function emitClaudeProgress(stdout: string, options?: AgentRunOptions): Promise<void> {
   if (!options?.onProgress) {
     return;
   }
@@ -134,21 +135,21 @@ function emitClaudeProgress(stdout: string, options?: AgentRunOptions): void {
       continue;
     }
     for (const part of message.content) {
-      emitClaudeContentPart(part, options);
+      await emitClaudeContentPart(part, options);
     }
   }
 }
 
-function emitClaudeContentPart(part: unknown, options: AgentRunOptions): void {
+async function emitClaudeContentPart(part: unknown, options: AgentRunOptions): Promise<void> {
   if (!isRecord(part)) {
     return;
   }
   if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
-    options.onProgress?.({ kind: "thinking", text: part.text.trim() });
+    await emitAgentProgress(options, { kind: "thinking", text: part.text.trim() });
     return;
   }
   if (part.type === "tool_use") {
-    options.onProgress?.({
+    await emitAgentProgress(options, {
       kind: "tool_use",
       tool: typeof part.name === "string" ? part.name : "Tool",
       text: stringifyUnknown(part.input)
@@ -156,7 +157,7 @@ function emitClaudeContentPart(part: unknown, options: AgentRunOptions): void {
     return;
   }
   if (part.type === "tool_result") {
-    options.onProgress?.({
+    await emitAgentProgress(options, {
       kind: "tool_result",
       text: stringifyUnknown(part.content)
     });

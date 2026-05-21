@@ -1,6 +1,7 @@
 import { execa } from "execa";
 import type { PromptRunner } from "./codex-agent-adapter.js";
 import type { AgentRunOptions } from "./agent-cli.js";
+import { emitAgentProgress } from "./agent-progress.js";
 
 export interface CodexCliRunnerOptions {
   command?: string;
@@ -86,7 +87,7 @@ async function parseCodexJsonOutput(stdout: string, options?: AgentRunOptions): 
     }
     const event = parseCodexEvent(trimmed);
     if (event.type === "turn.failed") {
-      options?.onProgress?.({ kind: "error", text: readTurnFailureMessage(event) });
+      await emitAgentProgress(options, { kind: "error", text: readTurnFailureMessage(event) });
       throw new Error(readTurnFailureMessage(event));
     }
     if (event.type !== "item.completed") {
@@ -120,7 +121,7 @@ async function emitCodexProgress(
     return;
   }
   if (itemType === "tool_call" || itemType === "function_call") {
-    await options.onProgress({
+    await emitAgentProgress(options, {
       kind: "tool_use",
       tool: readString(item.name) || readString(item.tool_name) || "Tool",
       text: readString(item.arguments) || readString(item.input) || stringifyRecord(item)
@@ -128,7 +129,7 @@ async function emitCodexProgress(
     return;
   }
   if (itemType === "tool_result" || itemType === "function_call_output") {
-    await options.onProgress({
+    await emitAgentProgress(options, {
       kind: "tool_result",
       tool: readString(item.name) || readString(item.tool_name) || undefined,
       text: readString(item.output) || readString(item.result) || stringifyRecord(item)
@@ -138,7 +139,7 @@ async function emitCodexProgress(
   if (itemType === "agent_message" || itemType === "message") {
     const text = extractItemText(item);
     if (text) {
-      await options.onProgress({ kind: "thinking", text });
+      await emitAgentProgress(options, { kind: "thinking", text });
     }
   }
 }

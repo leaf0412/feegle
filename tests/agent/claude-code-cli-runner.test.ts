@@ -125,4 +125,50 @@ describe("createClaudeCodeCliPromptRunner", () => {
       { kind: "tool_result", text: "passed" }
     ]);
   });
+
+  it("waits for each async progress callback before emitting the next update", async () => {
+    const runner = createClaudeCodeCliPromptRunner(
+      {
+        command: "claude",
+        cwd: "/tmp/workspace"
+      },
+      async () => ({
+        stdout: [
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              content: [{ type: "text", text: "我先看一下代码。" }]
+            }
+          }),
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              content: [{ type: "tool_use", name: "Bash", input: { command: "npm test" } }]
+            }
+          }),
+          JSON.stringify({
+            type: "result",
+            result: "Claude 完成了处理"
+          })
+        ].join("\n"),
+        stderr: ""
+      })
+    );
+    const events: string[] = [];
+
+    await runner("hello claude", {
+      async onProgress(update) {
+        events.push(`start:${update.kind}`);
+        await Promise.resolve();
+        events.push(`end:${update.kind}`);
+      }
+    });
+
+    expect(events).toEqual([
+      "start:thinking",
+      "end:thinking",
+      "start:tool_use",
+      "end:tool_use"
+    ]);
+  });
 });
