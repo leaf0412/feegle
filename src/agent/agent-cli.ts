@@ -22,6 +22,7 @@ export interface AgentProgressUpdate {
 
 export interface AgentRunOptions {
   onProgress?: (update: AgentProgressUpdate) => void | Promise<void>;
+  cwd?: string;
 }
 
 export interface AgentChatMessage {

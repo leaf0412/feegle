@@ -95,6 +95,48 @@ describe("FeishuChatHandler", () => {
     ]);
   });
 
+  it("passes the group-bound workspace path as cwd so chat turns run in the selected project", async () => {
+    const client = trackingClient();
+    const providers = new AgentProviderRegistry();
+    let seenCwd: string | undefined;
+    const agent = stubAgent({
+      chat: async (_messages, options) => {
+        seenCwd = options?.cwd;
+        return "done";
+      }
+    });
+    providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
+    providers.setActive("codex");
+    const handler = new FeishuChatHandler({
+      client,
+      providers,
+      history: new ChatHistoryStore(),
+      chatBindingStore: {
+        get: (chatId: string) => ({
+          chatId,
+          repositoryIds: [],
+          workspaceId: "ws_feegle",
+          updatedAt: "2026-05-21T00:00:00.000Z"
+        })
+      } as never,
+      workspaceStore: {
+        get: (id: string) =>
+          id === "ws_feegle"
+            ? { id, path: "/Users/yb/Desktop/code/personal/feegle", createdAt: "2026-05-21T00:00:00.000Z" }
+            : undefined
+      } as never
+    });
+
+    await handler.handle({
+      chatId: "oc_1",
+      triggerMessageId: "om_trigger",
+      sessionKey: "feishu:oc_1:channel",
+      userText: "inspect this repo"
+    });
+
+    expect(seenCwd).toBe("/Users/yb/Desktop/code/personal/feegle");
+  });
+
   it("falls into the error status when the agent throws and updates the card to red", async () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();

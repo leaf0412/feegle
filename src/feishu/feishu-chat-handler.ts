@@ -15,12 +15,16 @@ import {
   type FeishuRichCardStatus
 } from "./feishu-rich-card.js";
 import type { PlatformProgressToolStep } from "../platform/progress.js";
+import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
+import type { WorkspaceStore } from "../repositories/workspace-store.js";
 
 export interface FeishuChatHandlerDeps {
   client: FeishuClientPort;
   providers: AgentProviderRegistry;
   history: ChatHistoryStore;
   sessionStore?: SessionStore;
+  workspaceStore?: WorkspaceStore;
+  chatBindingStore?: ChatBindingStore;
   now?: () => number;
 }
 
@@ -71,6 +75,9 @@ export class FeishuChatHandler {
         console.warn("session store touch failed", errorMessage(error));
       }
     }
+
+    const cwd = resolveCwd(request.chatId, this.deps.workspaceStore, this.deps.chatBindingStore);
+
     this.deps.history.append(request.sessionKey, { role: "user", content: request.userText });
     const messages = this.deps.history.get(request.sessionKey);
 
@@ -85,6 +92,7 @@ export class FeishuChatHandler {
     });
 
     const options: AgentRunOptions = {
+      cwd,
       onProgress: async (update) => {
         applyProgress(renderState, update);
         await this.safeUpdate(preview, renderState, "working", true);
@@ -220,4 +228,16 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function resolveCwd(
+  chatId: string,
+  workspaceStore?: WorkspaceStore,
+  chatBindingStore?: ChatBindingStore
+): string | undefined {
+  if (!workspaceStore || !chatBindingStore) return undefined;
+  const binding = chatBindingStore.get(chatId);
+  if (!binding?.workspaceId) return undefined;
+  const workspace = workspaceStore.get(binding.workspaceId);
+  return workspace?.path;
 }

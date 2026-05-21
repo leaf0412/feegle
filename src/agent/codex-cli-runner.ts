@@ -4,7 +4,7 @@ import type { AgentRunOptions } from "./agent-cli.js";
 
 export interface CodexCliRunnerOptions {
   command?: string;
-  cwd: string;
+  cwd?: string;
   sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   approvalPolicy?: "untrusted" | "on-request" | "never";
   timeoutMs?: number;
@@ -38,8 +38,12 @@ export function createCodexCliPromptRunner(
   runner: CodexCliCommandRunner = defaultRunner
 ): PromptRunner {
   return async (prompt, runOptions) => {
-    const result = await runner(options.command ?? "codex", buildCodexArgs(options), {
-      cwd: options.cwd,
+    const cwd = runOptions?.cwd ?? options.cwd;
+    if (!cwd) {
+      throw new Error("未设置工作目录。请运行 /dir use <workspace> 来设置。");
+    }
+    const result = await runner(options.command ?? "codex", buildCodexArgs(options, cwd), {
+      cwd,
       input: prompt,
       timeout: options.timeoutMs ?? 300_000
     });
@@ -48,7 +52,7 @@ export function createCodexCliPromptRunner(
   };
 }
 
-function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
+function buildCodexArgs(options: CodexCliRunnerOptions, cwd: string): string[] {
   const args: string[] = [
     "--ask-for-approval",
     options.approvalPolicy ?? "never"
@@ -63,7 +67,7 @@ function buildCodexArgs(options: CodexCliRunnerOptions): string[] {
     "exec",
     "--skip-git-repo-check",
     "--cd",
-    options.cwd,
+    cwd,
     "--sandbox",
     options.sandbox ?? "workspace-write",
     "--json",

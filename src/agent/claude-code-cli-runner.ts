@@ -4,7 +4,7 @@ import type { PromptRunner } from "./prompt-agent-adapter.js";
 
 export interface ClaudeCodeCliRunnerOptions {
   command?: string;
-  cwd: string;
+  cwd?: string;
   timeoutMs?: number;
   model?: string;
   mode?: string;
@@ -36,9 +36,13 @@ export function createClaudeCodeCliPromptRunner(
   runner: ClaudeCodeCliCommandRunner = defaultRunner
 ): PromptRunner {
   return async (prompt, runOptions) => {
+    const cwd = runOptions?.cwd ?? options.cwd;
+    if (!cwd) {
+      throw new Error("未设置工作目录。请运行 /dir use <workspace> 来设置。");
+    }
     try {
       const result = await runner(options.command ?? "claude", buildClaudeCodeArgs(options), {
-        cwd: options.cwd,
+        cwd,
         input: `${JSON.stringify(buildUserMessage(prompt))}\n`,
         timeout: options.timeoutMs ?? 300_000
       });

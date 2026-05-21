@@ -153,7 +153,9 @@ export class FeegleApp {
       client: this.deps.feishuClient,
       providers: agentProviders,
       history: chatHistory,
-      sessionStore
+      sessionStore,
+      workspaceStore,
+      chatBindingStore
     });
     const responder = new FeishuCommandResponder(this.deps.feishuClient, {
       registry,

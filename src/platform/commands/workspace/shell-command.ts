@@ -41,6 +41,9 @@ export class ShellCommandHandler implements SlashCommandHandler {
     if (!record) {
       return textReply(`找不到 ${active.kind} provider 记录。`);
     }
+    if (!record.cwd) {
+      return textReply("provider 未设置工作目录，/shell 需要 cwd。请运行 /dir use <workspace> 设置。");
+    }
     const timeout = this.deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     try {
       const result = await execa(command, {
