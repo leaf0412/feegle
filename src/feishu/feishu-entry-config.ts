@@ -1,4 +1,5 @@
 import { parseFeishuPlatformConfig, type FeishuPlatformConfig } from "./feishu-platform-config.js";
+import type { FeishuClientPort } from "./feishu-client.js";
 
 export interface FeishuEntryEnv {
   FEISHU_APP_ID?: string;
@@ -23,7 +24,7 @@ export function buildFeishuEntryConfig(env: FeishuEntryEnv): FeishuPlatformConfi
     appSecret: readRequiredEnv(env, "FEISHU_APP_SECRET"),
     verificationToken: env.FEISHU_VERIFICATION_TOKEN,
     encryptKey: env.FEISHU_ENCRYPT_KEY,
-    botOpenId: readRequiredEnv(env, "FEISHU_BOT_OPEN_ID"),
+    botOpenId: env.FEISHU_BOT_OPEN_ID,
     enableInteractiveCards: readBooleanEnv(env, "FEISHU_ENABLE_INTERACTIVE_CARDS"),
     allowFrom: env.FEISHU_ALLOW_FROM,
     allowChat: env.FEISHU_ALLOW_CHAT,
@@ -34,6 +35,21 @@ export function buildFeishuEntryConfig(env: FeishuEntryEnv): FeishuPlatformConfi
     replyToTrigger: readBooleanEnv(env, "FEISHU_REPLY_TO_TRIGGER"),
     progressStyle: env.FEISHU_PROGRESS_STYLE
   });
+}
+
+export async function resolveFeishuEntryConfig(
+  env: FeishuEntryEnv,
+  client: Pick<FeishuClientPort, "fetchBotOpenId">
+): Promise<FeishuPlatformConfig> {
+  const config = buildFeishuEntryConfig(env);
+  if (config.botOpenId) {
+    return config;
+  }
+  const botOpenId = await client.fetchBotOpenId();
+  if (!botOpenId) {
+    throw new Error("Feishu bot info response missing open_id");
+  }
+  return { ...config, botOpenId };
 }
 
 function readRequiredEnv(env: FeishuEntryEnv, name: keyof FeishuEntryEnv): string {

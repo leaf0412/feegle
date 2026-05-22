@@ -2,7 +2,7 @@ import * as lark from "@larksuiteoapi/node-sdk";
 import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { HttpFeishuCloudDocClient } from "./feishu-cloud-doc-client.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
-import { buildFeishuEntryConfig } from "./feishu-entry-config.js";
+import { buildFeishuEntryConfig, resolveFeishuEntryConfig } from "./feishu-entry-config.js";
 import { FeegleApp } from "../app/feegle-app.js";
 import { resolveFeegleHome } from "../app/feegle-home.js";
 import { parseOwnerEmails } from "../app/owner-emails.js";
@@ -10,12 +10,13 @@ import { installConsoleTimestamps } from "../app/console-timestamps.js";
 
 installConsoleTimestamps();
 
-const config = buildFeishuEntryConfig(process.env);
+const baseConfig = buildFeishuEntryConfig(process.env);
 const feishuOpenApiClient = new lark.Client({
-  appId: config.appId,
-  appSecret: config.appSecret
+  appId: baseConfig.appId,
+  appSecret: baseConfig.appSecret
 });
 const feishuClient: FeishuClientPort = new LarkFeishuClient(feishuOpenApiClient);
+const config = await resolveFeishuEntryConfig(process.env, feishuClient);
 const cloudDoc = new HttpFeishuCloudDocClient({
   request: (payload) => {
     if (!feishuOpenApiClient.request) {
