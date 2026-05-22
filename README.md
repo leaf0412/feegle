@@ -51,6 +51,7 @@ Set these values in your shell before starting the Feishu adapter:
 ```bash
 export FEISHU_APP_ID="cli_xxx"
 export FEISHU_APP_SECRET="xxx"
+export FEISHU_BOT_OPEN_ID="ou_xxx"
 ```
 
 Optional values:
@@ -58,7 +59,6 @@ Optional values:
 ```bash
 export FEISHU_VERIFICATION_TOKEN="xxx"
 export FEISHU_ENCRYPT_KEY="xxx"
-export FEISHU_BOT_OPEN_ID="ou_xxx"
 export FEISHU_ENABLE_INTERACTIVE_CARDS="true"
 export FEISHU_ALLOW_FROM="*"
 export FEISHU_ALLOW_CHAT="*"
