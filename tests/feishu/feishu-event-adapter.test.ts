@@ -269,6 +269,36 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(false);
   });
 
+  it("does not respond to group messages that mention someone other than the bot", () => {
+    const parsed = extractTextMessageCommand(
+      {
+        sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+        message: {
+          message_id: "om_other_mention",
+          chat_id: "oc_1",
+          chat_type: "group",
+          message_type: "text",
+          content: JSON.stringify({ text: "@_user_2 你看下这个" }),
+          mentions: [{ id: { open_id: "ou_teammate" }, name: "teammate", key: "@_user_2" }]
+        }
+      },
+      {
+        platform: "feishu",
+        botOpenId: "ou_bot",
+        allowFrom: "*",
+        allowChat: "*",
+        groupOnly: false,
+        groupReplyAll: false,
+        shareSessionInChannel: true,
+        threadIsolation: false
+      }
+    );
+
+    expect(parsed?.message.text).toBe("@_user_2 你看下这个");
+    expect(parsed?.command).toEqual({ type: "chat", raw: "@_user_2 你看下这个" });
+    expect(parsed?.shouldRespond).toBe(false);
+  });
+
   it("normalizes mentioned group text into a platform message", () => {
     const parsed = extractTextMessageCommand(
       {
@@ -329,7 +359,7 @@ describe("feishu event adapter", () => {
     expect(parsed?.shouldRespond).toBe(true);
   });
 
-  it("treats a single leading mention as bot-directed when configured bot id differs from Feishu payload", () => {
+  it("does not treat a single leading non-bot mention as bot-directed", () => {
     const parsed = extractTextMessageCommand(
       {
         sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -354,12 +384,12 @@ describe("feishu event adapter", () => {
       }
     );
 
-    expect(parsed?.message.text).toBe("/help");
+    expect(parsed?.message.text).toBe("@_user_1 /help");
     expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
-    expect(parsed?.shouldRespond).toBe(true);
+    expect(parsed?.shouldRespond).toBe(false);
   });
 
-  it("responds to mentioned slash commands when Feishu content has already removed the mention token", () => {
+  it("does not respond to slash commands when Feishu removed a non-bot mention token", () => {
     const parsed = extractTextMessageCommand(
       {
         sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -386,10 +416,10 @@ describe("feishu event adapter", () => {
 
     expect(parsed?.message.text).toBe("/help");
     expect(parsed?.command).toEqual({ type: "help", groupKey: undefined });
-    expect(parsed?.shouldRespond).toBe(true);
+    expect(parsed?.shouldRespond).toBe(false);
   });
 
-  it("responds to mentioned natural language messages when Feishu content has already removed the mention token", () => {
+  it("does not respond to natural language when Feishu removed a non-bot mention token", () => {
     const parsed = extractTextMessageCommand(
       {
         sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
@@ -416,7 +446,7 @@ describe("feishu event adapter", () => {
 
     expect(parsed?.message.text).toBe("test");
     expect(parsed?.command).toEqual({ type: "chat", raw: "test" });
-    expect(parsed?.shouldRespond).toBe(true);
+    expect(parsed?.shouldRespond).toBe(false);
   });
 
   it("drops messages blocked by allow lists", () => {
