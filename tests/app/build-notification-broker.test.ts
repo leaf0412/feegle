@@ -32,7 +32,7 @@ describe("buildNotificationBroker", () => {
   });
 
   it("freezes after build so runtime cannot register additional notification adapters", () => {
-    const broker = buildNotificationBroker({ feishuClient: {} as FeishuClientPort });
+    const broker = buildNotificationBroker({ feishuClient: {} as FeishuClientPort, modules: [] });
     expect(() =>
       broker.register("late", {
         sendText: async () => {},

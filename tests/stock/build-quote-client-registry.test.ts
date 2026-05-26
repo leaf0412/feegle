@@ -20,7 +20,7 @@ describe("buildQuoteClientRegistry", () => {
   });
 
   it("freezes after build so runtime cannot register additional quote clients", () => {
-    const registry = buildQuoteClientRegistry();
+    const registry = buildQuoteClientRegistry({ modules: [] });
     expect(() => registry.register("late", { query: async () => [] })).toThrow(/frozen/);
   });
 

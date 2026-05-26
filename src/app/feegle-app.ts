@@ -31,10 +31,10 @@ import { TaskStore } from "../scheduler/task-store.js";
 import type { Task } from "../scheduler/task.js";
 import { RuntimeHostInfoProvider } from "../scheduler/util/host-info.js";
 import { buildQuoteClientRegistry } from "../stock/build-quote-client-registry.js";
-import { defaultQuoteClientId } from "../stock/default-quote-client-modules.js";
+import { defaultQuoteClientId, defaultQuoteClientModules } from "../stock/default-quote-client-modules.js";
 import type { QuoteClientModule } from "../stock/quote-client-module.js";
 import { StockStore } from "../stock/stock-store.js";
-import { buildNotificationBroker } from "./build-notification-broker.js";
+import { buildNotificationBroker, feishuNotificationAdapterModule } from "./build-notification-broker.js";
 import { ConfigStore, type ConfigStorePort } from "./config-store.js";
 import { acquireFeegleLock } from "./feegle-lock.js";
 import { HookManager } from "./hooks.js";
@@ -120,12 +120,14 @@ export class FeegleApp {
     const gitService = new GitService();
     const notify = buildNotificationBroker({
       feishuClient: this.deps.feishuClient,
-      modules: this.deps.notificationAdapterModules
+      modules: [feishuNotificationAdapterModule(), ...(this.deps.notificationAdapterModules ?? [])]
     });
 
     const quoteClientId = this.deps.quoteClientId ?? defaultQuoteClientId;
     const quote = requiredQuoteClient(
-      buildQuoteClientRegistry({ modules: this.deps.quoteClientModules }).get(quoteClientId),
+      buildQuoteClientRegistry({
+        modules: [...defaultQuoteClientModules(), ...(this.deps.quoteClientModules ?? [])]
+      }).get(quoteClientId),
       quoteClientId
     );
     const bootCtx = new BootContext();

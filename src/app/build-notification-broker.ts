@@ -3,27 +3,19 @@ import { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterDeps, NotificationAdapterModule } from "./notification-adapter-module.js";
 
 export interface BuildNotificationBrokerOptions extends NotificationAdapterDeps {
-  modules?: readonly NotificationAdapterModule[];
+  modules: readonly NotificationAdapterModule[];
 }
-
-const defaultModuleFactories = [
-  feishuNotificationAdapterModule
-];
 
 export function buildNotificationBroker(options: BuildNotificationBrokerOptions): NotificationBroker {
   const broker = new NotificationBroker();
-  for (const module of [...defaultNotificationAdapterModules(), ...(options.modules ?? [])]) {
+  for (const module of options.modules) {
     module.register(broker, options);
   }
   broker.freeze();
   return broker;
 }
 
-function defaultNotificationAdapterModules(): NotificationAdapterModule[] {
-  return defaultModuleFactories.map((createModule) => createModule());
-}
-
-function feishuNotificationAdapterModule(): NotificationAdapterModule {
+export function feishuNotificationAdapterModule(): NotificationAdapterModule {
   return {
     id: "feishu",
     register: (broker, deps) => {
