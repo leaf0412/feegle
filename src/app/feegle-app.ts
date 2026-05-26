@@ -1,60 +1,23 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
-import { join } from "node:path";
 import { BootContext } from "../boot/boot-context.js";
-import { warnStartupGaps } from "../boot/warn-startup-gaps.js";
-import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
-import { ChatHistoryStore } from "../agent/chat-history-store.js";
-import { SessionStore } from "../agent/session-store.js";
-import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
-import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
-import { GitLabClient } from "../gitlab/gitlab-client.js";
-import { GitLabFollowStore } from "../gitlab/gitlab-follow-store.js";
-import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
+import type { BootReport } from "../boot/boot-phase.js";
+import { buildBootPhases } from "../boot/build-boot-phases.js";
+import { defaultPlugins } from "../boot/default-plugins.js";
+import { collectContributions, type FeeglePlugin } from "../boot/feegle-plugin.js";
+import { runBoot } from "../boot/run-boot.js";
 import type { FeishuCloudDocClientPort } from "../feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runtime.js";
-import { buildSlashCommandRegistry } from "../platform/build-slash-command-registry.js";
-import { AliasStore } from "../platform/commands/alias-store.js";
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
-import { ChatBindingStore } from "../repositories/chat-binding-store.js";
-import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
-import { RepositoryStore } from "../repositories/repository-store.js";
-import { WorkspaceStore } from "../repositories/workspace-store.js";
-import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
-import { defaultHandlerKindModules } from "../scheduler/default-handler-kind-modules.js";
-import { DedupStore } from "../scheduler/dedup-store.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
-import { ConsoleJsonLogger } from "../scheduler/logger.js";
-import { RunsLog } from "../scheduler/runs-log.js";
-import { TaskRegistry } from "../scheduler/task-registry.js";
-import { TaskScheduler } from "../scheduler/task-scheduler.js";
-import { TaskStore } from "../scheduler/task-store.js";
 import type { Task } from "../scheduler/task.js";
-import { RuntimeHostInfoProvider } from "../scheduler/util/host-info.js";
-import { buildQuoteClientRegistry } from "../stock/build-quote-client-registry.js";
-import { defaultQuoteClientId, defaultQuoteClientModules } from "../stock/default-quote-client-modules.js";
+import { defaultQuoteClientId } from "../stock/default-quote-client-modules.js";
 import type { QuoteClientModule } from "../stock/quote-client-module.js";
-import { StockStore } from "../stock/stock-store.js";
-import { buildNotificationBroker, feishuNotificationAdapterModule } from "./build-notification-broker.js";
-import { ConfigStore, type ConfigStorePort } from "./config-store.js";
-import { acquireFeegleLock } from "./feegle-lock.js";
-import { HookManager } from "./hooks.js";
-import { NotificationBroker } from "./notification-broker.js";
+import type { ConfigStorePort } from "./config-store.js";
+import type { HookManager } from "./hooks.js";
+import type { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterModule } from "./notification-adapter-module.js";
-import { openRuntimeDb, type RuntimeDb } from "./runtime-db.js";
-import { ChatWorkspaceStore } from "../workbench/chat-workspace-store.js";
-import { PendingInteractionStore } from "../workbench/pending-interaction-store.js";
-import { DirectorySetupService } from "../workbench/directory-setup-service.js";
-import { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
-import { PlanArtifactService } from "../workbench/plan-artifact-service.js";
-import {
-  buildPlanExecutionRevisionCard,
-  buildPlanRevisionRequestCard
-} from "../feishu/feishu-workbench-cards.js";
-import type { ProviderStorePort } from "../agent/provider-store.js";
-import { EmptyProviderStoreReadView, requireAgentConfig } from "../boot/resolve-agents.js";
-import { GitService } from "../git/git-service.js";
-import { PlanExecutionService } from "../workbench/plan-execution-service.js";
+import type { RuntimeDb } from "./runtime-db.js";
 
 export interface Startable {
   start(): Promise<void>;
@@ -72,6 +35,8 @@ export interface FeegleAppDeps {
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
   loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
   createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort; hooks?: HookManager }) => Startable;
+  /** Inject the full plugin set (tests). When set, the default plugins and the injected-module fields below are ignored. */
+  plugins?: readonly FeeglePlugin[];
   slashCommandModules?: readonly SlashCommandModule[];
   handlerKindModules?: readonly HandlerKindModule[];
   quoteClientModules?: readonly QuoteClientModule[];
@@ -84,212 +49,74 @@ export class FeegleApp {
   private lockfileRelease?: () => Promise<void>;
   private scheduler?: Startable;
   private runtime?: Startable;
-  private hooks?: HookManager;
   private runtimeDb?: RuntimeDb;
+  private report?: BootReport;
 
-  constructor(private readonly deps: FeegleAppDeps) {
-    this.hooks = deps.hooks;
-  }
+  constructor(private readonly deps: FeegleAppDeps) {}
 
   async start(): Promise<void> {
-    this.lockfileRelease = await (this.deps.acquireLock ?? acquireFeegleLock)(this.deps.feegleHome);
-    const configStore = await (this.deps.loadConfigStore ?? ConfigStore.load)(this.deps.feegleHome);
-    this.runtimeDb = openRuntimeDb(join(this.deps.feegleHome, "feegle.db"));
-    const chatWorkspaceStore = new ChatWorkspaceStore(this.runtimeDb);
-    const pendingInteractionStore = new PendingInteractionStore(this.runtimeDb);
-    const planArtifactStore = new PlanArtifactStore(this.runtimeDb);
-    const config = configStore.get();
-    const providerStoreReadView: ProviderStorePort = new EmptyProviderStoreReadView();
-    const sessionStore = await SessionStore.load(this.deps.feegleHome);
-    const chatHistory = new ChatHistoryStore();
-    const aliasStore = await AliasStore.load(this.deps.feegleHome);
-    const repositoryStore = await RepositoryStore.load(this.deps.feegleHome);
-    const workspaceStore = await WorkspaceStore.load(this.deps.feegleHome);
-    const chatBindingStore = await ChatBindingStore.load(this.deps.feegleHome);
-    const agentProviders =
-      this.deps.agentProviders ??
-      (this.deps.loadAgentProviders
-        ? await this.deps.loadAgentProviders(this.deps.feegleHome)
-        : buildAgentProviderRegistry({ store: providerStoreReadView, config: requireAgentConfig(config) }));
-    const stockStore = await StockStore.load(this.deps.feegleHome);
-    const dedupStore = await DedupStore.load(this.deps.feegleHome);
-    const runsLog = await RunsLog.open(this.deps.feegleHome);
-    const taskStore = await TaskStore.load(this.deps.feegleHome);
-    await taskStore.ensureSeed(defaultSeedTasks());
-    const taskRegistry = new TaskRegistry(taskStore);
-    const gitlabClient = new GitLabClient(process.env["GITLAB_TOKEN"] ?? "");
-    const gitlabFollowStore = new GitLabFollowStore(this.runtimeDb);
-    const gitService = new GitService();
-    const notify = buildNotificationBroker({
-      feishuClient: this.deps.feishuClient,
-      modules: [feishuNotificationAdapterModule(), ...(this.deps.notificationAdapterModules ?? [])]
-    });
-
-    const quoteClientId = this.deps.quoteClientId ?? defaultQuoteClientId;
-    const quote = requiredQuoteClient(
-      buildQuoteClientRegistry({
-        modules: [...defaultQuoteClientModules(), ...(this.deps.quoteClientModules ?? [])]
-      }).get(quoteClientId),
-      quoteClientId
-    );
-    const bootCtx = new BootContext();
-    bootCtx.provide("taskRegistry", taskRegistry);
-    bootCtx.provide("stockStore", stockStore);
-    bootCtx.provide("quote", quote);
-    bootCtx.provide("agents", agentProviders);
-    bootCtx.provide("gitlab", gitlabClient);
-    bootCtx.provide("gitlabFollowStore", gitlabFollowStore);
-    bootCtx.provide("gitService", gitService);
-    const kinds = buildHandlerKindRegistry({
-      ctx: bootCtx,
-      modules: [...defaultHandlerKindModules(), ...(this.deps.handlerKindModules ?? [])]
-    });
-
-    warnStartupGaps(configStore, taskRegistry, this.deps.ownerEmails);
-    this.scheduler = this.deps.createScheduler?.({ notify, configStore, hooks: this.hooks }) ?? new TaskScheduler({
-      registry: taskRegistry,
-      configStore,
-      kinds,
-      dedup: dedupStore,
-      runsLog,
-      notify,
-      agents: agentProviders,
-      host: new RuntimeHostInfoProvider(),
-      clock: { now: () => new Date() },
-      logger: new ConsoleJsonLogger(),
-      hooks: this.hooks
-    });
-    await this.scheduler?.start();
-    this.hooks?.emit({ event: "scheduler.started" });
-
-    const repositories = new InMemoryRepositoryRegistry();
-    const userDirectory = new FeishuUserDirectory(this.deps.feishuClient);
-    const registry = buildSlashCommandRegistry({
-      feegleHome: this.deps.feegleHome,
-      userDirectory,
-      repositories,
-      repositoryStore,
-      workspaceStore,
-      chatBindingStore,
-      ownerEmails: this.deps.ownerEmails,
-      taskRegistry,
-      configStore,
-      stockStore,
-      quote,
-      kinds,
-      scheduler: this.scheduler as TaskScheduler,
-      runsLog,
-      providers: agentProviders,
-      providerStore: providerStoreReadView,
-      sessionStore,
-      chatHistory,
-      aliasStore,
-      modules: this.deps.slashCommandModules
-    });
-    const chatHandler = new FeishuChatHandler({
-      client: this.deps.feishuClient,
-      providers: agentProviders,
-      history: chatHistory,
-      sessionStore,
-      workspaceStore,
-      chatBindingStore,
-      chatWorkspaceStore,
-      pendingInteractions: pendingInteractionStore,
-      configuredWorkspaces: config.workspaces
-    });
-    const workbench = new DirectorySetupService({
-      chatWorkspaces: chatWorkspaceStore,
-      pendingInteractions: pendingInteractionStore,
-      chatHandler
-    });
-    const planArtifacts = new PlanArtifactService({
-      feegleHome: this.deps.feegleHome,
-      client: this.deps.feishuClient,
-      cloudDoc: this.deps.cloudDoc,
-      store: planArtifactStore
-    });
-    const planExecution = new PlanExecutionService({
-      feegleHome: this.deps.feegleHome,
-      client: this.deps.feishuClient,
-      store: planArtifactStore,
-      git: new GitService(),
-      agent: agentProviders.resolveActiveAgent() ?? {
-        runDevelopmentTask: async () => {
-          throw new Error("no active agent provider configured for plan execution");
-        }
+    const ctx = new BootContext();
+    const contributions = collectContributions(this.resolvePlugins());
+    const phases = buildBootPhases({
+      appDeps: this.deps,
+      contributions,
+      quoteClientId: this.deps.quoteClientId ?? defaultQuoteClientId,
+      seedTasks: defaultSeedTasks(),
+      onLockRelease: (release) => {
+        this.lockfileRelease = release;
+      },
+      onScheduler: (scheduler) => {
+        this.scheduler = scheduler;
+      },
+      onRuntime: (runtime) => {
+        this.runtime = runtime;
       }
     });
-    const responder = new FeishuCommandResponder(this.deps.feishuClient, {
-      registry,
-      chatHandler,
-      trace: logFeishuCommandTrace,
-      configStore,
-      taskRegistry,
-      userDirectory,
-      workbench: {
-        handleDirectorySubmit: (input) => workbench.handleDirectorySubmit(input),
-        handlePlanRevise: async (input) => ({
-          kind: "feishu_card_update",
-          card: buildPlanRevisionRequestCard(input.command)
-        }),
-        handlePlanRevisionSubmit: async (input) => {
-          const current = planArtifactStore.latest(input.command.planId);
-          if (!current) {
-            return { kind: "text", text: `计划不存在：${input.command.planId}` };
-          }
-          const provider = agentProviders.resolve(current.provider);
-          if (!provider) {
-            return { kind: "text", text: `计划使用的 agent provider 不存在：${current.provider}` };
-          }
-          const artifact = await planArtifacts.revisePlan({
-            planId: input.command.planId,
-            revisionNote: input.command.revisionNote,
-            agent: provider.buildAgent()
-          });
-          return { kind: "text", text: `已生成计划 v${artifact.version}，请查看新文件和确认卡。` };
-        },
-        handlePlanApprove: (input) => planExecution.approve(input.command.planId),
-        handlePlanCancel: (input) => planExecution.cancel(input.command.planId),
-        handlePlanReject: (input) => planExecution.cancel(input.command.planId),
-        handlePlanPush: (input) => planExecution.push(input.command.planId),
-        handlePlanCleanup: (input) => planExecution.cleanup(input.command.planId),
-        handlePlanBaseBranchSubmit: (input) =>
-          planExecution.submitBaseBranch({
-            planId: input.command.planId,
-            baseBranch: input.command.baseBranch,
-            ...(input.command.headBranch ? { headBranch: input.command.headBranch } : {})
-          }),
-        handlePlanReviseExecution: async (input) => ({
-          kind: "feishu_card",
-          card: buildPlanExecutionRevisionCard({
-            planId: input.command.planId,
-            version: planArtifactStore.latest(input.command.planId)?.version ?? input.command.version,
-            iteration: planArtifactStore.latest(input.command.planId)?.executionIteration ?? 1
-          })
-        }),
-        handlePlanReviseExecutionSubmit: (input) =>
-          planExecution.reviseExecution(input.command.planId, input.command.note)
-      }
-    });
-    this.runtime = this.deps.runtimeFactory(responder);
-    await this.runtime.start();
+    this.report = await runBoot(phases, ctx);
+    this.runtimeDb = ctx.require("runtimeDb");
+  }
+
+  bootReport(): BootReport | undefined {
+    return this.report;
   }
 
   async stop(): Promise<void> {
     await this.runtime?.stop?.();
     await this.scheduler?.stop?.();
     this.runtimeDb?.close();
-    this.hooks?.emit({ event: "scheduler.stopped" });
+    this.deps.hooks?.emit({ event: "scheduler.stopped" });
     await this.lockfileRelease?.();
   }
-}
 
-
-function requiredQuoteClient<T>(client: T | undefined, id: string): T {
-  if (!client) {
-    throw new Error(`Quote client not registered: ${id}`);
+  private resolvePlugins(): readonly FeeglePlugin[] {
+    if (this.deps.plugins) {
+      return this.deps.plugins;
+    }
+    const base = defaultPlugins({
+      feegleHome: this.deps.feegleHome,
+      feishuClient: this.deps.feishuClient,
+      cloudDoc: this.deps.cloudDoc,
+      runtimeFactory: this.deps.runtimeFactory
+    });
+    const injected = this.injectedModulesPlugin();
+    return injected ? [...base, injected] : base;
   }
-  return client;
+
+  private injectedModulesPlugin(): FeeglePlugin | undefined {
+    const handlerKinds = this.deps.handlerKindModules ?? [];
+    const slashCommands = this.deps.slashCommandModules ?? [];
+    const quoteClients = this.deps.quoteClientModules ?? [];
+    const notificationAdapters = this.deps.notificationAdapterModules ?? [];
+    if (
+      handlerKinds.length === 0 &&
+      slashCommands.length === 0 &&
+      quoteClients.length === 0 &&
+      notificationAdapters.length === 0
+    ) {
+      return undefined;
+    }
+    return { id: "injected-modules", handlerKinds, slashCommands, quoteClients, notificationAdapters };
+  }
 }
 
 function defaultSeedTasks(): Task[] {
@@ -315,4 +142,3 @@ function defaultSeedTasks(): Task[] {
     }
   ];
 }
-
