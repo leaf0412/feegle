@@ -12,6 +12,7 @@ import { FeishuPreviewSession } from "./feishu-preview-session.js";
 import {
   buildCardJSONWithStatus,
   buildRichCard,
+  buildRichCards,
   type FeishuRichCardStatus
 } from "./feishu-rich-card.js";
 import type { PlatformProgressToolStep } from "../platform/progress.js";
@@ -213,14 +214,32 @@ export class FeishuChatHandler {
     streaming: boolean
   ): Promise<void> {
     try {
+      const [firstCard, ...continuationCards] = renderRichCards(state, status, streaming, this.now());
       await this.waitUntilPreviewUpdateAllowed(state);
-      await preview.finish({
-        keepOnFinish: true,
-        finalContent: renderRichCard(state, status, streaming, this.now())
-      });
+      await preview.finish({ keepOnFinish: true, finalContent: firstCard });
       state.lastPreviewUpdateAt = this.now();
+      await this.sendContinuationCards(preview.currentMessageId, continuationCards);
     } catch (error) {
       console.warn("Feishu chat preview finish failed", errorMessage(error));
+    }
+  }
+
+  /**
+   * Posts the overflow cards of a split answer as a reply chain: each card
+   * replies to the message before it so Feishu threads them under the original
+   * preview card. Stops if the platform stops returning message ids.
+   */
+  private async sendContinuationCards(
+    firstMessageId: string | undefined,
+    cards: ReadonlyArray<string>
+  ): Promise<void> {
+    let parentMessageId = firstMessageId;
+    for (const card of cards) {
+      if (parentMessageId === undefined) {
+        return;
+      }
+      const replyId = await this.deps.client.replyInteractiveCard(parentMessageId, JSON.parse(card));
+      parentMessageId = replyId ?? parentMessageId;
     }
   }
 
@@ -322,6 +341,27 @@ function renderRichCard(
   } catch (error) {
     console.warn("Feishu chat rich card render failed, falling back", errorMessage(error));
     return buildCardJSONWithStatus(markdown, status);
+  }
+}
+
+/**
+ * Renders the finished answer as one or more cards. A single card is returned
+ * when it fits; an oversized answer is split across a panel-bearing first card
+ * plus panel-less continuation cards so no content is dropped.
+ */
+function renderRichCards(
+  state: PreviewRenderState,
+  status: FeishuRichCardStatus,
+  streaming: boolean,
+  nowMs: number
+): string[] {
+  const elapsedMs = nowMs - state.startedAt;
+  const markdown = composeMarkdown(state, status);
+  try {
+    return buildRichCards({ status, steps: state.steps, markdown, streaming, elapsedMs });
+  } catch (error) {
+    console.warn("Feishu chat rich card render failed, falling back", errorMessage(error));
+    return [buildCardJSONWithStatus(markdown, status)];
   }
 }
 

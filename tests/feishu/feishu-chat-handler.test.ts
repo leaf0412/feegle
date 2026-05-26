@@ -99,6 +99,41 @@ describe("FeishuChatHandler", () => {
     ]);
   });
 
+  it("splits an oversized answer into a reply chain instead of truncating it", async () => {
+    const client = trackingClient();
+    const providers = new AgentProviderRegistry();
+    const history = new ChatHistoryStore();
+    const huge = "段落内容很长。".repeat(8_000); // far past the 28KB single-card limit
+    const agent = stubAgent({ chat: async () => huge });
+    providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
+    providers.setActive("codex");
+    const handler = new FeishuChatHandler({ client, providers, history });
+
+    const result = await handler.handle({
+      chatId: "oc_1",
+      triggerMessageId: "om_trigger",
+      sessionKey: "feishu:oc_1:ou_alice",
+      userText: "write a long doc"
+    });
+
+    expect(result.status).toBe("delivered");
+    // First card is finalised in place on the preview message.
+    expect(client.cards.update.length).toBeGreaterThan(0);
+    // Continuation cards arrive as additional reply-chain messages beyond the
+    // single preview-start card, each marked as a continuation.
+    expect(client.cards.start.length).toBeGreaterThan(1);
+    const continuationCards = client.cards.start.slice(1);
+    expect(continuationCards.length).toBeGreaterThan(0);
+    for (const card of continuationCards) {
+      expect(JSON.stringify(card.card)).toContain("（续");
+    }
+    // Every emitted card stays under the Feishu byte limit.
+    const allCards = [...client.cards.update, ...client.cards.start.map((c) => c.card)];
+    for (const card of allCards) {
+      expect(Buffer.byteLength(JSON.stringify(card), "utf8")).toBeLessThanOrEqual(28_000);
+    }
+  });
+
   it("keeps the preview card alive while the agent is still running", async () => {
     vi.useFakeTimers();
     const client = trackingClient();

@@ -16,6 +16,12 @@ export interface BuildRichCardInput {
 const MAX_PANEL_STEPS = 30;
 const MAX_CARD_JSON_BYTES = 28_000;
 
+// Per-chunk content budget when an answer must be spread across several cards.
+// Sits well below MAX_CARD_JSON_BYTES so card structure, the panel on the first
+// card, markdown preprocessing growth, and JSON escaping all stay within limit.
+const SPLIT_CONTENT_BUDGET_BYTES = 20_000;
+const CODE_FENCE_CLOSE = "\n```";
+
 export function isCardJSON(content: string): boolean {
   if (content.length < 10 || content[0] !== "{") {
     return false;
@@ -76,6 +82,162 @@ export function buildRichCard(input: BuildRichCardInput): string {
     );
   }
   return serialized;
+}
+
+/**
+ * Render a finished answer as one or more cards.
+ *
+ * The common path is a single card (identical to `buildRichCard`). Only when
+ * that card overflows the 28KB Feishu limit do we split: the answer markdown is
+ * chunked on code-fence-aware byte boundaries, the first chunk shares the card
+ * with the tool-steps panel, and each remaining chunk becomes a panel-less
+ * continuation card marked `（续 n/N）`. No answer content is ever dropped.
+ */
+export function buildRichCards(input: BuildRichCardInput): string[] {
+  try {
+    return [buildRichCard(input)];
+  } catch {
+    // Overflow — fall through and split the answer across cards.
+  }
+
+  const chunks = splitMarkdownByByteBudget(input.markdown, SPLIT_CONTENT_BUDGET_BYTES);
+  const total = chunks.length;
+  return chunks.map((chunk, index) => {
+    if (index === 0) {
+      return buildFirstSplitCard({ ...input, markdown: chunk, streaming: false });
+    }
+    const content = `（续 ${index + 1}/${total}）\n\n${chunk}`;
+    return buildRichCard({
+      status: input.status,
+      steps: [],
+      markdown: content,
+      streaming: false
+    });
+  });
+}
+
+/**
+ * The first split card keeps the tool-steps panel when it still fits; if the
+ * panel alone pushes the card over the limit, it is dropped so the answer chunk
+ * still gets through. The answer chunk is never sacrificed.
+ */
+function buildFirstSplitCard(input: BuildRichCardInput): string {
+  try {
+    return buildRichCard(input);
+  } catch {
+    return buildRichCard({ ...input, steps: [] });
+  }
+}
+
+/**
+ * Split `text` into chunks whose UTF-8 byte length never exceeds `budgetBytes`,
+ * preferring line boundaries. When a boundary lands inside a ``` code block the
+ * fence is closed at the end of a chunk and re-opened at the start of the next
+ * so every chunk renders as valid markdown. A single line that exceeds the
+ * budget is split on code-point boundaries (never mid-character).
+ *
+ * Ported from cc-connect's SplitMessageCodeFenceAware, but byte-based to match
+ * Feishu's byte limit (a CJK character is 3 bytes, not 1 rune).
+ */
+export function splitMarkdownByByteBudget(text: string, budgetBytes: number): string[] {
+  if (Buffer.byteLength(text, "utf8") <= budgetBytes) {
+    return [text];
+  }
+
+  const closingBytes = Buffer.byteLength(CODE_FENCE_CLOSE, "utf8");
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let currentBytes = 0; // byte length of current.join("\n")
+  let openFence = ""; // the opening ``` line while inside a code block, else ""
+
+  const limit = (): number => (openFence !== "" ? budgetBytes - closingBytes : budgetBytes);
+
+  const flush = (): void => {
+    if (current.length === 0) {
+      return;
+    }
+    let chunk = current.join("\n");
+    if (openFence !== "") {
+      chunk += CODE_FENCE_CLOSE;
+    }
+    chunks.push(chunk);
+    current = [];
+    currentBytes = 0;
+    if (openFence !== "") {
+      current.push(openFence);
+      currentBytes = Buffer.byteLength(openFence, "utf8");
+    }
+  };
+
+  const pushLine = (line: string): void => {
+    const lineBytes = Buffer.byteLength(line, "utf8");
+    const separator = current.length > 0 ? 1 : 0;
+    if (currentBytes + separator + lineBytes <= limit()) {
+      current.push(line);
+      currentBytes += separator + lineBytes;
+      return;
+    }
+    flush();
+    const sepAfterFlush = current.length > 0 ? 1 : 0;
+    if (currentBytes + sepAfterFlush + lineBytes <= limit()) {
+      current.push(line);
+      currentBytes += sepAfterFlush + lineBytes;
+      return;
+    }
+    splitOversizedLine(line);
+  };
+
+  const splitOversizedLine = (line: string): void => {
+    const chars = Array.from(line);
+    let index = 0;
+    while (index < chars.length) {
+      let separator = current.length > 0 ? 1 : 0;
+      let available = limit() - currentBytes - separator;
+      if (available <= 0) {
+        flush();
+        separator = current.length > 0 ? 1 : 0;
+        available = limit() - currentBytes - separator;
+      }
+      let part = "";
+      let partBytes = 0;
+      while (index < chars.length) {
+        const charBytes = Buffer.byteLength(chars[index], "utf8");
+        if (partBytes + charBytes > available) {
+          break;
+        }
+        part += chars[index];
+        partBytes += charBytes;
+        index += 1;
+      }
+      if (part === "") {
+        flush();
+        continue;
+      }
+      current.push(part);
+      currentBytes += separator + partBytes;
+      if (index < chars.length) {
+        flush();
+      }
+    }
+  };
+
+  for (const line of text.split("\n")) {
+    pushLine(line);
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      openFence = openFence !== "" ? "" : trimmed;
+    }
+  }
+
+  if (current.length > 0) {
+    let chunk = current.join("\n");
+    if (openFence !== "") {
+      chunk += CODE_FENCE_CLOSE;
+    }
+    chunks.push(chunk);
+  }
+
+  return chunks;
 }
 
 function buildBodyElements(input: BuildRichCardInput): Record<string, unknown>[] {
