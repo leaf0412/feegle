@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
+import { BootContext } from "../../src/boot/boot-context.js";
 import { buildHandlerKindRegistry } from "../../src/scheduler/build-handler-kind-registry.js";
 import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
 import { TaskRegistry } from "../../src/scheduler/task-registry.js";
 import type { StockStore } from "../../src/stock/stock-store.js";
 
+function contextWithCoreCaps(): BootContext {
+  const ctx = new BootContext();
+  ctx.provide("taskRegistry", new TaskRegistry({ list: () => [], upsert: async () => {}, remove: async () => {} }));
+  ctx.provide("stockStore", {} as StockStore);
+  ctx.provide("quote", { query: async () => [] });
+  ctx.provide("agents", new AgentProviderRegistry());
+  return ctx;
+}
+
 describe("buildHandlerKindRegistry", () => {
-  it("lets external kind modules add kinds without editing the app entry", () => {
+  it("lets a kind module add a kind that pulls its deps from the context", () => {
     const kind: HandlerKind<Record<string, never>> = {
       id: "external-kind",
       title: "External",
@@ -16,18 +26,8 @@ describe("buildHandlerKindRegistry", () => {
       run: async () => ({ outcome: "noop" })
     };
     const registry = buildHandlerKindRegistry({
-      taskRegistry: new TaskRegistry({ list: () => [], upsert: async () => {}, remove: async () => {} }),
-      stockStore: {} as StockStore,
-      quote: { query: async () => [] },
-      agents: new AgentProviderRegistry(),
-      modules: [
-        {
-          id: "external",
-          register: (target) => {
-            target.register(kind);
-          }
-        }
-      ]
+      ctx: contextWithCoreCaps(),
+      modules: [{ id: "external", register: (target) => target.register(kind) }]
     });
 
     expect(registry.get("external-kind")).toBe(kind);
@@ -44,10 +44,7 @@ describe("buildHandlerKindRegistry", () => {
     };
     expect(() =>
       buildHandlerKindRegistry({
-        taskRegistry: new TaskRegistry({ list: () => [], upsert: async () => {}, remove: async () => {} }),
-        stockStore: {} as StockStore,
-        quote: { query: async () => [] },
-        agents: new AgentProviderRegistry(),
+        ctx: contextWithCoreCaps(),
         modules: [
           { id: "first", register: (target) => target.register(kind) },
           { id: "second", register: (target) => target.register(kind) }

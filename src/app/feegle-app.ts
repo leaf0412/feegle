@@ -1,10 +1,13 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import { join } from "node:path";
+import { BootContext } from "../boot/boot-context.js";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
 import { SessionStore } from "../agent/session-store.js";
 import { FeishuChatHandler } from "../feishu/feishu-chat-handler.js";
 import { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
+import { GitLabClient } from "../gitlab/gitlab-client.js";
+import { GitLabFollowStore } from "../gitlab/gitlab-follow-store.js";
 import { FeishuCommandResponder, logFeishuCommandTrace } from "../feishu/feishu-command-responder.js";
 import type { FeishuCloudDocClientPort } from "../feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../feishu/feishu-client.js";
@@ -17,6 +20,7 @@ import { InMemoryRepositoryRegistry } from "../repositories/repository-registry.
 import { RepositoryStore } from "../repositories/repository-store.js";
 import { WorkspaceStore } from "../repositories/workspace-store.js";
 import { buildHandlerKindRegistry } from "../scheduler/build-handler-kind-registry.js";
+import { defaultHandlerKindModules } from "../scheduler/default-handler-kind-modules.js";
 import { DedupStore } from "../scheduler/dedup-store.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
 import { ConsoleJsonLogger } from "../scheduler/logger.js";
@@ -111,6 +115,9 @@ export class FeegleApp {
     const taskStore = await TaskStore.load(this.deps.feegleHome);
     await taskStore.ensureSeed(defaultSeedTasks());
     const taskRegistry = new TaskRegistry(taskStore);
+    const gitlabClient = new GitLabClient(process.env["GITLAB_TOKEN"] ?? "");
+    const gitlabFollowStore = new GitLabFollowStore(this.runtimeDb);
+    const gitService = new GitService();
     const notify = buildNotificationBroker({
       feishuClient: this.deps.feishuClient,
       modules: this.deps.notificationAdapterModules
@@ -121,12 +128,17 @@ export class FeegleApp {
       buildQuoteClientRegistry({ modules: this.deps.quoteClientModules }).get(quoteClientId),
       quoteClientId
     );
+    const bootCtx = new BootContext();
+    bootCtx.provide("taskRegistry", taskRegistry);
+    bootCtx.provide("stockStore", stockStore);
+    bootCtx.provide("quote", quote);
+    bootCtx.provide("agents", agentProviders);
+    bootCtx.provide("gitlab", gitlabClient);
+    bootCtx.provide("gitlabFollowStore", gitlabFollowStore);
+    bootCtx.provide("gitService", gitService);
     const kinds = buildHandlerKindRegistry({
-      taskRegistry,
-      stockStore,
-      quote,
-      agents: agentProviders,
-      modules: this.deps.handlerKindModules
+      ctx: bootCtx,
+      modules: [...defaultHandlerKindModules(), ...(this.deps.handlerKindModules ?? [])]
     });
 
     warnStartupGaps(configStore, taskRegistry, this.deps.ownerEmails);

@@ -1,5 +1,8 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { HandlerKindModule } from "./handler-kind-module.js";
 import { AgentPromptKind } from "./kinds/agent-prompt-kind.js";
+import { GitLabFollowKind } from "./kinds/gitlab-follow-kind.js";
 import { HeartbeatKind } from "./kinds/heartbeat-kind.js";
 import { StockAdvisorKind } from "./kinds/stock-advisor-kind.js";
 import { StockMonitorKind } from "./kinds/stock-monitor-kind.js";
@@ -10,54 +13,83 @@ const defaultModuleFactories = [
   stockMonitorKindModule,
   stockPortfolioSnapshotKindModule,
   stockAdvisorKindModule,
-  agentPromptKindModule
+  agentPromptKindModule,
+  gitlabFollowKindModule
 ];
 
 export function defaultHandlerKindModules(): HandlerKindModule[] {
   return defaultModuleFactories.map((createModule) => createModule());
 }
 
-function heartbeatKindModule(): HandlerKindModule {
+export function heartbeatKindModule(): HandlerKindModule {
   return {
     id: "heartbeat",
-    register: (registry, deps) => {
-      registry.register(new HeartbeatKind({ taskRegistry: deps.taskRegistry }));
+    register: (registry, ctx) => {
+      const { taskRegistry } = ctx.pick("taskRegistry");
+      registry.register(new HeartbeatKind({ taskRegistry }));
     }
   };
 }
 
-function stockMonitorKindModule(): HandlerKindModule {
+export function stockMonitorKindModule(): HandlerKindModule {
   return {
     id: "stock-monitor",
-    register: (registry, deps) => {
-      registry.register(new StockMonitorKind({ stockStore: deps.stockStore, quote: deps.quote }));
+    register: (registry, ctx) => {
+      const { stockStore, quote } = ctx.pick("stockStore", "quote");
+      registry.register(new StockMonitorKind({ stockStore, quote }));
     }
   };
 }
 
-function stockPortfolioSnapshotKindModule(): HandlerKindModule {
+export function stockPortfolioSnapshotKindModule(): HandlerKindModule {
   return {
     id: "stock-portfolio-snapshot",
-    register: (registry, deps) => {
-      registry.register(new StockPortfolioSnapshotKind({ stockStore: deps.stockStore, quote: deps.quote }));
+    register: (registry, ctx) => {
+      const { stockStore, quote } = ctx.pick("stockStore", "quote");
+      registry.register(new StockPortfolioSnapshotKind({ stockStore, quote }));
     }
   };
 }
 
-function stockAdvisorKindModule(): HandlerKindModule {
+export function stockAdvisorKindModule(): HandlerKindModule {
   return {
     id: "stock-advisor",
-    register: (registry, deps) => {
-      registry.register(new StockAdvisorKind({ stockStore: deps.stockStore, quote: deps.quote, agents: deps.agents }));
+    register: (registry, ctx) => {
+      const { stockStore, quote, agents } = ctx.pick("stockStore", "quote", "agents");
+      registry.register(new StockAdvisorKind({ stockStore, quote, agents }));
     }
   };
 }
 
-function agentPromptKindModule(): HandlerKindModule {
+export function agentPromptKindModule(): HandlerKindModule {
   return {
     id: "agent-prompt",
-    register: (registry, deps) => {
-      registry.register(new AgentPromptKind({ agents: deps.agents }));
+    register: (registry, ctx) => {
+      const { agents } = ctx.pick("agents");
+      registry.register(new AgentPromptKind({ agents }));
+    }
+  };
+}
+
+export function gitlabFollowKindModule(): HandlerKindModule {
+  return {
+    id: "gitlab-follow",
+    register: (registry, ctx) => {
+      const { gitlab, gitlabFollowStore, gitService, agents } = ctx.pick(
+        "gitlab",
+        "gitlabFollowStore",
+        "gitService",
+        "agents"
+      );
+      registry.register(
+        new GitLabFollowKind({
+          gitlab,
+          store: gitlabFollowStore,
+          agents,
+          git: gitService,
+          workspaceRoot: process.env["GITLAB_WORKSPACE"] ?? join(homedir(), ".feegle", "repos")
+        })
+      );
     }
   };
 }
