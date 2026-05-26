@@ -1,6 +1,7 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import { join } from "node:path";
 import { BootContext } from "../boot/boot-context.js";
+import { warnStartupGaps } from "../boot/warn-startup-gaps.js";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import { ChatHistoryStore } from "../agent/chat-history-store.js";
 import { SessionStore } from "../agent/session-store.js";
@@ -346,12 +347,3 @@ function defaultSeedTasks(): Task[] {
   ];
 }
 
-function warnStartupGaps(configStore: ConfigStorePort, taskRegistry: TaskRegistry, ownerEmails: ReadonlySet<string>): void {
-  const tasks = taskRegistry.list();
-  if (configStore.get().failureTarget === null && tasks.some((task) => task.enabled)) {
-    console.warn("⚠️ failureTarget not configured; enabled tasks exist. Run /error_target set in your target Feishu chat.");
-  }
-  if (ownerEmails.size === 0 && tasks.some((task) => task.source === "domain" || task.source === "user")) {
-    console.warn("⚠️ FEEGLE_OWNER_EMAILS not set; all owner-only commands will be silently denied.");
-  }
-}
