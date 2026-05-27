@@ -23,6 +23,8 @@
 | **agent-provider** | — | `/provider list/register/unregister/use`（已实现） | `platform/commands/provider/provider-command-handlers.ts` | `platform/commands/provider-command-module.ts` | providers, providerStore |
 | **planned**（占位） | — | session/setup/knowledge 各组未实现命令 + agent group 剩余占位（`/model` `/reasoning` `/mode` `/memory` …） | （无 handler） | `platform/commands/planned-command-module.ts` | — |
 
+> **agent-provider 负载均衡**：注册 ≥2 个 provider 时，自然语言 chat 按"最少在飞 + round-robin"在各 provider 间分摊，并按会话黏（session 的 agentKind 固定）。`active`（/provider use）此时仅作为配置类命令与 cron 的默认目标，不再决定 chat 走向。
+
 > ⚠️ 注意 `scheduler-command-module.ts` 一个 module 同时覆盖了 cron-admin / stock-monitor / stock-portfolio / error-target 四个 feature 的命令注册——这是当前最反内聚的位置。
 
 ## Cross-cutting Infrastructure

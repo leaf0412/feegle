@@ -49,7 +49,7 @@ describe("StatusCommandHandler", () => {
     });
     const reply = await handler.execute();
     if (reply.kind !== "text") throw new Error("expected text reply");
-    expect(reply.text).toContain("active agent: (none");
+    expect(reply.text).toContain("default agent (config/cron): (none");
   });
 
   it("counts only enabled tasks so operators can see scheduler load at a glance", async () => {

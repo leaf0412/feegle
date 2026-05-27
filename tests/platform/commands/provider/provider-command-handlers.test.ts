@@ -166,7 +166,7 @@ describe("provider command handlers", () => {
         providerStore: store
       });
       const reply = await handler.execute(ctx("codex"));
-      expect((reply as { text: string }).text).toContain("已激活");
+      expect((reply as { text: string }).text).toContain("已设为配置类命令与定时任务的默认 agent");
       expect(registry.activeKindName()).toBe("codex");
       expect(store.snapshot().activeKind).toBe("codex");
     });

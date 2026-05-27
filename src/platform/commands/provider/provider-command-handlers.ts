@@ -158,7 +158,7 @@ export class ProviderUseCommandHandler extends ProviderCommand {
     }
     this.deps.providers.setActive(kind);
     return textReply(
-      `${defaultProviderDisplayName(kind)} 已激活，自然语言聊天将走 ${defaultProviderDisplayName(kind)}。`
+      `${defaultProviderDisplayName(kind)} 已设为配置类命令与定时任务的默认 agent。自然语言聊天在注册了多个 agent 时会自动负载均衡。`
     );
   }
 }

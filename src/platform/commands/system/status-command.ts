@@ -29,7 +29,7 @@ export class StatusCommandHandler implements SlashCommandHandler {
     lines.push(`  host: ${os.hostname()} (pid ${process.pid})`);
     lines.push(`  memory: ${formatMemory(process.memoryUsage().rss)}`);
     lines.push("");
-    lines.push(`  active agent: ${activeKind ?? "(none — run /provider use <kind>)"}`);
+    lines.push(`  default agent (config/cron): ${activeKind ?? "(none; chat balances across all registered)"}`);
     lines.push(`  tasks: ${enabled}/${tasks.length} enabled`);
     if (lastRun) {
       lines.push(
