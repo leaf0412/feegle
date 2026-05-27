@@ -470,6 +470,22 @@ describe("FeishuCommandResponder", () => {
       command: { type: "chat", raw: "hi" }
     });
     expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ chatId: "oc_g", userText: "hi", triggerMessageId: "om_1" });
+  });
+
+  it("blocks group chat when no binding store is wired (safe default, not a bypass)", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(), chatHandler // no chatBindingStore
+    });
+    await responder.handleCommand({
+      source: "message", chatId: "oc_g", messageId: "om_1", chatType: "group",
+      command: { type: "chat", raw: "hi" }
+    });
+    expect(calls).toEqual([]);
+    expect(replies[0].text).toContain("请先 /bind");
   });
 
   it("does not gate single (p2p) chat — it runs without a binding", async () => {
