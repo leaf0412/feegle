@@ -36,6 +36,19 @@ export interface GitLabNote {
   author: GitLabUser;
 }
 
+export interface GitLabIssueSearchResult {
+  id: number;
+  iid: number;
+  project_id: number;
+  title: string;
+  description: string | null;
+  state: "opened" | "closed";
+  created_at: string;
+  updated_at: string;
+  web_url: string;
+  labels: string[];
+}
+
 export interface GitLabSummarySection {
   issueBasics: string;
   commentSummary: string;

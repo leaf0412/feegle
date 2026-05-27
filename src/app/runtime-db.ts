@@ -49,6 +49,26 @@ function migrate(db: RuntimeDb): void {
       updated_at text not null,
       primary key (plan_id, version)
     );
+
+    create table if not exists gitlab_follow_entries (
+      id integer primary key autoincrement,
+      host text not null,
+      project_id integer not null,
+      issue_iid integer not null,
+      issue_url text not null,
+      project_path text not null,
+      title text not null,
+      status text not null default 'discovered',
+      agent_prompt text,
+      agent_response text,
+      user_feedback text,
+      branch_name text,
+      worktree_path text,
+      error_message text,
+      created_at text not null,
+      updated_at text not null,
+      unique(host, project_id, issue_iid)
+    );
   `);
   ensureColumn(db, "plan_artifacts", "doc_token", "text");
   ensureColumn(db, "plan_artifacts", "doc_url", "text");

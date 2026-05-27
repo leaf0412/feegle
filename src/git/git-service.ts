@@ -19,6 +19,13 @@ export class GitService {
     await this.runner("git", ["clone", remoteUrl, localPath]);
   }
 
+  async cloneWithToken(remoteUrl: string, localPath: string, token: string): Promise<void> {
+    await this.runner("git", [
+      "-c", `http.extraHeader=PRIVATE-TOKEN: ${token}`,
+      "clone", remoteUrl, localPath
+    ]);
+  }
+
   async createBranch(localPath: string, baseBranch: string, branchName: string): Promise<void> {
     await this.runner("git", ["-C", localPath, "checkout", baseBranch]);
     await this.runner("git", ["-C", localPath, "checkout", "-b", branchName]);

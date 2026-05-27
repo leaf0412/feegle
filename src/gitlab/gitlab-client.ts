@@ -1,4 +1,4 @@
-import type { GitLabIssue, GitLabIssueUrl, GitLabNote } from "./gitlab-types.js";
+import type { GitLabIssue, GitLabIssueUrl, GitLabNote, GitLabIssueSearchResult } from "./gitlab-types.js";
 
 export class GitLabClient {
   private readonly baseUrl: (host: string) => string;
@@ -31,6 +31,14 @@ export class GitLabClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ body })
     });
+  }
+
+  async searchMentionedIssues(username: string, host?: string): Promise<GitLabIssueSearchResult[]> {
+    const query = encodeURIComponent(`@${username}`);
+    const effectiveHost = host ?? process.env["GITLAB_HOST"] ?? "www.lejuhub.com";
+    const url = `https://${effectiveHost}/api/v4/search?scope=issues&search=${query}&state=opened&per_page=50`;
+    const items = await this.request<GitLabIssueSearchResult[]>(url);
+    return items.filter((item) => item.state === "opened");
   }
 
   private encodeProjectPath(url: GitLabIssueUrl): string {
