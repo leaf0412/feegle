@@ -1,6 +1,6 @@
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
-import { warnStartupGaps } from "../warn-startup-gaps.js";
+import { warnStartupGaps, checkAgentReadiness } from "../warn-startup-gaps.js";
 import type { ConfigStorePort } from "../../app/config-store.js";
 import type { Startable } from "../../app/feegle-app.js";
 import type { HookManager } from "../../app/hooks.js";
@@ -30,6 +30,13 @@ export function schedulerPhase(deps: SchedulerPhaseDeps): BootPhase {
         "agents"
       );
       warnStartupGaps(configStore, taskRegistry, deps.ownerEmails);
+      for (const readiness of checkAgentReadiness(agents)) {
+        if (readiness.status === "ok") {
+          console.info(readiness.message);
+        } else {
+          console.warn(readiness.message);
+        }
+      }
       const scheduler =
         deps.createScheduler?.({ notify, configStore, hooks: deps.hooks }) ??
         new TaskScheduler({
