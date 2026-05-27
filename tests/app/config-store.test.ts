@@ -1,8 +1,18 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "../../src/app/config-store.js";
+
+async function withHome(jsonc: string, fn: (home: string) => Promise<void>) {
+  const home = await mkdtemp(join(tmpdir(), "feegle-cfg-"));
+  try {
+    await writeFile(join(home, "config.jsonc"), jsonc, "utf8");
+    await fn(home);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}
 
 describe("ConfigStore", () => {
   it("creates a null failure target on first load so failures are explicit", async () => {
@@ -56,5 +66,69 @@ describe("ConfigStore", () => {
     await writeFile(join(home, "config.json"), JSON.stringify({ schemaVersion: 2, failureTarget: null }));
 
     await expect(ConfigStore.load(home)).rejects.toThrow(/config.json/);
+  });
+});
+
+describe("ConfigStore feishu/gitlab/ownerEmails", () => {
+  it("parses feishu, gitlab and ownerEmails so config.jsonc is the single source of truth", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1,
+        failureTarget: null,
+        ownerEmails: ["a@b.com"],
+        feishu: {
+          appId: "cli_x", appSecret: "sec",
+          enableInteractiveCards: true, allowFrom: "*", allowChat: "*",
+          groupOnly: false, groupReplyAll: false, shareSessionInChannel: false,
+          threadIsolation: false, replyToTrigger: true, progressStyle: "card",
+          reactionEmoji: "OnIt"
+        },
+        gitlab: { token: "glpat", host: "www.lejuhub.com", workspace: "/tmp/repos" }
+      }),
+      async (home) => {
+        const store = await ConfigStore.load(home);
+        const c = store.get();
+        expect(c.feishu?.appId).toBe("cli_x");
+        expect(c.gitlab?.host).toBe("www.lejuhub.com");
+        expect(c.ownerEmails).toEqual(["a@b.com"]);
+      }
+    );
+  });
+
+  it("rejects a feishu section missing a required behavior toggle (no hidden code default)", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1, failureTarget: null,
+        feishu: { appId: "cli_x", appSecret: "sec" } // 缺必填开关
+      }),
+      async (home) => {
+        await expect(ConfigStore.load(home)).rejects.toThrow(/Invalid config/);
+      }
+    );
+  });
+
+  it("rejects a gitlab section missing host (token/host/workspace all required when present)", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1, failureTarget: null,
+        gitlab: { token: "glpat", workspace: "/tmp/repos" } // 缺 host
+      }),
+      async (home) => {
+        await expect(ConfigStore.load(home)).rejects.toThrow(/Invalid config/);
+      }
+    );
+  });
+
+  it("get() returns deep copies so callers cannot mutate stored config", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1, failureTarget: null, ownerEmails: ["a@b.com"]
+      }),
+      async (home) => {
+        const store = await ConfigStore.load(home);
+        store.get().ownerEmails!.push("x@y.com");
+        expect(store.get().ownerEmails).toEqual(["a@b.com"]);
+      }
+    );
   });
 });

@@ -29,11 +29,39 @@ export const AgentConfigSchema = z.object({
   providers: z.record(AgentProviderConfigSchema)
 });
 
+export const FeishuConfigSchema = z.object({
+  appId: z.string().min(1),
+  appSecret: z.string().min(1),
+  enableInteractiveCards: z.boolean(),
+  allowFrom: z.string(),
+  allowChat: z.string(),
+  groupOnly: z.boolean(),
+  groupReplyAll: z.boolean(),
+  shareSessionInChannel: z.boolean(),
+  threadIsolation: z.boolean(),
+  replyToTrigger: z.boolean(),
+  progressStyle: z.enum(["legacy", "compact", "card"]),
+  reactionEmoji: z.string(),
+  verificationToken: z.string().min(1).optional(),
+  encryptKey: z.string().min(1).optional(),
+  botOpenId: z.string().min(1).optional(),
+  doneEmoji: z.string().min(1).optional()
+});
+
+export const GitLabConfigSchema = z.object({
+  token: z.string().min(1),
+  host: z.string().min(1),
+  workspace: z.string().min(1)
+});
+
 export const FeegleConfigSchema = z.object({
   schemaVersion: z.literal(1),
   failureTarget: NotificationTargetSchema.nullable(),
   agent: AgentConfigSchema.optional(),
-  workspaces: z.record(z.string().min(1)).optional()
+  workspaces: z.record(z.string().min(1)).optional(),
+  ownerEmails: z.array(z.string().min(1)).optional(),
+  feishu: FeishuConfigSchema.optional(),
+  gitlab: GitLabConfigSchema.optional()
 });
 
 export type FeegleConfig = z.infer<typeof FeegleConfigSchema>;
@@ -89,6 +117,15 @@ export class ConfigStore {
     }
     if (this.data.workspaces) {
       config.workspaces = { ...this.data.workspaces };
+    }
+    if (this.data.ownerEmails) {
+      config.ownerEmails = [...this.data.ownerEmails];
+    }
+    if (this.data.feishu) {
+      config.feishu = { ...this.data.feishu };
+    }
+    if (this.data.gitlab) {
+      config.gitlab = { ...this.data.gitlab };
     }
     return config;
   }
