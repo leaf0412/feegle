@@ -45,7 +45,7 @@ function render(
   if (owner) {
     lines.push("已通过 owner 校验，可使用 /cron · /bind_stocks · /portfolio · /error_target · /provider 等命令。");
   } else if (email) {
-    lines.push(`未匹配 FEEGLE_OWNER_EMAILS。把 ${email} 加入该环境变量（逗号分隔多个）即可解锁 owner-only 命令。`);
+    lines.push(`未匹配 owner。把 ${email} 加入 ~/.feegle/config.jsonc 的 "ownerEmails" 数组即可解锁 owner-only 命令。`);
   } else {
     lines.push("飞书未返回邮箱，bot 无法识别 owner。检查飞书企业通讯录是否填写了邮箱，并确认应用具备 contact:user.email 读取权限。");
   }

@@ -11,6 +11,6 @@ export function warnStartupGaps(
     console.warn("⚠️ failureTarget not configured; enabled tasks exist. Run /error_target set in your target Feishu chat.");
   }
   if (ownerEmails.size === 0 && tasks.some((task) => task.source === "domain" || task.source === "user")) {
-    console.warn("⚠️ FEEGLE_OWNER_EMAILS not set; all owner-only commands will be silently denied.");
+    console.warn("⚠️ ownerEmails 未配置（~/.feegle/config.jsonc）; all owner-only commands will be silently denied.");
   }
 }

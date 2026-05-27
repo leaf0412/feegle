@@ -35,7 +35,7 @@ describe("WhoamiCommandHandler", () => {
     if (reply.kind !== "text") throw new Error("expected text reply");
     expect(reply.text).toContain("邮箱: bob@example.com");
     expect(reply.text).toContain("isOwner: ❌");
-    expect(reply.text).toContain("FEEGLE_OWNER_EMAILS");
+    expect(reply.text).toContain("ownerEmails");
     expect(reply.text).toContain("bob@example.com");
   });
 
