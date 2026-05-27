@@ -2,8 +2,8 @@ import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { NotificationTarget } from "./notification-port.js";
-import { createDefaultJsonFile, writeJsonAtomically } from "./json-file.js";
-import { parseJsonc } from "./jsonc.js";
+import { createDefaultJsonFile, writeTextAtomically } from "./json-file.js";
+import { parseJsonc, setJsoncValue } from "./jsonc.js";
 
 export const NotificationTargetSchema = z.object({
   platform: z.literal("feishu"),
@@ -79,7 +79,8 @@ const DEFAULT_CONFIG: FeegleConfig = {
 export class ConfigStore {
   private constructor(
     private readonly filePath: string,
-    private data: FeegleConfig
+    private data: FeegleConfig,
+    private rawText: string
   ) {}
 
   static async load(home: string, env: NodeJS.ProcessEnv = process.env): Promise<ConfigStore> {
@@ -99,7 +100,7 @@ export class ConfigStore {
     try {
       const parsed = filePath.endsWith(".jsonc") ? parseJsonc(raw, filePath) : JSON.parse(raw);
       const resolved = interpolateEnv(parsed, env);
-      return new ConfigStore(filePath, FeegleConfigSchema.parse(resolved));
+      return new ConfigStore(filePath, FeegleConfigSchema.parse(resolved), raw);
     } catch (error) {
       throw new Error(`Invalid config at ${filePath}: ${errorMessage(error)}`);
     }
@@ -132,11 +133,13 @@ export class ConfigStore {
   }
 
   async setFailureTarget(target: NotificationTarget | null): Promise<void> {
-    this.data = {
-      schemaVersion: 1,
-      failureTarget: target ? NotificationTargetSchema.parse(target) : null
-    };
-    await writeJsonAtomically(this.filePath, this.data);
+    const value = target ? NotificationTargetSchema.parse(target) : null;
+    // Edit only the failureTarget field in the raw source so every other field, the {env:...}
+    // tokens and JSONC comments survive — never rewrite the whole file from the resolved in-memory
+    // config (that would persist plaintext secrets and drop sections).
+    this.rawText = setJsoncValue(this.rawText, ["failureTarget"], value);
+    await writeTextAtomically(this.filePath, this.rawText);
+    this.data = { ...this.data, failureTarget: value };
   }
 }
 

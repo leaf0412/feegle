@@ -172,4 +172,38 @@ describe("ConfigStore environment-variable interpolation", () => {
       }
     );
   });
+
+  it("setFailureTarget edits only failureTarget — preserves other fields, {env:...} tokens and comments", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-cfg-"));
+    try {
+      await writeFile(
+        join(home, "config.jsonc"),
+        `{
+          // operator config
+          "schemaVersion": 1,
+          "failureTarget": null,
+          "ownerEmails": ["a@b.com"],
+          "feishu": ${JSON.stringify(fullFeishu("{env:FEISHU_APP_ID}", "{env:FEISHU_APP_SECRET}"))}
+        }`,
+        "utf8"
+      );
+      const env = { FEISHU_APP_ID: "cli_real", FEISHU_APP_SECRET: "secret_real" };
+      const store = await ConfigStore.load(home, env);
+
+      await store.setFailureTarget({ platform: "feishu", chatId: "oc_ops" });
+
+      const onDisk = await readFile(join(home, "config.jsonc"), "utf8");
+      expect(onDisk).toContain("{env:FEISHU_APP_SECRET}"); // token preserved, NOT resolved to plaintext
+      expect(onDisk).toContain("a@b.com"); // other fields not wiped
+      expect(onDisk).toContain("operator config"); // comment preserved
+      expect(onDisk).toContain("oc_ops"); // failureTarget written
+
+      const reloaded = await ConfigStore.load(home, env);
+      expect(reloaded.get().failureTarget).toEqual({ platform: "feishu", chatId: "oc_ops" });
+      expect(reloaded.get().feishu?.appSecret).toBe("secret_real");
+      expect(reloaded.get().ownerEmails).toEqual(["a@b.com"]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
 });

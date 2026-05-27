@@ -3,10 +3,9 @@ import { open, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 
-export async function writeJsonAtomically(filePath: string, value: unknown): Promise<void> {
+export async function writeTextAtomically(filePath: string, content: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.tmp.${process.pid}.${randomUUID()}`;
-  const content = `${JSON.stringify(value, null, 2)}\n`;
   const handle = await open(tmpPath, "w");
   try {
     await handle.writeFile(content, "utf8");
@@ -15,6 +14,10 @@ export async function writeJsonAtomically(filePath: string, value: unknown): Pro
     await handle.close();
   }
   await rename(tmpPath, filePath);
+}
+
+export async function writeJsonAtomically(filePath: string, value: unknown): Promise<void> {
+  await writeTextAtomically(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 export async function createDefaultJsonFile(filePath: string, value: unknown): Promise<void> {
