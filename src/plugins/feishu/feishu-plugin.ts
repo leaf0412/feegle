@@ -17,6 +17,7 @@ import {
   buildPlanRevisionRequestCard
 } from "../../feishu/feishu-workbench-cards.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
+import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";
 import { resolveWorkspaceDir } from "../../app/workspace-dir.js";
 import { PlanArtifactService } from "../../workbench/plan-artifact-service.js";
 import type { PlanArtifactStore } from "../../workbench/plan-artifact-store.js";
@@ -64,6 +65,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     providers: cap.agents,
     history: cap.chatHistory,
     sessionStore: cap.sessionStore,
+    balancer: new AgentLoadBalancer(),
     workspaceDir: resolveWorkspaceDir(deps.feegleHome, config.defaultWorkspace)
   });
   const planArtifacts = new PlanArtifactService({
