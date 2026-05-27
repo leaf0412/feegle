@@ -61,7 +61,7 @@ describe("BindCommandHandler", () => {
     const bindings = await ChatBindingStore.load(home);
     const handler = new BindCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     await handler.execute(makeContext("feature/x main alpha"));
-    expect(bindings.get("oc_1")?.repositoryIds).toEqual([repo.id]);
+    expect(bindings.get("user:u_1")?.repositoryIds).toEqual([repo.id]);
   });
 });
 
@@ -79,7 +79,7 @@ describe("RepoShowCommandHandler", () => {
     const repos = await RepositoryStore.load(home);
     const repo = await repos.add({ name: "alpha", remoteUrl: "https://x/a", defaultBaseBranch: "main" });
     const bindings = await ChatBindingStore.load(home);
-    await bindings.upsert({ chatId: "oc_1", branch: "feature/x", baseBranch: "main", repositoryIds: [repo.id] });
+    await bindings.upsert({ chatId: "user:u_1", branch: "feature/x", baseBranch: "main", repositoryIds: [repo.id] });
     const handler = new RepoShowCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(makeContext());
     if (reply.kind !== "text") throw new Error("expected text reply");
@@ -99,9 +99,9 @@ describe("RepoClearCommandHandler", () => {
 
   it("removes existing binding so subsequent /repo show goes back to 'not bound'", async () => {
     const bindings = await ChatBindingStore.load(home);
-    await bindings.upsert({ chatId: "oc_1", branch: "x", baseBranch: "main" });
+    await bindings.upsert({ chatId: "user:u_1", branch: "x", baseBranch: "main" });
     const handler = new RepoClearCommandHandler({ chatBindingStore: bindings });
     await handler.execute(makeContext());
-    expect(bindings.get("oc_1")).toBeUndefined();
+    expect(bindings.get("user:u_1")).toBeUndefined();
   });
 });

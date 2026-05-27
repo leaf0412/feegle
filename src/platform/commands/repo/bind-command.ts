@@ -5,6 +5,7 @@ import type {
   SlashCommandHandler,
   SlashCommandReply
 } from "../../slash-command-handler.js";
+import { resolveBindingScopeKey } from "./binding-scope-key.js";
 
 export interface BindCommandDeps {
   repositoryStore: RepositoryStore;
@@ -36,15 +37,17 @@ export class BindCommandHandler implements SlashCommandHandler {
     if (missing.length > 0) {
       return textReply(`未识别的仓库：${missing.join(", ")}。运行 /repo list 查看可用。`);
     }
+    const scopeKey = resolveBindingScopeKey(context);
     const binding = await this.deps.chatBindingStore.upsert({
-      chatId: context.chatId,
+      chatId: scopeKey,
       branch: branch!,
       baseBranch: baseBranch!,
       repositoryIds
     });
     const repoLabel = binding.repositoryIds.length > 0 ? binding.repositoryIds.join(", ") : "（无指定仓库）";
+    const scopeNoun = context.chatType === "group" ? "本群" : "你（单聊）";
     return textReply(
-      `✅ 当前 chat 已绑定：\n  branch: ${binding.branch}\n  base:   ${binding.baseBranch}\n  repos:  ${repoLabel}`
+      `✅ ${scopeNoun}已绑定：\n  branch: ${binding.branch}\n  base:   ${binding.baseBranch}\n  repos:  ${repoLabel}`
     );
   }
 }
