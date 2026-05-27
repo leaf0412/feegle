@@ -11,6 +11,7 @@ import {
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
+import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 
 type FeishuCommandSender = { platform: "feishu"; userId: string; email?: string };
 
@@ -38,6 +39,7 @@ export interface FeishuCommandResponderOptions {
   configStore?: { get(): { failureTarget: unknown } };
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
   userDirectory?: FeishuUserDirectory;
+  chatBindingStore?: ChatBindingStore;
   workbench?: FeishuWorkbenchHandler;
 }
 
@@ -148,6 +150,19 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       return;
     }
     const sessionKey = input.sessionKey ?? `feishu:${input.chatId}:${input.chatId}`;
+    if (input.chatType === "group") {
+      const binding = this.options.chatBindingStore?.get(input.chatId);
+      if (!binding || binding.repositoryIds.length === 0) {
+        await this.traceAsync("reply_text", input, () =>
+          this.client.replyText(
+            input.messageId,
+            "本群尚未绑定仓库，请先 /bind <branch> <base> <repo...> 绑定仓库后再聊天。"
+          )
+        );
+        this.trace("chat_unbound", input);
+        return;
+      }
+    }
     await this.traceAsync("chat", input, () =>
       this.options.chatHandler!.handle({
         chatId: input.chatId,

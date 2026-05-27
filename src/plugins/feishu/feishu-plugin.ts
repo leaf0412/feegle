@@ -53,6 +53,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     "configStore",
     "taskRegistry",
     "userDirectory",
+    "chatBindingStore",
     "slashCommands",
     "agents",
     "sessionStore",
@@ -92,6 +93,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     configStore: cap.configStore,
     taskRegistry: cap.taskRegistry,
     userDirectory: cap.userDirectory,
+    chatBindingStore: cap.chatBindingStore,
     workbench: buildWorkbenchHandlers({
       planArtifactStore: cap.planArtifactStore,
       agents: cap.agents,

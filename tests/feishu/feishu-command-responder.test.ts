@@ -427,6 +427,65 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([]);
   });
 
+  it("blocks group chat and prompts /bind when the group has no bound repo", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({})
+    });
+    await responder.handleCommand({
+      source: "message", chatId: "oc_g", messageId: "om_1", chatType: "group",
+      command: { type: "chat", raw: "帮我看看这个 bug" }
+    });
+    expect(calls).toEqual([]);
+    expect(replies).toHaveLength(1);
+    expect(replies[0].text).toContain("请先 /bind");
+  });
+
+  it("blocks group chat when the binding has zero repos", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({ oc_g: { repositoryIds: [] } })
+    });
+    await responder.handleCommand({
+      source: "message", chatId: "oc_g", messageId: "om_1", chatType: "group",
+      command: { type: "chat", raw: "hi" }
+    });
+    expect(calls).toEqual([]);
+    expect(replies[0].text).toContain("绑定仓库");
+  });
+
+  it("allows group chat once a repo is bound", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({ oc_g: { repositoryIds: ["1"] } })
+    });
+    await responder.handleCommand({
+      source: "message", chatId: "oc_g", messageId: "om_1", chatType: "group",
+      command: { type: "chat", raw: "hi" }
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not gate single (p2p) chat — it runs without a binding", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const calls: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(fakeClient(replies), {
+      registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({})
+    });
+    await responder.handleCommand({
+      source: "message", chatId: "oc_dm", messageId: "om_1", chatType: "p2p",
+      command: { type: "chat", raw: "hi" }
+    });
+    expect(calls).toHaveLength(1);
+  });
+
   it("replies with placeholder text for unknown commands", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];
@@ -508,6 +567,12 @@ describe("FeishuCommandResponder", () => {
     }
   });
 });
+
+function fakeBindingStore(
+  bindings: Record<string, { repositoryIds: string[] }>
+): import("../../src/repositories/chat-binding-store.js").ChatBindingStore {
+  return { get: (id: string) => bindings[id] } as unknown as import("../../src/repositories/chat-binding-store.js").ChatBindingStore;
+}
 
 function testRegistry(repositories: RepositoryRecord[] = []): SlashCommandRegistry {
   return buildSlashCommandRegistry(
