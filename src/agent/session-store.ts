@@ -94,6 +94,24 @@ export class SessionStore {
     return { ...created };
   }
 
+  /**
+   * Pins (or re-pins) the agent kind a session is bound to. Load balancing uses
+   * it to record a new session's chosen agent, and to re-pin a session whose
+   * previous agent was unregistered. Creates the session if it does not exist.
+   * Unlike getOrCreate, this overwrites an existing pin.
+   */
+  async assignAgent(sessionKey: string, agentKind: string): Promise<SessionRecord> {
+    if (!this.get(sessionKey)) {
+      return this.getOrCreate(sessionKey, { agentKind });
+    }
+    return this.mutate(sessionKey, (session) => ({
+      ...session,
+      agentKind,
+      lastActiveAt: this.clock().toISOString(),
+      status: "active"
+    }));
+  }
+
   async touch(sessionKey: string): Promise<SessionRecord> {
     return this.mutate(sessionKey, (session) => ({
       ...session,

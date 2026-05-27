@@ -80,4 +80,19 @@ describe("SessionStore", () => {
       "feishu:oc_a:root:m_2"
     ]);
   });
+
+  it("assignAgent creates a session pinned to the chosen agent when none exists", async () => {
+    const store = await SessionStore.load(home, { clock: makeClock() });
+    const record = await store.assignAgent("feishu:oc_a:root:m_1", "codex");
+    expect(record.agentKind).toBe("codex");
+    expect(store.get("feishu:oc_a:root:m_1")?.agentKind).toBe("codex");
+  });
+
+  it("assignAgent re-pins an existing session so a removed agent can be replaced", async () => {
+    const store = await SessionStore.load(home, { clock: makeClock() });
+    await store.getOrCreate("feishu:oc_a:root:m_1", { agentKind: "claude_code" });
+    const record = await store.assignAgent("feishu:oc_a:root:m_1", "codex");
+    expect(record.agentKind).toBe("codex");
+    expect(store.list()).toHaveLength(1);
+  });
 });
