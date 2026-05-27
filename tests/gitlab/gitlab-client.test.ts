@@ -120,6 +120,17 @@ describe("GitLabClient", () => {
     );
   });
 
+  it("uses the explicitly passed host for mention search (no env / hardcoded default)", async () => {
+    const calls: string[] = [];
+    const fetchMock = (async (url: string) => {
+      calls.push(url);
+      return { ok: true, status: 200, json: async () => [] };
+    }) as unknown as typeof fetch;
+    const client = new GitLabClient("glpat-token", fetchMock);
+    await client.searchMentionedIssues("bot", "git.example.com");
+    expect(calls[0]).toContain("https://git.example.com/api/v4/search");
+  });
+
   it("throws on non-2xx response", async () => {
     const fetchMock = createFetchMock();
     fetchMock.mockResolvedValue({

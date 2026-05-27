@@ -21,7 +21,7 @@ export function providersPhase(deps: ProvidersPhaseDeps): BootPhase {
     name: "providers",
     run: async (ctx: BootContext) => {
       ctx.provide("agents", await deps.resolveAgents(ctx));
-      ctx.provide("gitlab", new GitLabClient(process.env["GITLAB_TOKEN"] ?? ""));
+      ctx.provide("gitlab", new GitLabClient(ctx.require("configStore").get().gitlab?.token ?? ""));
       ctx.provide("gitlabFollowStore", new GitLabFollowStore(ctx.require("runtimeDb")));
       ctx.provide("gitService", new GitService());
       ctx.provide(

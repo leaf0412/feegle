@@ -33,10 +33,9 @@ export class GitLabClient {
     });
   }
 
-  async searchMentionedIssues(username: string, host?: string): Promise<GitLabIssueSearchResult[]> {
+  async searchMentionedIssues(username: string, host: string): Promise<GitLabIssueSearchResult[]> {
     const query = encodeURIComponent(`@${username}`);
-    const effectiveHost = host ?? process.env["GITLAB_HOST"] ?? "www.lejuhub.com";
-    const url = `https://${effectiveHost}/api/v4/search?scope=issues&search=${query}&state=opened&per_page=50`;
+    const url = `https://${host}/api/v4/search?scope=issues&search=${query}&state=opened&per_page=50`;
     const items = await this.request<GitLabIssueSearchResult[]>(url);
     return items.filter((item) => item.state === "opened");
   }
@@ -67,12 +66,4 @@ export class GitLabClient {
 
     return response.json() as Promise<T>;
   }
-}
-
-export function readGitLabToken(): string {
-  const token = process.env["GITLAB_TOKEN"];
-  if (!token || token.trim() === "") {
-    throw new Error("GITLAB_TOKEN environment variable is not set");
-  }
-  return token.trim();
 }

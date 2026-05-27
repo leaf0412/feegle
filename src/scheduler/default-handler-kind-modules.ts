@@ -1,5 +1,3 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
 import type { HandlerKindModule } from "./handler-kind-module.js";
 import { AgentPromptKind } from "./kinds/agent-prompt-kind.js";
 import { GitLabFollowKind } from "./kinds/gitlab-follow-kind.js";
@@ -75,19 +73,21 @@ export function gitlabFollowKindModule(): HandlerKindModule {
   return {
     id: "gitlab-follow",
     register: (registry, ctx) => {
-      const { gitlab, gitlabFollowStore, gitService, agents } = ctx.pick(
+      const { gitlab, gitlabFollowStore, gitService, agents, configStore } = ctx.pick(
         "gitlab",
         "gitlabFollowStore",
         "gitService",
-        "agents"
+        "agents",
+        "configStore"
       );
+      const gl = configStore.get().gitlab;
       registry.register(
         new GitLabFollowKind({
           gitlab,
           store: gitlabFollowStore,
           agents,
           git: gitService,
-          workspaceRoot: process.env["GITLAB_WORKSPACE"] ?? join(homedir(), ".feegle", "repos")
+          config: gl ? { token: gl.token, host: gl.host, workspaceRoot: gl.workspace } : null
         })
       );
     }

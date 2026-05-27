@@ -28,7 +28,7 @@ export class GitLabFollowKind implements HandlerKind<Params> {
       store: GitLabFollowStore;
       agents: AgentProviderRegistry;
       git: GitService;
-      workspaceRoot: string;
+      config: { token: string; host: string; workspaceRoot: string } | null;
     }
   ) {}
 
@@ -41,7 +41,10 @@ export class GitLabFollowKind implements HandlerKind<Params> {
   }
 
   async run(ctx: TaskContext, params: Params): Promise<HandlerRunResult> {
-    const issues = await this.deps.gitlab.searchMentionedIssues(params.botUsername);
+    if (!this.deps.config) {
+      throw new Error("gitlab-follow requires a [gitlab] section (token/host/workspace) in ~/.feegle/config.jsonc");
+    }
+    const issues = await this.deps.gitlab.searchMentionedIssues(params.botUsername, this.deps.config.host);
     ctx.logger.debug(`gitlab-follow: found ${issues.length} issues mentioning @${params.botUsername}`);
 
     for (const issue of issues) {
@@ -114,7 +117,7 @@ export class GitLabFollowKind implements HandlerKind<Params> {
       const parsed = parseGitLabIssueUrl(entry.issueUrl);
       const cloneUrl = `https://${parsed.host}/${parsed.namespace}/${parsed.project}.git`;
       mkdirSync(repoPath, { recursive: true });
-      await this.deps.git.cloneWithToken(cloneUrl, repoPath, process.env["GITLAB_TOKEN"] ?? "");
+      await this.deps.git.cloneWithToken(cloneUrl, repoPath, this.deps.config!.token);
     }
 
     this.deps.store.setStatus(entry, "cloning");
@@ -296,7 +299,7 @@ export class GitLabFollowKind implements HandlerKind<Params> {
   private repoPath(entry: FollowEntry): string {
     const parsed = parseGitLabIssueUrl(entry.issueUrl);
     const nsPath = parsed.namespace ? `${parsed.namespace}/${parsed.project}` : parsed.project;
-    return join(this.deps.workspaceRoot, parsed.host, nsPath);
+    return join(this.deps.config!.workspaceRoot, parsed.host, nsPath);
   }
 
   private async resolveBaseBranch(repoPath: string): Promise<string> {

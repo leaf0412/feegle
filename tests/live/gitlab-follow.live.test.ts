@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GitLabClient, readGitLabToken } from "../../src/gitlab/gitlab-client.js";
+import { GitLabClient } from "../../src/gitlab/gitlab-client.js";
 import { parseGitLabIssueUrl } from "../../src/gitlab/gitlab-url-parser.js";
 
 // Read-only smoke test against a real GitLab (lejuhub by default). Gated off by default.
@@ -8,13 +8,15 @@ import { parseGitLabIssueUrl } from "../../src/gitlab/gitlab-url-parser.js";
 //   LIVE_GITLAB_ISSUE_URL=<https://.../-/issues/N> npx vitest run tests/live/gitlab-follow.live.test.ts
 // Requires GITLAB_TOKEN in the environment. Never posts comments — verification only.
 describe.skipIf(process.env.RUN_LIVE_GITLAB_TEST !== "1")("GitLab follow live (read-only)", () => {
-  const client = new GitLabClient(readGitLabToken());
+  const token = process.env["GITLAB_TOKEN"];
+  const host = process.env["LIVE_GITLAB_HOST"] ?? "www.lejuhub.com";
+  const client = new GitLabClient(token ?? "");
 
   it("searchMentionedIssues authenticates and returns only opened issues", async () => {
     const bot = process.env.LIVE_GITLAB_BOT;
     expect(bot, "set LIVE_GITLAB_BOT to the bot username").toBeTruthy();
 
-    const issues = await client.searchMentionedIssues(bot!);
+    const issues = await client.searchMentionedIssues(bot!, host);
     expect(Array.isArray(issues)).toBe(true);
     for (const issue of issues) {
       expect(issue.state).toBe("opened");

@@ -26,7 +26,7 @@ describe("GitLabFollowKind metadata", () => {
     store: {} as any,
     agents: {} as any,
     git: {} as any,
-    workspaceRoot: "/tmp/test"
+    config: { token: "test-token", host: "www.lejuhub.com", workspaceRoot: "/tmp/test" }
   };
 
   it("has correct id and title", () => {
@@ -49,6 +49,11 @@ describe("GitLabFollowKind metadata", () => {
   it("describes params with bot username", () => {
     const kind = new GitLabFollowKind(mockDeps);
     expect(kind.describeParams({ botUsername: "my-bot" })).toBe("bot: @my-bot");
+  });
+
+  it("refuses to run without a [gitlab] config section", async () => {
+    const kind = new GitLabFollowKind({ ...mockDeps, config: null });
+    await expect(kind.run(makeCtx(), { botUsername: "bot" })).rejects.toThrow(/gitlab/);
   });
 });
 
@@ -110,7 +115,7 @@ describe("GitLabFollowKind state machine", () => {
       store,
       agents: agents as any,
       git: git as any,
-      workspaceRoot
+      config: { token: "test-token", host: "www.lejuhub.com", workspaceRoot }
     });
   }
 
@@ -136,7 +141,7 @@ describe("GitLabFollowKind state machine", () => {
 
     await buildKind().run(makeCtx(), { botUsername: "bot" });
 
-    expect(gitlab.searchMentionedIssues).toHaveBeenCalledWith("bot");
+    expect(gitlab.searchMentionedIssues).toHaveBeenCalledWith("bot", "www.lejuhub.com");
     expect(reload().status).toBe("cloning"); // discovered -> advanced one step in same run
   });
 
