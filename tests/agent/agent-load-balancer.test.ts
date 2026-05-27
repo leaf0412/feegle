@@ -8,11 +8,26 @@ describe("AgentLoadBalancer", () => {
     expect(balancer.select(["codex", "claude_code"])).toBe("claude_code");
   });
 
-  it("rotates round-robin on ties so a cold start does not stack every session on one agent", () => {
+  it("rotates round-robin across ties so consecutive idle selects cycle through all candidates", () => {
     const balancer = new AgentLoadBalancer();
-    const first = balancer.select(["codex", "claude_code"]);
-    const second = balancer.select(["codex", "claude_code"]);
-    expect(first).not.toBe(second);
+    const picks = [
+      balancer.select(["codex", "claude_code"]),
+      balancer.select(["codex", "claude_code"]),
+      balancer.select(["codex", "claude_code"])
+    ];
+    expect(new Set(picks).size).toBe(2); // both agents used, not stacked on one
+    expect(picks[0]).not.toBe(picks[1]);
+    expect(picks[0]).toBe(picks[2]); // ring of size 2 returns to start
+  });
+
+  it("does not let a non-tie select desync the tie rotation", () => {
+    const balancer = new AgentLoadBalancer();
+    const first = balancer.select(["codex", "claude_code"]); // tie
+    balancer.acquire("claude_code");
+    expect(balancer.select(["codex", "claude_code"])).toBe("codex"); // not a tie: 0 < 1
+    balancer.release("claude_code");
+    const third = balancer.select(["codex", "claude_code"]); // tie again
+    expect(third).not.toBe(first); // rotation not desynced by the non-tie call
   });
 
   it("release floors at zero so an over-release cannot make a busy agent look idle", () => {

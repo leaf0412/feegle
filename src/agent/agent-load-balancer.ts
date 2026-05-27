@@ -17,6 +17,9 @@ export class AgentLoadBalancer {
     }
     const lowest = Math.min(...candidateKinds.map((kind) => this.inFlightCount(kind)));
     const leastBusy = candidateKinds.filter((kind) => this.inFlightCount(kind) === lowest);
+    if (leastBusy.length === 1) {
+      return leastBusy[0]!;
+    }
     const chosen = leastBusy[this.rotation % leastBusy.length]!;
     this.rotation += 1;
     return chosen;
