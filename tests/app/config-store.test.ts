@@ -132,3 +132,44 @@ describe("ConfigStore feishu/gitlab/ownerEmails", () => {
     );
   });
 });
+
+describe("ConfigStore environment-variable interpolation", () => {
+  const fullFeishu = (appId: string, appSecret: string) => ({
+    appId, appSecret,
+    enableInteractiveCards: true, allowFrom: "*", allowChat: "*",
+    groupOnly: false, groupReplyAll: false, shareSessionInChannel: false,
+    threadIsolation: false, replyToTrigger: true, progressStyle: "card",
+    reactionEmoji: "OnIt"
+  });
+
+  it("resolves {env:VAR} references from the environment so secrets stay out of config.jsonc", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1, failureTarget: null,
+        feishu: fullFeishu("{env:FEISHU_APP_ID}", "{env:FEISHU_APP_SECRET}")
+      }),
+      async (home) => {
+        const store = await ConfigStore.load(home, {
+          FEISHU_APP_ID: "cli_real",
+          FEISHU_APP_SECRET: "secret_real"
+        });
+        expect(store.get().feishu?.appId).toBe("cli_real");
+        expect(store.get().feishu?.appSecret).toBe("secret_real");
+      }
+    );
+  });
+
+  it("throws a clear error when a referenced environment variable is unset (no silent fallback)", async () => {
+    await withHome(
+      JSON.stringify({
+        schemaVersion: 1, failureTarget: null,
+        feishu: fullFeishu("{env:FEISHU_APP_ID}", "{env:FEISHU_APP_SECRET}")
+      }),
+      async (home) => {
+        await expect(
+          ConfigStore.load(home, { FEISHU_APP_ID: "cli_real" }) // FEISHU_APP_SECRET missing
+        ).rejects.toThrow(/FEISHU_APP_SECRET/);
+      }
+    );
+  });
+});

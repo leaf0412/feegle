@@ -82,7 +82,7 @@ export class ConfigStore {
     private data: FeegleConfig
   ) {}
 
-  static async load(home: string): Promise<ConfigStore> {
+  static async load(home: string, env: NodeJS.ProcessEnv = process.env): Promise<ConfigStore> {
     const filePath = await resolveConfigPath(home);
     let raw: string;
     try {
@@ -98,7 +98,8 @@ export class ConfigStore {
 
     try {
       const parsed = filePath.endsWith(".jsonc") ? parseJsonc(raw, filePath) : JSON.parse(raw);
-      return new ConfigStore(filePath, FeegleConfigSchema.parse(parsed));
+      const resolved = interpolateEnv(parsed, env);
+      return new ConfigStore(filePath, FeegleConfigSchema.parse(resolved));
     } catch (error) {
       throw new Error(`Invalid config at ${filePath}: ${errorMessage(error)}`);
     }
@@ -161,6 +162,36 @@ async function pathExists(filePath: string): Promise<boolean> {
 
 function cloneProviders(providers: NonNullable<FeegleConfig["agent"]>["providers"]): NonNullable<FeegleConfig["agent"]>["providers"] {
   return Object.fromEntries(Object.entries(providers).map(([kind, provider]) => [kind, { ...provider }]));
+}
+
+/**
+ * Resolve `{env:VAR_NAME}` references in every string value against `env`, so config.jsonc can
+ * point at system environment variables instead of holding plaintext secrets. A referenced variable
+ * that is unset or empty throws — no silent fallback.
+ */
+function interpolateEnv<T>(value: T, env: NodeJS.ProcessEnv): T {
+  if (typeof value === "string") {
+    return resolveEnvTokens(value, env) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => interpolateEnv(item, env)) as unknown as T;
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, interpolateEnv(item, env)])
+    ) as T;
+  }
+  return value;
+}
+
+function resolveEnvTokens(input: string, env: NodeJS.ProcessEnv): string {
+  return input.replace(/\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name) => {
+    const resolved = env[name];
+    if (resolved === undefined || resolved === "") {
+      throw new Error(`references environment variable ${name} which is not set`);
+    }
+    return resolved;
+  });
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
