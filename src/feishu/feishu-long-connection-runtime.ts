@@ -1,5 +1,5 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
-import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "./feishu-platform-config.js";
+import type { FeishuPlatformConfig } from "./feishu-platform-config.js";
 import {
   extractBotMenuCommand,
   extractCardActionCommand,
@@ -12,7 +12,7 @@ import {
 import { FeishuMessageDedup } from "./feishu-dedup.js";
 import { FeishuRecallTracker } from "./feishu-recall-tracker.js";
 
-export interface FeishuLongConnectionConfig extends FeishuPlatformConfigInput {}
+export interface FeishuLongConnectionConfig extends FeishuPlatformConfig {}
 
 export interface FeishuCommandHandler {
   handleCommand(input: {
@@ -52,7 +52,7 @@ export interface FeishuWsClient {
 
 export class FeishuLongConnectionRuntime {
   private readonly dedup = new FeishuMessageDedup();
-  private readonly platformConfig;
+  private readonly platformConfig: FeishuPlatformConfig;
   readonly recallTracker = new FeishuRecallTracker();
 
   constructor(
@@ -60,7 +60,9 @@ export class FeishuLongConnectionRuntime {
     private readonly sdk: FeishuLongConnectionSdk,
     private readonly handler: FeishuCommandHandler
   ) {
-    this.platformConfig = parseFeishuPlatformConfig(config);
+    // config is already the parsed/resolved platform config (entry → resolveFeishuEntryConfig);
+    // consume it directly instead of re-parsing (re-parsing would resurrect reactionEmoji="none" → "OnIt").
+    this.platformConfig = config;
   }
 
   async start(): Promise<void> {

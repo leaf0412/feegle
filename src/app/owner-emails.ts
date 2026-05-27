@@ -11,3 +11,7 @@ export function parseOwnerEmails(input: string | undefined): ReadonlySet<string>
       .filter((value) => value.length > 0)
   );
 }
+
+export function normalizeOwnerEmails(emails: readonly string[] | undefined): ReadonlySet<string> {
+  return new Set((emails ?? []).map((value) => normalizeOwnerEmail(value)).filter((value) => value.length > 0));
+}

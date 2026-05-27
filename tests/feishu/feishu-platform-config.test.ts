@@ -1,35 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { parseFeishuPlatformConfig } from "../../src/feishu/feishu-platform-config.js";
+import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "../../src/feishu/feishu-platform-config.js";
+
+function input(overrides: Partial<FeishuPlatformConfigInput> = {}): FeishuPlatformConfigInput {
+  return {
+    appId: "cli", appSecret: "sec",
+    enableInteractiveCards: true, allowFrom: "*", allowChat: "*",
+    groupOnly: false, groupReplyAll: false, shareSessionInChannel: false,
+    threadIsolation: false, replyToTrigger: true, progressStyle: "card",
+    reactionEmoji: "OnIt",
+    ...overrides
+  };
+}
 
 describe("parseFeishuPlatformConfig", () => {
-  it("uses safe defaults for platform routing options", () => {
-    expect(parseFeishuPlatformConfig({ appId: "cli", appSecret: "secret" })).toEqual({
-      appId: "cli",
-      appSecret: "secret",
-      verificationToken: undefined,
-      encryptKey: undefined,
-      botOpenId: undefined,
-      enableInteractiveCards: true,
-      allowFrom: "*",
-      allowChat: "*",
-      groupOnly: false,
-      groupReplyAll: false,
-      shareSessionInChannel: false,
-      threadIsolation: false,
-      replyToTrigger: true,
-      progressStyle: "legacy",
-      reactionEmoji: "OnIt",
-      doneEmoji: undefined
-    });
+  it("passes typed values through unchanged (config.jsonc is the source; no code defaults)", () => {
+    const out = parseFeishuPlatformConfig(input({ allowFrom: "ou_a", groupOnly: true }));
+    expect(out.allowFrom).toBe("ou_a");
+    expect(out.groupOnly).toBe(true);
+    expect(out.progressStyle).toBe("card");
   });
 
-  it("rejects invalid progress style before runtime starts", () => {
-    expect(() =>
-      parseFeishuPlatformConfig({
-        appId: "cli",
-        appSecret: "secret",
-        progressStyle: "fast"
-      })
-    ).toThrow("Invalid Feishu progress style");
+  it("treats reactionEmoji \"none\" as disabled (undefined) so operators can turn reactions off", () => {
+    expect(parseFeishuPlatformConfig(input({ reactionEmoji: "none" })).reactionEmoji).toBeUndefined();
+  });
+
+  it("treats doneEmoji \"none\" as disabled (undefined)", () => {
+    expect(parseFeishuPlatformConfig(input({ doneEmoji: "none" })).doneEmoji).toBeUndefined();
   });
 });

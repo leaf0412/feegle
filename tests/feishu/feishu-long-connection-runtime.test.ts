@@ -8,6 +8,18 @@ import {
 import {
   FeishuLongConnectionRuntime
 } from "../../src/feishu/feishu-long-connection-runtime.js";
+import type { FeishuPlatformConfig } from "../../src/feishu/feishu-platform-config.js";
+
+function fullConfig(overrides: Partial<FeishuPlatformConfig> = {}): FeishuPlatformConfig {
+  return {
+    appId: "cli_xxx", appSecret: "secret",
+    enableInteractiveCards: true, allowFrom: "*", allowChat: "*",
+    groupOnly: false, groupReplyAll: false, shareSessionInChannel: false,
+    threadIsolation: false, replyToTrigger: true, progressStyle: "legacy",
+    reactionEmoji: "OnIt",
+    ...overrides
+  };
+}
 
 describe("FeishuLongConnectionRuntime", () => {
   beforeEach(() => {
@@ -45,13 +57,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      {
-        appId: "cli_xxx",
-        appSecret: "secret_xxx",
-        verificationToken: "token",
-        encryptKey: "encrypt",
-        botOpenId: "ou_bot"
-      },
+      fullConfig({ verificationToken: "token", encryptKey: "encrypt", botOpenId: "ou_bot" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -143,7 +149,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      fullConfig(),
       { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
       { handleCommand: async (input) => { handled.push(input); } }
     );
@@ -183,7 +189,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx" },
+      fullConfig(),
       { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
       { handleCommand: async () => {} }
     );
@@ -215,7 +221,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      fullConfig({ botOpenId: "ou_bot" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -277,7 +283,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      fullConfig({ botOpenId: "ou_bot" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -349,7 +355,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx", allowFrom: "ou_allowed" },
+      fullConfig({ allowFrom: "ou_allowed" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -407,7 +413,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      fullConfig({ botOpenId: "ou_bot" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient
@@ -468,7 +474,7 @@ describe("FeishuLongConnectionRuntime", () => {
     }
 
     const runtime = new FeishuLongConnectionRuntime(
-      { appId: "cli_xxx", appSecret: "secret_xxx", botOpenId: "ou_bot" },
+      fullConfig({ botOpenId: "ou_bot" }),
       {
         EventDispatcher: FakeEventDispatcher,
         WSClient: FakeWSClient

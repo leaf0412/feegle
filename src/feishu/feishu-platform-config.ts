@@ -25,16 +25,16 @@ export interface FeishuPlatformConfigInput {
   verificationToken?: string;
   encryptKey?: string;
   botOpenId?: string;
-  enableInteractiveCards?: boolean;
-  allowFrom?: string;
-  allowChat?: string;
-  groupOnly?: boolean;
-  groupReplyAll?: boolean;
-  shareSessionInChannel?: boolean;
-  threadIsolation?: boolean;
-  replyToTrigger?: boolean;
-  progressStyle?: string;
-  reactionEmoji?: string;
+  enableInteractiveCards: boolean;
+  allowFrom: string;
+  allowChat: string;
+  groupOnly: boolean;
+  groupReplyAll: boolean;
+  shareSessionInChannel: boolean;
+  threadIsolation: boolean;
+  replyToTrigger: boolean;
+  progressStyle: FeishuProgressStyle;
+  reactionEmoji: string;
   doneEmoji?: string;
 }
 
@@ -45,26 +45,16 @@ export function parseFeishuPlatformConfig(input: FeishuPlatformConfigInput): Fei
     verificationToken: input.verificationToken,
     encryptKey: input.encryptKey,
     botOpenId: input.botOpenId,
-    enableInteractiveCards: input.enableInteractiveCards ?? true,
-    allowFrom: input.allowFrom ?? "*",
-    allowChat: input.allowChat ?? "*",
-    groupOnly: input.groupOnly ?? false,
-    groupReplyAll: input.groupReplyAll ?? false,
-    shareSessionInChannel: input.shareSessionInChannel ?? false,
-    threadIsolation: input.threadIsolation ?? false,
-    replyToTrigger: input.replyToTrigger ?? true,
-    progressStyle: parseProgressStyle(input.progressStyle),
-    reactionEmoji: input.reactionEmoji === "none" ? undefined : input.reactionEmoji ?? "OnIt",
+    enableInteractiveCards: input.enableInteractiveCards,
+    allowFrom: input.allowFrom,
+    allowChat: input.allowChat,
+    groupOnly: input.groupOnly,
+    groupReplyAll: input.groupReplyAll,
+    shareSessionInChannel: input.shareSessionInChannel,
+    threadIsolation: input.threadIsolation,
+    replyToTrigger: input.replyToTrigger,
+    progressStyle: input.progressStyle,
+    reactionEmoji: input.reactionEmoji === "none" ? undefined : input.reactionEmoji,
     doneEmoji: input.doneEmoji === "none" ? undefined : input.doneEmoji
   };
-}
-
-function parseProgressStyle(value: string | undefined): FeishuProgressStyle {
-  if (value === undefined || value === "" || value === "legacy") {
-    return "legacy";
-  }
-  if (value === "compact" || value === "card") {
-    return value;
-  }
-  throw new Error(`Invalid Feishu progress style: ${value}`);
 }
