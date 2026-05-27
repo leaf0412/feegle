@@ -22,8 +22,6 @@ import type { TaskScheduler } from "../scheduler/task-scheduler.js";
 import type { TaskStore } from "../scheduler/task-store.js";
 import type { QuoteClient } from "../stock/stock-quote-port.js";
 import type { StockStore } from "../stock/stock-store.js";
-import type { ChatWorkspaceStore } from "../workbench/chat-workspace-store.js";
-import type { PendingInteractionStore } from "../workbench/pending-interaction-store.js";
 import type { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
 
 /**
@@ -37,8 +35,6 @@ export interface Capabilities {
   // infra
   configStore: ConfigStorePort;
   runtimeDb: RuntimeDb;
-  chatWorkspaceStore: ChatWorkspaceStore;
-  pendingInteractionStore: PendingInteractionStore;
   planArtifactStore: PlanArtifactStore;
   // stores
   sessionStore: SessionStore;

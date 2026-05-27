@@ -106,7 +106,7 @@ describe("parseFeishuCommand", () => {
     });
   });
 
-  it("parses workbench directory setup form submissions", () => {
+  it("treats a retired workbench directory submit click as a generic act: action", () => {
     expect(
       parseFeishuCardActionValue({
         action: "act:/workbench directory submit",
@@ -118,11 +118,14 @@ describe("parseFeishuCommand", () => {
         }
       })
     ).toEqual({
-      type: "workbench_directory_submit",
-      interactionId: "pi_1",
-      provider: "codex",
-      workspacePath: "/repo/shortcut",
-      manualPath: "/repo/manual"
+      type: "platform_action",
+      action: {
+        kind: "act",
+        command: "/workbench",
+        args: "directory submit",
+        raw: "act:/workbench directory submit"
+      },
+      sessionKey: undefined
     });
   });
 

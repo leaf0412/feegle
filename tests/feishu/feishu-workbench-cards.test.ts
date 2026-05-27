@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   assertValidFeishuWorkbenchCard,
-  buildDirectorySavedCard,
-  buildDirectorySetupCard,
   buildBaseBranchPromptCard,
   buildPlanCompletedCard,
   buildPlanExecutionRevisionCard,
@@ -12,39 +10,7 @@ import {
   buildPlanRevisionRequestCard
 } from "../../src/feishu/feishu-workbench-cards.js";
 
-describe("buildDirectorySetupCard", () => {
-  it("renders a directory setup form with workspace select and manual path input", () => {
-    const card = buildDirectorySetupCard({
-      interactionId: "pi_1",
-      providers: ["codex", "claude"],
-      workspaces: [{ label: "feegle", path: "/repo/feegle" }]
-    });
-
-    const json = JSON.stringify(card);
-
-    expect(json).toContain("form");
-    expect(json).toContain("input");
-    expect(json).toContain("select_static");
-    expect(json).toContain("act:/workbench directory submit");
-    expect(json).toContain("provider");
-    expect(json).toContain("workspace_path");
-    expect(json).toContain("manual_path");
-    expect(formContainers(card).some((form) => hasOwnProperty(form, "submit"))).toBe(false);
-    expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
-    expect(formElements(card)).toContainEqual(
-      expect.objectContaining({
-        tag: "button",
-        action_type: "form_submit",
-        name: "submit_directory",
-        value: expect.objectContaining({
-          action: "act:/workbench directory submit",
-          interaction_id: "pi_1"
-        })
-      })
-    );
-    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
-  });
-
+describe("workbench cards", () => {
   it("renders a compact plan review card with approval actions", () => {
     const card = buildPlanReviewCard({
       planId: "plan_1",
@@ -122,34 +88,17 @@ describe("buildDirectorySetupCard", () => {
   });
 
   it("rejects known Feishu card fields that fail only at send time", () => {
-    const invalidCard = buildDirectorySetupCard({
-      interactionId: "pi_1",
-      providers: ["codex"],
-      workspaces: [{ label: "feegle", path: "/repo/feegle" }]
+    const invalidCard = buildPlanRevisionRequestCard({
+      planId: "plan_1",
+      version: 1
     }) as unknown as Record<string, unknown>;
     const forms = formContainers(invalidCard);
     forms[0].submit = { tag: "button" };
-    formElements(invalidCard)[0].label = { tag: "plain_text", content: "Agent" };
+    formElements(invalidCard)[0].label = { tag: "plain_text", content: "Note" };
 
     expect(() => assertValidFeishuWorkbenchCard(invalidCard)).toThrow(
       "Invalid Feishu workbench card: form elements must not include label; form must not include submit"
     );
-  });
-
-  it("renders a read-only saved directory card after the setup form is submitted", () => {
-    const card = buildDirectorySavedCard({
-      provider: "codex",
-      workspacePath: "/repo/feegle"
-    });
-
-    const json = JSON.stringify(card);
-
-    expect(json).toContain("已保存工作目录");
-    expect(json).toContain("/repo/feegle");
-    expect(json).toContain("codex");
-    expect(json).not.toContain("form_submit");
-    expect(json).not.toContain("select_static");
-    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
   it("builds a base branch prompt card with remote candidates", () => {

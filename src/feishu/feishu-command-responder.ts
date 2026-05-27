@@ -173,8 +173,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchSlashCommand(input, command.definition.id, extractSlashCommandArgs(command.raw, command.definition.command));
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
-      case "workbench_directory_submit":
-        return { kind: "text", text: "目录设置已下线：通用聊天现在固定运行在全局工作目录。" };
       case "workbench_plan_revision_submit":
         return this.dispatchWorkbenchPlanRevisionSubmit(input, command);
       case "workbench_plan_revise":

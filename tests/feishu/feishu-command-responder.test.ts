@@ -64,30 +64,6 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("tells the user directory setup is retired now that chats use the global workspace dir", async () => {
-    const replies: Array<{ messageId: string; text: string }> = [];
-    const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: testRegistry()
-    });
-
-    await responder.handleCommand({
-      source: "card",
-      chatId: "oc_1",
-      messageId: "om_card",
-      sender: { platform: "feishu", userId: "ou_alice" },
-      command: {
-        type: "workbench_directory_submit",
-        interactionId: "pi_1",
-        provider: "codex",
-        manualPath: "/repo/feegle"
-      }
-    });
-
-    expect(replies).toHaveLength(1);
-    expect(replies[0]?.messageId).toBe("om_card");
-    expect(replies[0]?.text).toContain("目录设置已下线");
-  });
-
   it("updates the current card for workbench plan revision requests", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const progress: unknown[] = [];

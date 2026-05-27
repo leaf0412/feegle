@@ -1,21 +1,5 @@
 import type { FeishuCardColor, FeishuPlainText } from "./feishu-card-builder.js";
 
-export interface DirectorySetupCardInput {
-  interactionId: string;
-  providers: string[];
-  workspaces: DirectorySetupWorkspace[];
-}
-
-export interface DirectorySetupWorkspace {
-  label: string;
-  path: string;
-}
-
-export interface DirectorySavedCardInput {
-  provider?: string;
-  workspacePath: string;
-}
-
 export interface PlanReviewCardInput {
   planId: string;
   title: string;
@@ -157,88 +141,6 @@ interface FeishuButtonElement {
     pc_url: string;
     ios_url: string;
     android_url: string;
-  };
-}
-
-export function buildDirectorySetupCard(input: DirectorySetupCardInput): FeishuWorkbenchCard {
-  return {
-    schema: "2.0",
-    config: {
-      wide_screen_mode: true,
-      update_multi: true
-    },
-    header: {
-      template: "blue",
-      title: plainText("选择工作目录")
-    },
-    body: {
-      elements: [
-        {
-          tag: "markdown",
-          content: [
-            "这个群还没有绑定工作目录。请选择常用目录，或直接输入一个本机目录。",
-            "",
-            "**Agent**：选择本次使用的本地 agent。",
-            "**常用目录**：来自 `~/.feegle/config.jsonc` 的快捷项。",
-            "**手动输入目录**：会优先于常用目录。"
-          ].join("\n")
-        },
-        {
-          tag: "form",
-          name: "workbench_directory",
-          elements: [
-            {
-              tag: "select_static",
-              name: "provider",
-              placeholder: plainText("选择 Agent"),
-              options: input.providers.map((provider) => ({ text: plainText(provider), value: provider }))
-            },
-            {
-              tag: "select_static",
-              name: "workspace_path",
-              placeholder: plainText("选择常用目录"),
-              options: input.workspaces.map((workspace) => ({
-                text: plainText(workspace.label),
-                value: workspace.path
-              }))
-            },
-            {
-              tag: "input",
-              name: "manual_path",
-              placeholder: plainText("/Users/yb/Desktop/code/project")
-            },
-            directorySubmitButton(input.interactionId)
-          ]
-        }
-      ]
-    }
-  };
-}
-
-export function buildDirectorySavedCard(input: DirectorySavedCardInput): FeishuWorkbenchCard {
-  return {
-    schema: "2.0",
-    config: {
-      wide_screen_mode: true,
-      update_multi: true
-    },
-    header: {
-      template: "green",
-      title: plainText("已保存工作目录")
-    },
-    body: {
-      elements: [
-        {
-          tag: "markdown",
-          content: [
-            `**工作目录**：\`${input.workspacePath}\``,
-            ...(input.provider ? [`**Agent**：${input.provider}`] : []),
-            "",
-            "这次选择已确认，原请求正在继续处理。"
-          ].join("\n")
-        }
-      ]
-    }
   };
 }
 
@@ -592,20 +494,6 @@ export function assertValidFeishuWorkbenchCard(card: unknown): asserts card is F
   if (violations.length > 0) {
     throw new Error(`Invalid Feishu workbench card: ${Array.from(new Set(violations)).sort().join("; ")}`);
   }
-}
-
-function directorySubmitButton(interactionId: string): FeishuFormSubmitButton {
-  return {
-    tag: "button",
-    text: plainText("保存并继续"),
-    type: "primary",
-    action_type: "form_submit",
-    name: "submit_directory",
-    value: {
-      action: "act:/workbench directory submit",
-      interaction_id: interactionId
-    }
-  };
 }
 
 function docUrlButton(docUrl: string): FeishuButtonElement {

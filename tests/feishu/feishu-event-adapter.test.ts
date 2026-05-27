@@ -126,13 +126,12 @@ describe("feishu event adapter", () => {
     const parsed = extractCardActionCommand({
       action: {
         value: {
-          action: "act:/workbench directory submit",
-          interaction_id: "pi_1"
+          action: "act:/workbench plan revise submit",
+          plan_id: "plan_1",
+          version: "2"
         },
         form_value: {
-          provider: "codex",
-          workspace_path: "/repo/feegle",
-          manual_path: ""
+          revision_note: "Add Playwright verification"
         }
       } as never,
       context: {
@@ -146,10 +145,10 @@ describe("feishu event adapter", () => {
       messageId: "om_1",
       shouldRespond: true,
       command: {
-        type: "workbench_directory_submit",
-        interactionId: "pi_1",
-        provider: "codex",
-        workspacePath: "/repo/feegle"
+        type: "workbench_plan_revision_submit",
+        planId: "plan_1",
+        version: 2,
+        revisionNote: "Add Playwright verification"
       }
     });
   });
