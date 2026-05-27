@@ -5,7 +5,7 @@ import type {
   SlashCommandHandler,
   SlashCommandReply
 } from "../../slash-command-handler.js";
-import { resolveBindingScopeKey } from "./binding-scope-key.js";
+import { resolveBindingScopeKey, resolveBindingScopeNoun } from "./binding-scope-key.js";
 
 export interface RepoShowCommandDeps {
   repositoryStore: RepositoryStore;
@@ -18,7 +18,7 @@ export class RepoShowCommandHandler implements SlashCommandHandler {
   constructor(private readonly deps: RepoShowCommandDeps) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
-    const scopeNoun = context.chatType === "group" ? "本群" : "你（单聊）";
+    const scopeNoun = resolveBindingScopeNoun(context);
     const binding = this.deps.chatBindingStore.get(resolveBindingScopeKey(context));
     if (!binding) {
       return textReply(`${scopeNoun}未绑定任何仓库。运行 /bind <branch> <base> <repo...> 设置。`);

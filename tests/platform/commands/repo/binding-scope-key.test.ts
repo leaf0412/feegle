@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveBindingScopeKey } from "../../../../src/platform/commands/repo/binding-scope-key.js";
+import { resolveBindingScopeKey, resolveBindingScopeNoun } from "../../../../src/platform/commands/repo/binding-scope-key.js";
 import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
 
 function ctx(overrides: Partial<SlashCommandContext>): SlashCommandContext {
@@ -32,5 +32,13 @@ describe("resolveBindingScopeKey", () => {
     expect(() =>
       resolveBindingScopeKey(ctx({ chatType: "p2p", sender: { platform: "feishu", userId: "" } }))
     ).toThrow(/user id/i);
+  });
+
+  it("labels a group scope as 本群", () => {
+    expect(resolveBindingScopeNoun(ctx({ chatType: "group" }))).toBe("本群");
+  });
+
+  it("labels a single chat as 你（单聊）", () => {
+    expect(resolveBindingScopeNoun(ctx({ chatType: "p2p" }))).toBe("你（单聊）");
   });
 });

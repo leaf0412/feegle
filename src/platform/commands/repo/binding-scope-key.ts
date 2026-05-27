@@ -17,3 +17,11 @@ export function resolveBindingScopeKey(context: SlashCommandContext): string {
   }
   return `user:${userId}`;
 }
+
+/**
+ * Human-facing noun for the binding scope, paired with resolveBindingScopeKey
+ * so the stored key and the wording a user sees never drift apart.
+ */
+export function resolveBindingScopeNoun(context: SlashCommandContext): string {
+  return context.chatType === "group" ? "本群" : "你（单聊）";
+}

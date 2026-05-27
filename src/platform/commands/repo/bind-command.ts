@@ -5,7 +5,7 @@ import type {
   SlashCommandHandler,
   SlashCommandReply
 } from "../../slash-command-handler.js";
-import { resolveBindingScopeKey } from "./binding-scope-key.js";
+import { resolveBindingScopeKey, resolveBindingScopeNoun } from "./binding-scope-key.js";
 
 export interface BindCommandDeps {
   repositoryStore: RepositoryStore;
@@ -45,7 +45,7 @@ export class BindCommandHandler implements SlashCommandHandler {
       repositoryIds
     });
     const repoLabel = binding.repositoryIds.length > 0 ? binding.repositoryIds.join(", ") : "（无指定仓库）";
-    const scopeNoun = context.chatType === "group" ? "本群" : "你（单聊）";
+    const scopeNoun = resolveBindingScopeNoun(context);
     return textReply(
       `✅ ${scopeNoun}已绑定：\n  branch: ${binding.branch}\n  base:   ${binding.baseBranch}\n  repos:  ${repoLabel}`
     );

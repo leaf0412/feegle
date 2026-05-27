@@ -4,7 +4,7 @@ import type {
   SlashCommandHandler,
   SlashCommandReply
 } from "../../slash-command-handler.js";
-import { resolveBindingScopeKey } from "./binding-scope-key.js";
+import { resolveBindingScopeKey, resolveBindingScopeNoun } from "./binding-scope-key.js";
 
 export interface RepoClearCommandDeps {
   chatBindingStore: ChatBindingStore;
@@ -16,7 +16,7 @@ export class RepoClearCommandHandler implements SlashCommandHandler {
   constructor(private readonly deps: RepoClearCommandDeps) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
-    const scopeNoun = context.chatType === "group" ? "本群" : "你（单聊）";
+    const scopeNoun = resolveBindingScopeNoun(context);
     const removed = await this.deps.chatBindingStore.clear(resolveBindingScopeKey(context));
     return textReply(removed ? `✅ 已清除${scopeNoun}的仓库绑定。` : `${scopeNoun}没有绑定，无需清除。`);
   }
