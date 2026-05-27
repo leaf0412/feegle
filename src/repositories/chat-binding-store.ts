@@ -82,6 +82,33 @@ export class ChatBindingStore {
     return { ...merged, repositoryIds: [...merged.repositoryIds] };
   }
 
+  async addRepository(chatId: string, repositoryId: string): Promise<ChatBinding> {
+    const existing = this.data.bindings.find((entry) => entry.chatId === chatId);
+    const repositoryIds = existing
+      ? existing.repositoryIds.includes(repositoryId)
+        ? existing.repositoryIds
+        : [...existing.repositoryIds, repositoryId]
+      : [repositoryId];
+    return this.upsert({ chatId, repositoryIds });
+  }
+
+  async removeRepository(
+    chatId: string,
+    repositoryId: string
+  ): Promise<{ removed: boolean; binding?: ChatBinding }> {
+    const existing = this.data.bindings.find((entry) => entry.chatId === chatId);
+    if (!existing || !existing.repositoryIds.includes(repositoryId)) {
+      return { removed: false, binding: existing ? this.get(chatId) : undefined };
+    }
+    const remaining = existing.repositoryIds.filter((id) => id !== repositoryId);
+    if (remaining.length === 0) {
+      await this.clear(chatId);
+      return { removed: true };
+    }
+    const binding = await this.upsert({ chatId, repositoryIds: remaining });
+    return { removed: true, binding };
+  }
+
   async clear(chatId: string): Promise<boolean> {
     const remaining = this.data.bindings.filter((entry) => entry.chatId !== chatId);
     if (remaining.length === this.data.bindings.length) return false;
