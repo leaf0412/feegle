@@ -64,17 +64,10 @@ describe("FeishuCommandResponder", () => {
     ]);
   });
 
-  it("dispatches workbench directory submissions before slash handling", async () => {
+  it("tells the user directory setup is retired now that chats use the global workspace dir", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
-    const calls: unknown[] = [];
     const responder = new FeishuCommandResponder(fakeClient(replies), {
-      registry: testRegistry(),
-      workbench: {
-        handleDirectorySubmit: async (input) => {
-          calls.push(input);
-          return { kind: "text", text: "已保存目录，正在继续处理原请求。" };
-        }
-      }
+      registry: testRegistry()
     });
 
     await responder.handleCommand({
@@ -90,15 +83,9 @@ describe("FeishuCommandResponder", () => {
       }
     });
 
-    expect(calls).toEqual([
-      expect.objectContaining({
-        chatId: "oc_1",
-        messageId: "om_card",
-        sender: { platform: "feishu", userId: "ou_alice" },
-        command: expect.objectContaining({ interactionId: "pi_1", manualPath: "/repo/feegle" })
-      })
-    ]);
-    expect(replies).toEqual([{ messageId: "om_card", text: "已保存目录，正在继续处理原请求。" }]);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]?.messageId).toBe("om_card");
+    expect(replies[0]?.text).toContain("目录设置已下线");
   });
 
   it("updates the current card for workbench plan revision requests", async () => {
@@ -107,7 +94,6 @@ describe("FeishuCommandResponder", () => {
     const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
       registry: testRegistry(),
       workbench: {
-        handleDirectorySubmit: async () => undefined,
         handlePlanRevise: async () => ({
           kind: "feishu_card_update",
           card: { body: { elements: [{ tag: "form", name: "workbench_plan_revision" }] } }

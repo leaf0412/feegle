@@ -11,10 +11,8 @@ import {
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
-import type {
-  DirectorySetupSubmitHandler,
-  DirectorySetupSubmitInput
-} from "../workbench/directory-setup-service.js";
+
+type FeishuCommandSender = { platform: "feishu"; userId: string; email?: string };
 
 export interface FeishuCommandTraceEvent {
   stage: string;
@@ -48,7 +46,7 @@ export type FeishuWorkbenchReply =
   | { kind: "feishu_card"; card: unknown }
   | { kind: "feishu_card_update"; card: unknown };
 
-export interface FeishuWorkbenchHandler extends DirectorySetupSubmitHandler {
+export interface FeishuWorkbenchHandler {
   handlePlanRevise?(input: PlanReviseInput): Promise<FeishuWorkbenchReply | undefined>;
   handlePlanRevisionSubmit?(input: PlanRevisionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
   handlePlanApprove?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
@@ -70,7 +68,7 @@ export interface PlanReviseInput {
 export interface PlanRevisionSubmitInput {
   chatId: string;
   messageId: string;
-  sender?: DirectorySetupSubmitInput["sender"];
+  sender?: FeishuCommandSender;
   command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>;
 }
 
@@ -176,7 +174,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
       case "workbench_directory_submit":
-        return this.dispatchWorkbenchDirectorySubmit(input, command);
+        return { kind: "text", text: "目录设置已下线：通用聊天现在固定运行在全局工作目录。" };
       case "workbench_plan_revision_submit":
         return this.dispatchWorkbenchPlanRevisionSubmit(input, command);
       case "workbench_plan_revise":
@@ -211,21 +209,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return _exhaustive;
       }
     }
-  }
-
-  private async dispatchWorkbenchDirectorySubmit(
-    input: DispatchInput,
-    command: Extract<FeishuCommand, { type: "workbench_directory_submit" }>
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    if (!this.options.workbench) {
-      return { kind: "text", text: "已收到工作目录设置，当前入口还没有接入保存执行器。" };
-    }
-    return this.options.workbench.handleDirectorySubmit({
-      chatId: input.chatId,
-      messageId: input.messageId,
-      ...(input.sender ? { sender: input.sender } : {}),
-      command
-    });
   }
 
   private async dispatchWorkbenchPlanRevise(

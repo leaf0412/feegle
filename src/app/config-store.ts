@@ -58,6 +58,7 @@ export const FeegleConfigSchema = z.object({
   schemaVersion: z.literal(1),
   failureTarget: NotificationTargetSchema.nullable(),
   agent: AgentConfigSchema.optional(),
+  defaultWorkspace: z.string().min(1).optional(),
   workspaces: z.record(z.string().min(1)).optional(),
   ownerEmails: z.array(z.string().min(1)).optional(),
   feishu: FeishuConfigSchema.optional(),
@@ -116,6 +117,9 @@ export class ConfigStore {
         default: this.data.agent.default,
         providers: cloneProviders(this.data.agent.providers)
       };
+    }
+    if (this.data.defaultWorkspace) {
+      config.defaultWorkspace = this.data.defaultWorkspace;
     }
     if (this.data.workspaces) {
       config.workspaces = { ...this.data.workspaces };

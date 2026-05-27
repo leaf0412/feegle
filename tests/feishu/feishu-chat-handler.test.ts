@@ -16,7 +16,8 @@ describe("FeishuChatHandler", () => {
     const handler = new FeishuChatHandler({
       client,
       providers: new AgentProviderRegistry(),
-      history: new ChatHistoryStore()
+      history: new ChatHistoryStore(),
+      workspaceDir: "/tmp/ws"
     });
 
     const result = await handler.handle({
@@ -45,7 +46,8 @@ describe("FeishuChatHandler", () => {
     const handler = new FeishuChatHandler({
       client,
       providers,
-      history: new ChatHistoryStore()
+      history: new ChatHistoryStore(),
+      workspaceDir: "/tmp/ws"
     });
 
     const result = await handler.handle({
@@ -78,7 +80,8 @@ describe("FeishuChatHandler", () => {
       client,
       providers,
       history,
-      now: () => (tick += 500)
+      now: () => (tick += 500),
+      workspaceDir: "/tmp/ws"
     });
 
     const result = await handler.handle({
@@ -107,7 +110,7 @@ describe("FeishuChatHandler", () => {
     const agent = stubAgent({ chat: async () => huge });
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
-    const handler = new FeishuChatHandler({ client, providers, history });
+    const handler = new FeishuChatHandler({ client, providers, history, workspaceDir: "/tmp/ws" });
 
     const result = await handler.handle({
       chatId: "oc_1",
@@ -153,7 +156,8 @@ describe("FeishuChatHandler", () => {
       providers,
       history: new ChatHistoryStore(),
       now: () => (tick += 5000),
-      progressHeartbeatMs: 10_000
+      progressHeartbeatMs: 10_000,
+      workspaceDir: "/tmp/ws"
     });
 
     const handling = handler.handle({
@@ -193,7 +197,8 @@ describe("FeishuChatHandler", () => {
       providers,
       history: new ChatHistoryStore(),
       now: () => nowMs,
-      progressUpdateMinIntervalMs: 1000
+      progressUpdateMinIntervalMs: 1000,
+      workspaceDir: "/tmp/ws"
     });
 
     const handling = handler.handle({
@@ -215,7 +220,7 @@ describe("FeishuChatHandler", () => {
     expect(JSON.stringify(client.cards.update.at(-1))).toContain("最终答案");
   });
 
-  it("passes the group-bound workspace path as cwd so chat turns run in the selected project", async () => {
+  it("runs the agent in the injected global workspace dir so chats always have a cwd", async () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
     let seenCwd: string | undefined;
@@ -231,20 +236,7 @@ describe("FeishuChatHandler", () => {
       client,
       providers,
       history: new ChatHistoryStore(),
-      chatBindingStore: {
-        get: (chatId: string) => ({
-          chatId,
-          repositoryIds: [],
-          workspaceId: "ws_feegle",
-          updatedAt: "2026-05-21T00:00:00.000Z"
-        })
-      } as never,
-      workspaceStore: {
-        get: (id: string) =>
-          id === "ws_feegle"
-            ? { id, path: "/Users/yb/Desktop/code/personal/feegle", createdAt: "2026-05-21T00:00:00.000Z" }
-            : undefined
-      } as never
+      workspaceDir: "/tmp/ws"
     });
 
     await handler.handle({
@@ -254,59 +246,7 @@ describe("FeishuChatHandler", () => {
       userText: "inspect this repo"
     });
 
-    expect(seenCwd).toBe("/Users/yb/Desktop/code/personal/feegle");
-  });
-
-  it("opens a directory setup card instead of running the agent when no group workspace is bound", async () => {
-    const client = trackingClient();
-    const providers = new AgentProviderRegistry();
-    const chat = vi.fn(async () => "done");
-    const agent = stubAgent({ chat });
-    providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
-    providers.setActive("codex");
-    const pending: unknown[] = [];
-    const handler = new FeishuChatHandler({
-      client,
-      providers,
-      history: new ChatHistoryStore(),
-      chatWorkspaceStore: {
-        get: () => undefined
-      },
-      pendingInteractions: {
-        put: async (input: unknown) => {
-          pending.push(input);
-          return input;
-        }
-      },
-      configuredWorkspaces: {
-        feegle: "/repo/feegle"
-      },
-      interactionIdFactory: () => "pi_1",
-      now: () => Date.parse("2026-05-21T00:00:00.000Z")
-    });
-
-    const result = await handler.handle({
-      chatId: "oc_1",
-      triggerMessageId: "om_1",
-      sessionKey: "feishu:oc_1:channel",
-      userText: "inspect this repo"
-    });
-
-    expect(result).toEqual({ status: "awaiting_workspace", interactionId: "pi_1" });
-    expect(client.cards.start).toHaveLength(1);
-    expect(JSON.stringify(client.cards.start[0]?.card)).toContain("选择工作目录");
-    expect(JSON.stringify(client.cards.start[0]?.card)).toContain("act:/workbench directory submit");
-    expect(pending).toEqual([
-      expect.objectContaining({
-        interactionId: "pi_1",
-        chatId: "oc_1",
-        messageId: "om_1",
-        kind: "directory_setup",
-        payload: { sessionKey: "feishu:oc_1:channel", userText: "inspect this repo" },
-        expiresAt: "2026-05-22T00:00:00.000Z"
-      })
-    ]);
-    expect(chat).not.toHaveBeenCalled();
+    expect(seenCwd).toBe("/tmp/ws");
   });
 
   it("falls into the error status when the agent throws and updates the card to red", async () => {
@@ -321,7 +261,8 @@ describe("FeishuChatHandler", () => {
     const handler = new FeishuChatHandler({
       client,
       providers,
-      history: new ChatHistoryStore()
+      history: new ChatHistoryStore(),
+      workspaceDir: "/tmp/ws"
     });
 
     const result = await handler.handle({
@@ -353,7 +294,7 @@ describe("FeishuChatHandler", () => {
     });
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
-    const handler = new FeishuChatHandler({ client, providers, history });
+    const handler = new FeishuChatHandler({ client, providers, history, workspaceDir: "/tmp/ws" });
 
     await handler.handle({ chatId: "oc_1", triggerMessageId: "om_1", sessionKey: "sk_1", userText: "one" });
     await handler.handle({ chatId: "oc_1", triggerMessageId: "om_2", sessionKey: "sk_1", userText: "two" });

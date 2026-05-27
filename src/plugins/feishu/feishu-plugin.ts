@@ -17,7 +17,7 @@ import {
   buildPlanRevisionRequestCard
 } from "../../feishu/feishu-workbench-cards.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import { DirectorySetupService } from "../../workbench/directory-setup-service.js";
+import { resolveWorkspaceDir } from "../../app/workspace-dir.js";
 import { PlanArtifactService } from "../../workbench/plan-artifact-service.js";
 import type { PlanArtifactStore } from "../../workbench/plan-artifact-store.js";
 import { PlanExecutionService } from "../../workbench/plan-execution-service.js";
@@ -58,8 +58,6 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     "chatHistory",
     "workspaceStore",
     "chatBindingStore",
-    "chatWorkspaceStore",
-    "pendingInteractionStore",
     "planArtifactStore"
   );
   const config = cap.configStore.get();
@@ -68,16 +66,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     providers: cap.agents,
     history: cap.chatHistory,
     sessionStore: cap.sessionStore,
-    workspaceStore: cap.workspaceStore,
-    chatBindingStore: cap.chatBindingStore,
-    chatWorkspaceStore: cap.chatWorkspaceStore,
-    pendingInteractions: cap.pendingInteractionStore,
-    configuredWorkspaces: config.workspaces
-  });
-  const workbench = new DirectorySetupService({
-    chatWorkspaces: cap.chatWorkspaceStore,
-    pendingInteractions: cap.pendingInteractionStore,
-    chatHandler
+    workspaceDir: resolveWorkspaceDir(deps.feegleHome, config.defaultWorkspace)
   });
   const planArtifacts = new PlanArtifactService({
     feegleHome: deps.feegleHome,
@@ -107,8 +96,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
       planArtifactStore: cap.planArtifactStore,
       agents: cap.agents,
       planArtifacts,
-      planExecution,
-      workbench
+      planExecution
     })
   });
   return deps.runtimeFactory(responder);
@@ -119,13 +107,11 @@ interface WorkbenchHandlerDeps {
   agents: AgentProviderRegistry;
   planArtifacts: PlanArtifactService;
   planExecution: PlanExecutionService;
-  workbench: DirectorySetupService;
 }
 
 function buildWorkbenchHandlers(deps: WorkbenchHandlerDeps): FeishuWorkbenchHandler {
-  const { planArtifactStore, agents, planArtifacts, planExecution, workbench } = deps;
+  const { planArtifactStore, agents, planArtifacts, planExecution } = deps;
   return {
-    handleDirectorySubmit: (input) => workbench.handleDirectorySubmit(input),
     handlePlanRevise: async (input) => ({
       kind: "feishu_card_update",
       card: buildPlanRevisionRequestCard(input.command)
