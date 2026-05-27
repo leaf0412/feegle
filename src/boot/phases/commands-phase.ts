@@ -21,7 +21,6 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
       const cap = ctx.pick(
         "userDirectory",
         "repositoryStore",
-        "workspaceStore",
         "chatBindingStore",
         "taskRegistry",
         "configStore",
@@ -40,7 +39,6 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         userDirectory: cap.userDirectory,
         repositories,
         repositoryStore: cap.repositoryStore,
-        workspaceStore: cap.workspaceStore,
         chatBindingStore: cap.chatBindingStore,
         ownerEmails: deps.ownerEmails,
         taskRegistry: cap.taskRegistry,

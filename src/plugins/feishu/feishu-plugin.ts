@@ -56,8 +56,6 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     "agents",
     "sessionStore",
     "chatHistory",
-    "workspaceStore",
-    "chatBindingStore",
     "planArtifactStore"
   );
   const config = cap.configStore.get();

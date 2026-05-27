@@ -59,7 +59,6 @@ export const FeegleConfigSchema = z.object({
   failureTarget: NotificationTargetSchema.nullable(),
   agent: AgentConfigSchema.optional(),
   defaultWorkspace: z.string().min(1).optional(),
-  workspaces: z.record(z.string().min(1)).optional(),
   ownerEmails: z.array(z.string().min(1)).optional(),
   feishu: FeishuConfigSchema.optional(),
   gitlab: GitLabConfigSchema.optional()
@@ -120,9 +119,6 @@ export class ConfigStore {
     }
     if (this.data.defaultWorkspace) {
       config.defaultWorkspace = this.data.defaultWorkspace;
-    }
-    if (this.data.workspaces) {
-      config.workspaces = { ...this.data.workspaces };
     }
     if (this.data.ownerEmails) {
       config.ownerEmails = [...this.data.ownerEmails];

@@ -1,14 +1,12 @@
 import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import { BindCommandHandler } from "./repo/bind-command.js";
-import { DirCommandHandler } from "./repo/dir-command.js";
 import { RepoAddCommandHandler } from "./repo/repo-add-command.js";
 import { RepoClearCommandHandler } from "./repo/repo-clear-command.js";
 import { RepoListCommandHandler } from "./repo-list-command.js";
 import { RepoRemoveCommandHandler } from "./repo/repo-remove-command.js";
 import { RepoScanCommandHandler } from "./repo/repo-scan-command.js";
 import { RepoShowCommandHandler } from "./repo/repo-show-command.js";
-import { WorkspaceCommandHandler } from "./repo/workspace-command.js";
 
 const repoListDefinition = defineSlashCommand("repo_list", "/repo list", "列出已注册仓库", "repo", "nav:/command repo_list");
 const repoAddDefinition = defineSlashCommand("repo_add", "/repo add <url>", "注册外部仓库", "repo", "nav:/command repo_add");
@@ -17,8 +15,6 @@ const repoScanDefinition = defineSlashCommand("repo_scan", "/repo scan", "刷新
 const repoShowDefinition = defineSlashCommand("repo_show", "/repo show", "显示当前绑定", "repo", "nav:/command repo_show");
 const repoClearDefinition = defineSlashCommand("repo_clear", "/repo clear", "清除绑定", "repo", "nav:/command repo_clear");
 const bindDefinition = defineSlashCommand("bind", "/bind|/bid <branch> <base> [repo1 ...]", "仓库规则绑定", "repo", "nav:/command bind", ["bid"]);
-const workspaceDefinition = defineSlashCommand("workspace", "/workspace", "工作区绑定与初始化", "repo", "cmd:/workspace");
-const dirDefinition = defineSlashCommand("dir", "/dir", "选择工作目录", "repo", "nav:/dir");
 
 export function repoCommandModule(): SlashCommandModule {
   return {
@@ -68,27 +64,6 @@ export function repoCommandModule(): SlashCommandModule {
         registry.declarePlanned(bindDefinition);
         registry.declarePlanned(repoShowDefinition);
         registry.declarePlanned(repoClearDefinition);
-      }
-
-      if (deps.workspaceStore) {
-        registry.registerCommand(
-          workspaceDefinition,
-          new WorkspaceCommandHandler({ workspaceStore: deps.workspaceStore, ownerEmails: deps.ownerEmails })
-        );
-        if (deps.chatBindingStore) {
-          registry.registerCommand(
-            dirDefinition,
-            new DirCommandHandler({
-              workspaceStore: deps.workspaceStore,
-              chatBindingStore: deps.chatBindingStore
-            })
-          );
-        } else {
-          registry.declarePlanned(dirDefinition);
-        }
-      } else {
-        registry.declarePlanned(workspaceDefinition);
-        registry.declarePlanned(dirDefinition);
       }
     }
   };

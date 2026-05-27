@@ -8,7 +8,6 @@ export const ChatBindingSchema = z.object({
   branch: z.string().min(1).optional(),
   baseBranch: z.string().min(1).optional(),
   repositoryIds: z.array(z.string().min(1)),
-  workspaceId: z.string().min(1).optional(),
   updatedAt: z.string()
 });
 
@@ -28,7 +27,6 @@ export interface BindInput {
   branch?: string;
   baseBranch?: string;
   repositoryIds?: string[];
-  workspaceId?: string;
 }
 
 export class ChatBindingStore {
@@ -71,7 +69,6 @@ export class ChatBindingStore {
       branch: input.branch ?? existing?.branch,
       baseBranch: input.baseBranch ?? existing?.baseBranch,
       repositoryIds: input.repositoryIds ?? existing?.repositoryIds ?? [],
-      workspaceId: input.workspaceId ?? existing?.workspaceId,
       updatedAt: now
     };
     const next: ChatBindingsFile = {

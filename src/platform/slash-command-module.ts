@@ -5,7 +5,6 @@ import type { ProviderStorePort } from "../agent/provider-store.js";
 import type { SessionStore } from "../agent/session-store.js";
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
-import type { WorkspaceStore } from "../repositories/workspace-store.js";
 import type { AliasStore } from "./commands/alias-store.js";
 import type { SchedulerCommandDeps } from "./commands/scheduler-command-deps.js";
 import type { RepositoryListSource } from "./commands/repo-list-command.js";
@@ -15,7 +14,6 @@ import type { PipelineHooks } from "./pipeline-hooks.js";
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
   repositoryStore?: RepositoryStore;
-  workspaceStore?: WorkspaceStore;
   chatBindingStore?: ChatBindingStore;
   feegleHome?: string;
   ownerEmails?: SchedulerCommandDeps["ownerEmails"];

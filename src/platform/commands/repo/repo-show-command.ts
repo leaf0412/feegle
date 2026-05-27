@@ -24,7 +24,6 @@ export class RepoShowCommandHandler implements SlashCommandHandler {
     const lines: string[] = ["📌 当前 chat 绑定"];
     if (binding.branch) lines.push(`  branch: ${binding.branch}`);
     if (binding.baseBranch) lines.push(`  base:   ${binding.baseBranch}`);
-    if (binding.workspaceId) lines.push(`  workspace: ${binding.workspaceId}`);
     if (binding.repositoryIds.length === 0) {
       lines.push("  repos:  （无）");
     } else {

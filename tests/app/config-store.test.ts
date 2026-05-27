@@ -49,16 +49,14 @@ describe("ConfigStore", () => {
             "codex": { "command": "codex", "sandbox": "workspace-write" }
           }
         },
-        "workspaces": {
-          "feegle": "/Users/yb/Desktop/code/personal/feegle",
-        },
+        "defaultWorkspace": "/Users/yb/Desktop/code/personal/feegle",
       }`
     );
 
     const store = await ConfigStore.load(home);
 
     expect(store.get().agent?.default).toBe("codex");
-    expect(store.get().workspaces?.feegle).toBe("/Users/yb/Desktop/code/personal/feegle");
+    expect(store.get().defaultWorkspace).toBe("/Users/yb/Desktop/code/personal/feegle");
   });
 
   it("rejects incompatible schema versions instead of silently migrating", async () => {

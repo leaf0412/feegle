@@ -13,7 +13,6 @@ import type { SlashCommandRegistry } from "../platform/slash-command-handler.js"
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
-import type { WorkspaceStore } from "../repositories/workspace-store.js";
 import type { DedupStore } from "../scheduler/dedup-store.js";
 import type { HandlerKindRegistry } from "../scheduler/handler-kind-registry.js";
 import type { RunsLog } from "../scheduler/runs-log.js";
@@ -41,7 +40,6 @@ export interface Capabilities {
   chatHistory: ChatHistoryStore;
   aliasStore: AliasStore;
   repositoryStore: RepositoryStore;
-  workspaceStore: WorkspaceStore;
   chatBindingStore: ChatBindingStore;
   stockStore: StockStore;
   dedupStore: DedupStore;
