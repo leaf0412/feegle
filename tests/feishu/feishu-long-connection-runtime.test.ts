@@ -105,6 +105,7 @@ describe("FeishuLongConnectionRuntime", () => {
           chatId: "oc_1",
           messageId: "om_1",
           sessionKey: expect.any(String),
+          chatType: "group",
           command: { type: "repo_select", repositoryIds: ["repo_1"] },
           shouldRespond: true
         },
@@ -445,6 +446,7 @@ describe("FeishuLongConnectionRuntime", () => {
         messageId: "om_record_only",
         sender: { platform: "feishu", userId: "ou_1" },
         sessionKey: expect.any(String),
+        chatType: "group",
         command: { type: "chat", raw: "只记录，不回复" },
         shouldRespond: false
       }

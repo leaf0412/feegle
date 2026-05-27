@@ -107,6 +107,7 @@ interface DispatchInput {
   messageId: string;
   sender?: { platform: "feishu"; userId: string; email?: string };
   sessionKey?: string;
+  chatType?: string;
   command: FeishuCommand;
 }
 
@@ -313,6 +314,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       chatId: input.chatId,
       messageId: input.messageId,
       sessionKey: input.sessionKey,
+      chatType: input.chatType,
       sender,
       definition,
       raw: definition.command,
@@ -362,6 +364,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       chatId: input.chatId,
       messageId: input.messageId,
       sessionKey: input.sessionKey,
+      chatType: input.chatType,
       sender,
       definition: {
         id: "__command_detail",

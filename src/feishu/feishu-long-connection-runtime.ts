@@ -21,6 +21,7 @@ export interface FeishuCommandHandler {
     messageId: string;
     sender?: { platform: "feishu"; userId: string };
     sessionKey?: string;
+    chatType?: string;
     command: FeishuCommand;
     shouldRespond?: boolean;
   }): Promise<void>;
@@ -105,6 +106,7 @@ export class FeishuLongConnectionRuntime {
               messageId: envelope.messageId,
               sender: envelope.sender,
               sessionKey: envelope.message?.sessionKey,
+              chatType: envelope.chatType,
               command: envelope.command,
               shouldRespond: envelope.shouldRespond
             })
@@ -154,6 +156,7 @@ export class FeishuLongConnectionRuntime {
               chatId: envelope.chatId,
               messageId: envelope.messageId,
               sender: envelope.sender,
+              chatType: envelope.chatType,
               command: envelope.command,
               shouldRespond: envelope.shouldRespond
             })

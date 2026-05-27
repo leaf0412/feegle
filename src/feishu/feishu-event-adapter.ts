@@ -12,6 +12,7 @@ export type { FeishuMessageExtractOptions } from "./feishu-message-normalizer.js
 export interface FeishuCommandEnvelope {
   chatId: string;
   messageId: string;
+  chatType?: string;
   sender?: { platform: "feishu"; userId: string };
   command: FeishuCommand;
   shouldRespond?: boolean;
@@ -182,6 +183,7 @@ export function explainTextMessageCommand(
     envelope: {
       chatId: message.chat_id,
       messageId: message.message_id,
+      chatType: message.chat_type,
       sender: feishuSender(event.sender?.sender_id),
       command: parseFeishuCommand(commandText),
       shouldRespond: options ? canRespondToFeishuTextMessage(event, options, commandText) : true,

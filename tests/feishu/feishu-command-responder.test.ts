@@ -277,6 +277,46 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([{ messageId: "om_sample", text: "external: hello world" }]);
   });
 
+  it("threads chatType into the slash command context so handlers can scope per chat type", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const definition: SlashCommandDefinition = {
+      id: "chat_type_probe",
+      command: "/probe",
+      description: "probe",
+      groupKey: "repo",
+      action: "cmd:/probe"
+    };
+    let seenChatType: string | undefined = "unset";
+    const handler: SlashCommandHandler = {
+      id: "chat_type_probe",
+      async execute(context) {
+        seenChatType = context.chatType;
+        return { kind: "text", text: "ok" };
+      }
+    };
+    const registry = buildSlashCommandRegistry({
+      repositories: { list: () => [] },
+      defaults: false,
+      modules: [
+        {
+          id: "probe",
+          register: (target) => target.registerCommand(definition, handler)
+        }
+      ]
+    });
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry });
+
+    await responder.handleCommand({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_probe",
+      chatType: "p2p",
+      command: { type: "slash_input", raw: "/probe" }
+    });
+
+    expect(seenChatType).toBe("p2p");
+  });
+
   it("lists registered repositories for /repo list without invoking the agent", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const responder = new FeishuCommandResponder(

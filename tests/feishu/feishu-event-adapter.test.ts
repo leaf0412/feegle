@@ -21,9 +21,25 @@ describe("feishu event adapter", () => {
     expect(parsed).toEqual({
       chatId: "oc_1",
       messageId: "om_1",
+      chatType: "group",
       shouldRespond: true,
       command: { type: "repo_select", repositoryIds: ["repo_1", "repo_2"] }
     });
+  });
+
+  it("carries chatType on the envelope so commands can scope per group vs single chat", () => {
+    const event = {
+      sender: { sender_type: "user", sender_id: { open_id: "ou_alice" } },
+      message: {
+        message_id: "om_1",
+        chat_id: "oc_1",
+        chat_type: "p2p",
+        message_type: "text",
+        content: JSON.stringify({ text: "/repo show" })
+      }
+    };
+    const envelope = extractTextMessageCommand(event as never);
+    expect(envelope?.chatType).toBe("p2p");
   });
 
   it("returns null for non-text messages", () => {

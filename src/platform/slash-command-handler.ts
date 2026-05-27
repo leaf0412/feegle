@@ -8,6 +8,7 @@ export interface SlashCommandContext {
   chatId: string;
   messageId: string;
   sessionKey?: string;
+  chatType?: "group" | "p2p" | string;
   sender: { platform: "feishu"; userId: string; email?: string };
   definition: SlashCommandDefinition;
   raw: string;
