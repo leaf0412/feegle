@@ -5,6 +5,8 @@ import type {
   AgentRunOptions
 } from "../agent/agent-cli.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
+import { AgentLoadBalancer } from "../agent/agent-load-balancer.js";
+import type { AgentProviderDefinition } from "../agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
 import type { SessionStore } from "../agent/session-store.js";
 import type { FeishuClientPort } from "./feishu-client.js";
@@ -23,6 +25,7 @@ export interface FeishuChatHandlerDeps {
   history: ChatHistoryStore;
   workspaceDir: string;
   sessionStore?: SessionStore;
+  balancer?: AgentLoadBalancer;
   progressHeartbeatMs?: number;
   progressUpdateMinIntervalMs?: number;
   now?: () => number;
@@ -49,34 +52,27 @@ export type FeishuChatResult =
  */
 export class FeishuChatHandler {
   private readonly now: () => number;
+  private readonly balancer: AgentLoadBalancer;
 
   constructor(private readonly deps: FeishuChatHandlerDeps) {
     this.now = deps.now ?? (() => Date.now());
+    this.balancer = deps.balancer ?? new AgentLoadBalancer();
   }
 
   async handle(request: FeishuChatRequest): Promise<FeishuChatResult> {
-    const provider = this.resolveProvider();
-    if (!provider) {
-      const available = this.deps.providers.available();
-      const text =
-        available.length === 0
-          ? "尚未注册任何 agent provider。请运行 /provider register codex cwd=<path>，再 /provider use codex 激活。"
-          : `已注册 ${available.map((p) => p.kind).join("、")}，但都未激活。运行 /provider use <kind> 激活一个。`;
-      await this.deps.client.replyText(request.triggerMessageId, text);
+    const resolved = await this.resolveProviderForSession(request.sessionKey);
+    if (!resolved) {
+      await this.deps.client.replyText(
+        request.triggerMessageId,
+        "尚未注册任何 agent provider。请运行 /provider register codex cwd=<path> 注册一个。"
+      );
       return { status: "no_provider" };
     }
+    const { provider, switchNotice } = resolved;
 
     const cwd = this.deps.workspaceDir;
 
     const agent: AgentCli = provider.buildAgent();
-    if (this.deps.sessionStore) {
-      try {
-        await this.deps.sessionStore.getOrCreate(request.sessionKey, { agentKind: provider.kind });
-        await this.deps.sessionStore.touch(request.sessionKey);
-      } catch (error) {
-        console.warn("session store touch failed", errorMessage(error));
-      }
-    }
 
     this.deps.history.append(request.sessionKey, { role: "user", content: request.userText });
     const messages = this.deps.history.get(request.sessionKey);
@@ -85,7 +81,8 @@ export class FeishuChatHandler {
     const renderState: PreviewRenderState = {
       provider: provider.displayName,
       steps: [],
-      startedAt: this.now()
+      startedAt: this.now(),
+      switchNotice
     };
     await preview.start(renderRichCard(renderState, "working", /* streaming */ true, this.now()), {
       replyToMessageId: request.triggerMessageId
@@ -100,6 +97,7 @@ export class FeishuChatHandler {
     };
     const stopHeartbeat = this.startProgressHeartbeat(preview, renderState);
 
+    this.balancer.acquire(provider.kind);
     let answer: string;
     try {
       answer = (await agent.chat(messages, options)).trim();
@@ -109,6 +107,8 @@ export class FeishuChatHandler {
       renderState.errorMessage = reason;
       await this.safeUpdate(preview, renderState, "error", false);
       return { status: "failed", reason };
+    } finally {
+      this.balancer.release(provider.kind);
     }
 
     stopHeartbeat();
@@ -118,8 +118,50 @@ export class FeishuChatHandler {
     return { status: "delivered" };
   }
 
-  private resolveProvider(): ReturnType<AgentProviderRegistry["active"]> {
-    return this.deps.providers.active();
+  /**
+   * Picks the provider for this session: an existing still-registered pin wins
+   * (sticky); otherwise the balancer chooses the least-busy registered provider
+   * and the choice is persisted. A pin pointing at an unregistered agent is
+   * re-balanced and surfaced via switchNotice (never silently dropped). Returns
+   * undefined only when no provider is registered.
+   */
+  private async resolveProviderForSession(
+    sessionKey: string
+  ): Promise<{ provider: AgentProviderDefinition; switchNotice?: string } | undefined> {
+    const registered = this.deps.providers.available();
+    if (registered.length === 0) {
+      return undefined;
+    }
+    const registeredKinds = registered.map((entry) => entry.kind);
+    const sessionStore = this.deps.sessionStore;
+
+    if (!sessionStore) {
+      const kind = this.balancer.select(registeredKinds);
+      return { provider: this.deps.providers.resolve(kind)! };
+    }
+
+    const pinned = sessionStore.get(sessionKey)?.agentKind;
+    if (pinned && registeredKinds.includes(pinned)) {
+      try {
+        await sessionStore.touch(sessionKey);
+      } catch (error) {
+        console.warn("session store touch failed", errorMessage(error));
+      }
+      return { provider: this.deps.providers.resolve(pinned)! };
+    }
+
+    const chosenKind = this.balancer.select(registeredKinds);
+    const provider = this.deps.providers.resolve(chosenKind)!;
+    try {
+      await sessionStore.assignAgent(sessionKey, chosenKind);
+    } catch (error) {
+      console.warn("session agent assignment failed", errorMessage(error));
+    }
+    const switchNotice =
+      pinned && !registeredKinds.includes(pinned)
+        ? `原 agent ${pinned} 已下线，本次切换到 ${provider.displayName}`
+        : undefined;
+    return { provider, switchNotice };
   }
 
   private async safeUpdate(
@@ -211,6 +253,7 @@ interface PreviewRenderState {
   provider: string;
   steps: PlatformProgressToolStep[];
   startedAt: number;
+  switchNotice?: string;
   lastPreviewUpdateAt?: number;
   answer?: string;
   errorMessage?: string;
@@ -302,7 +345,8 @@ function composeMarkdown(state: PreviewRenderState, status: FeishuRichCardStatus
     return state.errorMessage ?? "agent 调用失败";
   }
   if (status === "done") {
-    return state.answer ?? "（无输出）";
+    const answer = state.answer ?? "（无输出）";
+    return state.switchNotice ? `> ${state.switchNotice}\n\n${answer}` : answer;
   }
   return `${state.provider} 正在思考…`;
 }

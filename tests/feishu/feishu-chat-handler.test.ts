@@ -5,6 +5,11 @@ import { ChatHistoryStore } from "../../src/agent/chat-history-store.js";
 import { FeishuChatHandler } from "../../src/feishu/feishu-chat-handler.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { AgentLoadBalancer } from "../../src/agent/agent-load-balancer.js";
+import { SessionStore } from "../../src/agent/session-store.js";
 
 describe("FeishuChatHandler", () => {
   afterEach(() => {
@@ -35,13 +40,13 @@ describe("FeishuChatHandler", () => {
     expect(client.cards.start).toHaveLength(0);
   });
 
-  it("prompts to activate a registered provider when none is active", async () => {
+  it("uses the single registered provider without requiring /provider use", async () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
     providers.register({
       kind: "codex",
       displayName: "Codex",
-      buildAgent: () => ({}) as never
+      buildAgent: () => stubAgent({ chat: async () => "hi from codex" })
     });
     const handler = new FeishuChatHandler({
       client,
@@ -57,9 +62,8 @@ describe("FeishuChatHandler", () => {
       userText: "hello"
     });
 
-    expect(result).toEqual({ status: "no_provider" });
-    expect(client.replies[0].text).toContain("已注册 codex");
-    expect(client.replies[0].text).toContain("/provider use");
+    expect(result.status).toBe("delivered");
+    expect(JSON.stringify(client.cards.update.at(-1))).toContain("hi from codex");
   });
 
   it("streams agent progress into a preview card and finalises with the answer", async () => {
@@ -304,6 +308,91 @@ describe("FeishuChatHandler", () => {
       { role: "assistant", content: "ack" },
       { role: "user", content: "two" }
     ]);
+  });
+
+  it("pins a new session to the balanced provider and reuses it on later turns", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-chat-balance-"));
+    const sessionStore = await SessionStore.load(home);
+    const balancer = new AgentLoadBalancer();
+    const providers = new AgentProviderRegistry();
+    const calls: string[] = [];
+    providers.register({
+      kind: "codex",
+      displayName: "Codex",
+      buildAgent: () => stubAgent({ chat: async () => { calls.push("codex"); return "c"; } })
+    });
+    providers.register({
+      kind: "claude_code",
+      displayName: "Claude Code",
+      buildAgent: () => stubAgent({ chat: async () => { calls.push("claude"); return "k"; } })
+    });
+    const handler = new FeishuChatHandler({
+      client: trackingClient(),
+      providers,
+      history: new ChatHistoryStore(),
+      sessionStore,
+      balancer,
+      workspaceDir: "/tmp/ws"
+    });
+
+    await handler.handle({ chatId: "oc_1", triggerMessageId: "m1", sessionKey: "sk_1", userText: "one" });
+    const pinned = sessionStore.get("sk_1")?.agentKind;
+    expect(pinned).toBeDefined();
+
+    await handler.handle({ chatId: "oc_1", triggerMessageId: "m2", sessionKey: "sk_1", userText: "two" });
+    expect(new Set(calls).size).toBe(1); // sticky: one session stays on one agent
+  });
+
+  it("re-pins and surfaces a notice when a session's agent was unregistered", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-chat-repin-"));
+    const sessionStore = await SessionStore.load(home);
+    await sessionStore.assignAgent("sk_1", "codex"); // pin to an agent we will NOT register
+    const client = trackingClient();
+    const providers = new AgentProviderRegistry();
+    providers.register({
+      kind: "claude_code",
+      displayName: "Claude Code",
+      buildAgent: () => stubAgent({ chat: async () => "k" })
+    });
+    const handler = new FeishuChatHandler({
+      client,
+      providers,
+      history: new ChatHistoryStore(),
+      sessionStore,
+      balancer: new AgentLoadBalancer(),
+      workspaceDir: "/tmp/ws"
+    });
+
+    const result = await handler.handle({ chatId: "oc_1", triggerMessageId: "m1", sessionKey: "sk_1", userText: "hi" });
+
+    expect(result.status).toBe("delivered");
+    expect(sessionStore.get("sk_1")?.agentKind).toBe("claude_code");
+    expect(JSON.stringify(client.cards.update.at(-1))).toContain("已下线");
+  });
+
+  it("releases the in-flight slot even when the turn throws so the agent is not stuck busy", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-chat-inflight-"));
+    const sessionStore = await SessionStore.load(home);
+    const balancer = new AgentLoadBalancer();
+    const providers = new AgentProviderRegistry();
+    providers.register({
+      kind: "codex",
+      displayName: "Codex",
+      buildAgent: () => stubAgent({ chat: async () => { throw new Error("boom"); } })
+    });
+    const handler = new FeishuChatHandler({
+      client: trackingClient(),
+      providers,
+      history: new ChatHistoryStore(),
+      sessionStore,
+      balancer,
+      workspaceDir: "/tmp/ws"
+    });
+
+    const result = await handler.handle({ chatId: "oc_1", triggerMessageId: "m1", sessionKey: "sk_1", userText: "hi" });
+
+    expect(result.status).toBe("failed");
+    expect(balancer.inFlightCount("codex")).toBe(0);
   });
 });
 
