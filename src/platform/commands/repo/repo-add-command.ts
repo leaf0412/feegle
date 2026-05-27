@@ -6,6 +6,7 @@ import type {
   SlashCommandHandler,
   SlashCommandReply
 } from "../../slash-command-handler.js";
+import { deriveRepositoryName } from "./repo-url.js";
 
 export interface RepoAddCommandDeps {
   repositoryStore: RepositoryStore;
@@ -37,7 +38,7 @@ export class RepoAddCommandHandler implements SlashCommandHandler {
     } catch (error) {
       return textReply(`无法访问 git 远端: ${errorMessage(error)}`);
     }
-    const name = deriveName(url);
+    const name = deriveRepositoryName(url);
     const record = await this.deps.repositoryStore.add({
       name,
       remoteUrl: url,
@@ -52,12 +53,6 @@ export async function detectDefaultBranch(url: string): Promise<string> {
   const match = /ref:\s+refs\/heads\/(\S+)\s+HEAD/.exec(stdout);
   if (match && match[1]) return match[1];
   return "main";
-}
-
-function deriveName(url: string): string {
-  const stripped = url.replace(/\.git$/, "").replace(/\/$/, "");
-  const segments = stripped.split("/");
-  return segments[segments.length - 1] ?? stripped;
 }
 
 function textReply(text: string): SlashCommandReply {
