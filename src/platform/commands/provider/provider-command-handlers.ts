@@ -1,6 +1,5 @@
 import { stat } from "node:fs/promises";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import { listAgentKinds } from "../../../agent/agent-registry.js";
 import {
   buildProviderAdapter,
   defaultProviderDisplayName
@@ -28,8 +27,12 @@ export interface ProviderCommandDeps {
 const CODEX_FIELDS = new Set(["cwd", "command", "sandbox", "approvalPolicy", "timeoutMs"]);
 const CLAUDE_CODE_FIELDS = new Set(["cwd", "command", "timeoutMs"]);
 
+// Derive the allowed `kind` set from the persistence schema rather than the
+// in-memory agent registry. Task 2 moved dispatch onto a single ACP adapter,
+// so the registry no longer carries per-kind factories — the schema's
+// discriminator is the remaining source of truth until Task 3 opens it up.
 function knownKinds(): readonly ProviderKind[] {
-  return listAgentKinds() as ProviderKind[];
+  return ProviderRecordSchema.options.map((option) => option.shape.kind.value) as ProviderKind[];
 }
 
 abstract class ProviderCommand implements SlashCommandHandler {

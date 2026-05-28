@@ -60,7 +60,7 @@ describe("provider command handlers", () => {
       });
       const reply = await handler.execute(ctx(`codex cwd=${home}`));
       expect(reply).toMatchObject({ kind: "text" });
-      expect((reply as { text: string }).text).toContain("Codex 已注册");
+      expect((reply as { text: string }).text).toContain("codex 已注册");
       expect(store.snapshot().providers).toHaveLength(1);
       expect(registry.available().map((p) => p.kind)).toEqual(["codex"]);
     });

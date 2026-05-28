@@ -3,28 +3,27 @@ import {
   buildProviderAdapter,
   defaultProviderDisplayName
 } from "../../src/agent/provider-adapter-factory.js";
-import { CodexAgentAdapter } from "../../src/agent/codex-agent-adapter.js";
-import { ClaudeCodeAgentAdapter } from "../../src/agent/claude-code-agent-adapter.js";
+import { AcpAgentAdapter } from "../../src/agent/acp-agent-adapter.js";
 
 describe("provider-adapter-factory", () => {
-  it("builds a CodexAgentAdapter for codex records", () => {
+  it("builds an AcpAgentAdapter for codex records", () => {
     const adapter = buildProviderAdapter({
       kind: "codex",
       cwd: "/tmp/codex"
     });
-    expect(adapter).toBeInstanceOf(CodexAgentAdapter);
+    expect(adapter).toBeInstanceOf(AcpAgentAdapter);
   });
 
-  it("builds a ClaudeCodeAgentAdapter for claude_code records", () => {
+  it("builds an AcpAgentAdapter for claude_code records", () => {
     const adapter = buildProviderAdapter({
       kind: "claude_code",
       cwd: "/tmp/claude"
     });
-    expect(adapter).toBeInstanceOf(ClaudeCodeAgentAdapter);
+    expect(adapter).toBeInstanceOf(AcpAgentAdapter);
   });
 
-  it("maps each kind to a stable display name", () => {
-    expect(defaultProviderDisplayName("codex")).toBe("Codex");
-    expect(defaultProviderDisplayName("claude_code")).toBe("Claude Code");
+  it("uses the kind label as the display name", () => {
+    expect(defaultProviderDisplayName("codex")).toBe("codex");
+    expect(defaultProviderDisplayName("claude_code")).toBe("claude_code");
   });
 });
