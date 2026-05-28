@@ -440,7 +440,7 @@ describe("FeishuCommandResponder", () => {
     });
     expect(calls).toEqual([]);
     expect(replies).toHaveLength(1);
-    expect(replies[0].text).toContain("请先 /bind");
+    expect(replies[0].text).toContain("/bind_repo");
   });
 
   it("blocks group chat when the binding has zero repos", async () => {
@@ -485,7 +485,7 @@ describe("FeishuCommandResponder", () => {
       command: { type: "chat", raw: "hi" }
     });
     expect(calls).toEqual([]);
-    expect(replies[0].text).toContain("请先 /bind");
+    expect(replies[0].text).toContain("/bind_repo");
   });
 
   it("does not gate single (p2p) chat — it runs without a binding", async () => {
