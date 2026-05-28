@@ -89,6 +89,8 @@ Feishu routing options:
 
 Feegle reads operator config from `~/.feegle/config.jsonc` first. If that file does not exist, it falls back to `~/.feegle/config.json`. JSONC supports comments and trailing commas, which makes local agent setup easier to maintain.
 
+Feegle is an [ACP](https://agentclientprotocol.com) (Agent Client Protocol) client. Every provider record routes through `@agentclientprotocol/sdk`'s `ClientSideConnection` over the spawned binary's stdio. `kind` is the user's free-form label; `command` is the binary to spawn. Optional fields: `args`, `env`, `cwd`, `model`, `timeoutMs`.
+
 Example:
 
 ```jsonc
@@ -96,28 +98,40 @@ Example:
   "schemaVersion": 1,
   "failureTarget": null,
   "agent": {
-    "default": "codex",
+    "default": "claude_code",
     "providers": {
-      "codex": {
-        "command": "codex",
-        "sandbox": "workspace-write",
-        "approvalPolicy": "on-request"
+      "claude_code": { "command": "claude-agent-acp" },
+      "codex":       { "command": "codex-acp" },
+      "cc-deepseek": {
+        "command": "claude-agent-acp",
+        "env": {
+          "ANTHROPIC_BASE_URL": "https://aiapi.lejurobot.com",
+          "ANTHROPIC_AUTH_TOKEN": "<your deepseek token>",
+          "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek/deepseek-v4-pro[1m]",
+          "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek/deepseek-v4-pro[1m]",
+          "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek/deepseek-v4-flash",
+          "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek/deepseek-v4-flash"
+        }
       },
-      "claude": {
-        "command": "claude",
-        "sandbox": "workspace-write"
-      }
+      "gemini": { "command": "gemini" },
+      "qwen":   { "command": "qwen" }
     }
-  },
-  "workspaces": {
-    "feegle": "/Users/yb/Desktop/code/personal/feegle"
   }
 }
 ```
 
-`agent.default` selects the provider activated at startup. `agent.providers` defines local CLI providers such as Codex, Claude, or another compatible command. `workspaces` is only a set of shortcuts shown in Feishu cards; it is not a whitelist. A user can still type a directory manually in the group setup card.
+`agent.default` selects the provider activated at startup. Any ACP-compliant agent binary plugs in via `~/.feegle/config.jsonc` alone — no source changes required.
 
-The legacy `/provider register` and `/provider use` commands still work when no `agent` config is present.
+Install the ACP wrappers for Claude Code and Codex via npm:
+
+```bash
+npm i -g @agentclientprotocol/claude-agent-acp
+npm i -g @agentclientprotocol/codex-acp
+```
+
+Gemini CLI and Qwen Code speak ACP natively and need no wrapper.
+
+Sessions are resumed across turns via ACP's `loadSession` when the agent advertises that capability; feegle persists the ACP `sessionId` in `~/.feegle/sessions.json`.
 
 ## Scheduler And Stock Commands
 
@@ -171,19 +185,19 @@ Owner-only agent provider commands:
 
 ```text
 /provider list
-/provider register <kind> cwd=<path> [command=<cli>] [sandbox=read-only|workspace-write|danger-full-access] [approvalPolicy=untrusted|on-request|never] [timeoutMs=<ms>]
+/provider register <kind> [cwd=<path>] [command=<cli>] [model=<name>] [timeoutMs=<ms>]
 /provider unregister <kind>
 /provider use <kind>
 ```
 
-`<kind>` 取值：`codex` 或 `claude_code`。第一次启用流程：
+`<kind>` 是自取的标签，对应 `~/.feegle/config.jsonc` 里 `agent.providers` 的 key。第一次启用流程：
 
 ```text
-/provider register codex cwd=/Users/yb/work
-/provider use codex
+/provider register claude_code
+/provider use claude_code
 ```
 
-之后即可对 bot 发自然语言对话。`/provider register` 默认不激活，必须显式 `use`。要改字段（例如换 cwd），先 `unregister` 再 `register`。
+之后即可对 bot 发自然语言对话。`/provider register` 默认不激活，必须显式 `use`。要改字段（例如换 cwd），先 `unregister` 再 `register`。如需配置 `args` 或 `env`，直接编辑 `~/.feegle/config.jsonc`。
 
 Live quote smoke test is opt-in:
 

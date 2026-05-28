@@ -25,6 +25,8 @@
 
 > **agent-provider 负载均衡**：注册 ≥2 个 provider 时，自然语言 chat 按"最少在飞 + round-robin"在各 provider 间分摊，并按会话黏（session 的 agentKind 固定）。`active`（/provider use）此时仅作为配置类命令与 cron 的默认目标，不再决定 chat 走向。
 
+> **agent-provider 纯 ACP 架构**:agent 层是 ACP（Agent Client Protocol）客户端,任何 ACP-兼容 agent CLI(claude-agent-acp、codex-acp、gemini、qwen、Kimi、cc-deepseek-via-claude-agent-acp...)都能在 `~/.feegle/config.jsonc` 一行加上去就跑,无需改 feegle 源代码。`kind` 是用户自取的标签,`command` 是要 spawn 的二进制,可选 `args` `env` `cwd` `model` `timeoutMs`。Session 通过 ACP 的 `loadSession` 跨轮恢复(agent 声明该 capability 时),feegle 把 `sessionId` 持久化到 `~/.feegle/sessions.json`。
+
 > **repo 绑定与分支解耦**：`/bind_repo <url>` 把仓库绑到当前 scope（群=chatId，单聊=user:&lt;id&gt;，见 `resolveBindingScopeKey`）；未注册的 url 自动注册（不联网探测，占位 `defaultBaseBranch=main`）。`/unbind_repo <url|#|name|id>` 取消单个、`/repo clear` 清空。ChatBinding 只存 `repositoryIds`（branch 已移除）。群聊未绑定仓库时，自然语言 chat 被拦截并提示 `/bind_repo`（见 `feishu-command-responder.ts` 的 `dispatchChat`）。
 
 > ⚠️ 注意 `scheduler-command-module.ts` 一个 module 同时覆盖了 cron-admin / stock-monitor / stock-portfolio / error-target 四个 feature 的命令注册——这是当前最反内聚的位置。
