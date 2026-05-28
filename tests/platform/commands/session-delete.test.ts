@@ -1,9 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
+import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
 import { DeleteCommandHandler } from "../../../src/platform/commands/session/delete-command.js";
 import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
 import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
@@ -23,19 +22,21 @@ function makeContext(sessionKey: string | undefined, args = ""): SlashCommandCon
   };
 }
 
-let home: string;
+let db: RuntimeDb;
 
-beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "feegle-delete-"));
+beforeEach(() => {
+  db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
 });
 
-afterEach(async () => {
-  await rm(home, { recursive: true, force: true });
+afterEach(() => {
+  db.close();
 });
 
 describe("DeleteCommandHandler", () => {
   it("requires explicit 'confirm' arg so accidental /delete does not silently wipe history", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     await store.getOrCreate("feishu:oc_1:u_1", { name: "alpha" });
     const history = new ChatHistoryStore();
     history.append("feishu:oc_1:u_1", { role: "user", content: "important" });
@@ -48,7 +49,7 @@ describe("DeleteCommandHandler", () => {
   });
 
   it("deletes session and clears history on /delete confirm so the session is fully gone", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     await store.getOrCreate("feishu:oc_1:u_1", { name: "alpha" });
     const history = new ChatHistoryStore();
     history.append("feishu:oc_1:u_1", { role: "user", content: "doomed" });
@@ -61,7 +62,7 @@ describe("DeleteCommandHandler", () => {
   });
 
   it("reports gracefully when session does not exist so /delete on a fresh chat is a no-op", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new DeleteCommandHandler({ sessionStore: store, chatHistory: new ChatHistoryStore() });
     const reply = await handler.execute(makeContext("feishu:oc_1:u_1", "confirm"));
     if (reply.kind !== "text") throw new Error("expected text reply");

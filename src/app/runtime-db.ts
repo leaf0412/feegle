@@ -37,6 +37,18 @@ export function migrate(db: RuntimeDb): void {
     create index if not exists chat_binding_repositories_scope_idx
       on chat_binding_repositories(scope_key, ordinal);
 
+    create table if not exists sessions (
+      session_key text primary key,
+      name text,
+      agent_kind text,
+      acp_session_id text,
+      quiet integer not null default 0,
+      created_at text not null,
+      last_active_at text not null,
+      status text not null check (status in ('active', 'closed'))
+    );
+    create index if not exists sessions_status_idx on sessions(status, last_active_at);
+
     create table if not exists pending_interactions (
       interaction_id text primary key,
       chat_id text not null,

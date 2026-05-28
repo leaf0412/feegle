@@ -1,9 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
+import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
 import { HistoryCommandHandler } from "../../../src/platform/commands/session/history-command.js";
 import { NameCommandHandler } from "../../../src/platform/commands/session/name-command.js";
 import { SearchCommandHandler } from "../../../src/platform/commands/session/search-command.js";
@@ -27,14 +26,16 @@ function makeContext(sessionKey: string | undefined, args = ""): SlashCommandCon
   };
 }
 
-let home: string;
+let db: RuntimeDb;
 
-beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "feegle-hsn-"));
+beforeEach(() => {
+  db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
 });
 
-afterEach(async () => {
-  await rm(home, { recursive: true, force: true });
+afterEach(() => {
+  db.close();
 });
 
 describe("HistoryCommandHandler", () => {
@@ -72,7 +73,7 @@ describe("HistoryCommandHandler", () => {
 
 describe("SearchCommandHandler", () => {
   it("usage hint when args empty so /search alone doesn't silently search everything", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new SearchCommandHandler({ sessionStore: store, chatHistory: new ChatHistoryStore() });
     const reply = await handler.execute({ ...makeContext("feishu:oc_1:u_1"), definition: searchDef, raw: "/search" });
     if (reply.kind !== "text") throw new Error("expected text reply");
@@ -80,7 +81,7 @@ describe("SearchCommandHandler", () => {
   });
 
   it("finds matches across all sessions and shows snippet with session label", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     await store.getOrCreate("feishu:oc_1:u_1", { name: "alpha" });
     await store.getOrCreate("feishu:oc_2:u_1", { name: "beta" });
     const history = new ChatHistoryStore();
@@ -100,7 +101,7 @@ describe("SearchCommandHandler", () => {
   });
 
   it("reports not found when no message matches so empty results are explicit", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new SearchCommandHandler({ sessionStore: store, chatHistory: new ChatHistoryStore() });
     const reply = await handler.execute({
       ...makeContext("feishu:oc_1:u_1"),
@@ -115,7 +116,7 @@ describe("SearchCommandHandler", () => {
 
 describe("NameCommandHandler", () => {
   it("rejects empty args so accidental /name does not silently clear an existing label", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new NameCommandHandler({ sessionStore: store });
     const reply = await handler.execute({ ...makeContext("feishu:oc_1:u_1"), definition: nameDef, raw: "/name", args: "" });
     if (reply.kind !== "text") throw new Error("expected text reply");
@@ -123,7 +124,7 @@ describe("NameCommandHandler", () => {
   });
 
   it("tells user to /new first when session is missing so renaming has clear semantics", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new NameCommandHandler({ sessionStore: store });
     const reply = await handler.execute({
       ...makeContext("feishu:oc_1:u_1"),
@@ -136,7 +137,7 @@ describe("NameCommandHandler", () => {
   });
 
   it("persists the new name so /current later shows the updated label", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     await store.getOrCreate("feishu:oc_1:u_1");
     const handler = new NameCommandHandler({ sessionStore: store });
     await handler.execute({

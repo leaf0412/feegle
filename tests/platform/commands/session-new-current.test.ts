@@ -1,10 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
+import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
 import { CurrentCommandHandler } from "../../../src/platform/commands/session/current-command.js";
 import { NewCommandHandler } from "../../../src/platform/commands/session/new-command.js";
 import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
@@ -26,19 +25,21 @@ function makeContext(sessionKey: string | undefined, args = ""): SlashCommandCon
   };
 }
 
-let home: string;
+let db: RuntimeDb;
 
-beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "feegle-session-cmd-"));
+beforeEach(() => {
+  db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
 });
 
-afterEach(async () => {
-  await rm(home, { recursive: true, force: true });
+afterEach(() => {
+  db.close();
 });
 
 describe("NewCommandHandler", () => {
   it("aborts when sessionKey is missing so test fixtures and broken flows don't quietly clear histories", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new NewCommandHandler({
       sessionStore: store,
       chatHistory: new ChatHistoryStore(),
@@ -50,7 +51,7 @@ describe("NewCommandHandler", () => {
   });
 
   it("clears chat history so users actually start fresh after /new", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const history = new ChatHistoryStore();
     history.append("feishu:oc_1:u_1", { role: "user", content: "old" });
     const handler = new NewCommandHandler({
@@ -63,7 +64,7 @@ describe("NewCommandHandler", () => {
   });
 
   it("records the active provider kind so /current later shows which agent the session was opened on", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const providers = new AgentProviderRegistry();
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
     providers.setActive("codex");
@@ -77,7 +78,7 @@ describe("NewCommandHandler", () => {
   });
 
   it("uses the args as session name so users can label sessions inline", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new NewCommandHandler({
       sessionStore: store,
       chatHistory: new ChatHistoryStore(),
@@ -90,7 +91,7 @@ describe("NewCommandHandler", () => {
 
 describe("CurrentCommandHandler", () => {
   it("tells users session not yet started so they understand they can start by chatting", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     const handler = new CurrentCommandHandler({ sessionStore: store, chatHistory: new ChatHistoryStore() });
     const reply = await handler.execute({ ...makeContext("feishu:oc_1:u_1"), definition: currentDef, raw: "/current" });
     if (reply.kind !== "text") throw new Error("expected text reply");
@@ -98,7 +99,7 @@ describe("CurrentCommandHandler", () => {
   });
 
   it("renders metadata + message count so users can see the session at a glance", async () => {
-    const store = await SessionStore.load(home);
+    const store = new SessionStore(db);
     await store.getOrCreate("feishu:oc_1:u_1", { agentKind: "codex", name: "alpha" });
     const history = new ChatHistoryStore();
     history.append("feishu:oc_1:u_1", { role: "user", content: "hi" });

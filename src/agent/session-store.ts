@@ -1,8 +1,16 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import type { Statement } from "better-sqlite3";
 import { z } from "zod";
-import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
+import type { RuntimeDb } from "../app/runtime-db.js";
 
+/**
+ * A SessionRecord captures the per-chat session state: which agent kind is
+ * pinned, optional human label, optional ACP session id for resume, and the
+ * usual created/last-active timestamps + active/closed status.
+ *
+ * Storage: SQLite table `sessions`. The zod schema is kept exported so external
+ * code that imported the type (e.g. for command handlers) keeps compiling; it
+ * is also used by the boot migrator to validate legacy JSON input.
+ */
 export const SessionRecordSchema = z.object({
   sessionKey: z.string().min(1),
   name: z.string().min(1).optional(),
@@ -16,18 +24,6 @@ export const SessionRecordSchema = z.object({
 
 export type SessionRecord = z.infer<typeof SessionRecordSchema>;
 
-export const SessionsFileSchema = z.object({
-  schemaVersion: z.literal(1),
-  sessions: z.array(SessionRecordSchema)
-});
-
-export type SessionsFile = z.infer<typeof SessionsFileSchema>;
-
-const DEFAULT: SessionsFile = {
-  schemaVersion: 1,
-  sessions: []
-};
-
 export interface SessionUpsertOptions {
   agentKind?: string;
   name?: string;
@@ -37,44 +33,113 @@ export interface SessionStoreOptions {
   clock?: () => Date;
 }
 
-export class SessionStore {
-  private constructor(
-    private readonly filePath: string,
-    private data: SessionsFile,
-    private readonly clock: () => Date
-  ) {}
+interface SessionRow {
+  session_key: string;
+  name: string | null;
+  agent_kind: string | null;
+  acp_session_id: string | null;
+  quiet: number;
+  created_at: string;
+  last_active_at: string;
+  status: "active" | "closed";
+}
 
-  static async load(home: string, options: SessionStoreOptions = {}): Promise<SessionStore> {
-    const filePath = join(home, "sessions.json");
-    let raw: string;
-    try {
-      raw = await readFile(filePath, "utf8");
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        await createDefaultJsonFile(filePath, DEFAULT);
-        raw = await readFile(filePath, "utf8");
-      } else {
-        throw error;
-      }
-    }
-    try {
-      return new SessionStore(filePath, SessionsFileSchema.parse(JSON.parse(raw)), options.clock ?? (() => new Date()));
-    } catch (error) {
-      throw new Error(`Invalid sessions.json at ${filePath}: ${errorMessage(error)}`);
-    }
+function rowToRecord(row: SessionRow): SessionRecord {
+  const record: SessionRecord = {
+    sessionKey: row.session_key,
+    createdAt: row.created_at,
+    lastActiveAt: row.last_active_at,
+    status: row.status
+  };
+  if (row.name !== null) record.name = row.name;
+  if (row.agent_kind !== null) record.agentKind = row.agent_kind;
+  if (row.acp_session_id !== null) record.acpSessionId = row.acp_session_id;
+  // quiet is stored 0/1; only surface when truthy to keep the legacy shape
+  // (the old JSON file omitted `quiet` entirely when false).
+  if (row.quiet === 1) record.quiet = true;
+  return record;
+}
+
+// LIKE prefix-escape: real session keys could in principle contain `%` or `_`
+// (SQL wildcards). Escape with backslash + match using `ESCAPE '\'`.
+function escapeLikePrefix(prefix: string): string {
+  return prefix.replace(/[\\%_]/g, "\\$&");
+}
+
+export class SessionStore {
+  private readonly clock: () => Date;
+  private readonly listStmt: Statement;
+  private readonly listByPrefixStmt: Statement;
+  private readonly getStmt: Statement;
+  private readonly insertStmt: Statement;
+  private readonly assignAgentStmt: Statement;
+  private readonly setAcpStmt: Statement;
+  private readonly touchStmt: Statement;
+  private readonly renameStmt: Statement;
+  private readonly setQuietStmt: Statement;
+  private readonly closeStmt: Statement;
+  private readonly reopenStmt: Statement;
+  private readonly removeStmt: Statement;
+
+  constructor(
+    db: RuntimeDb,
+    options: SessionStoreOptions = {}
+  ) {
+    this.clock = options.clock ?? (() => new Date());
+    this.listStmt = db.prepare(
+      `select session_key, name, agent_kind, acp_session_id, quiet, created_at, last_active_at, status
+         from sessions order by created_at`
+    );
+    this.listByPrefixStmt = db.prepare(
+      `select session_key, name, agent_kind, acp_session_id, quiet, created_at, last_active_at, status
+         from sessions where session_key like ? escape '\\' order by created_at`
+    );
+    this.getStmt = db.prepare(
+      `select session_key, name, agent_kind, acp_session_id, quiet, created_at, last_active_at, status
+         from sessions where session_key = ?`
+    );
+    this.insertStmt = db.prepare(
+      `insert into sessions(session_key, name, agent_kind, acp_session_id, quiet, created_at, last_active_at, status)
+         values (@session_key, @name, @agent_kind, @acp_session_id, @quiet, @created_at, @last_active_at, @status)`
+    );
+    this.assignAgentStmt = db.prepare(
+      `update sessions set agent_kind = ?, last_active_at = ?, status = 'active' where session_key = ?`
+    );
+    this.setAcpStmt = db.prepare(
+      `update sessions set acp_session_id = ?, last_active_at = ?, status = 'active' where session_key = ?`
+    );
+    this.touchStmt = db.prepare(
+      `update sessions set last_active_at = ?, status = 'active' where session_key = ?`
+    );
+    this.renameStmt = db.prepare(
+      `update sessions set name = ? where session_key = ?`
+    );
+    this.setQuietStmt = db.prepare(
+      `update sessions set quiet = ? where session_key = ?`
+    );
+    this.closeStmt = db.prepare(
+      `update sessions set status = 'closed', last_active_at = ? where session_key = ?`
+    );
+    this.reopenStmt = db.prepare(
+      `update sessions set status = 'active', last_active_at = ? where session_key = ?`
+    );
+    this.removeStmt = db.prepare(`delete from sessions where session_key = ?`);
   }
 
   list(): SessionRecord[] {
-    return this.data.sessions.map((session) => ({ ...session }));
+    const rows = this.listStmt.all() as SessionRow[];
+    return rows.map(rowToRecord);
   }
 
   listByPrefix(sessionKeyPrefix: string): SessionRecord[] {
-    return this.list().filter((session) => session.sessionKey.startsWith(sessionKeyPrefix));
+    const escaped = escapeLikePrefix(sessionKeyPrefix);
+    const rows = this.listByPrefixStmt.all(`${escaped}%`) as SessionRow[];
+    return rows.map(rowToRecord);
   }
 
   get(sessionKey: string): SessionRecord | undefined {
-    const session = this.data.sessions.find((entry) => entry.sessionKey === sessionKey);
-    return session ? { ...session } : undefined;
+    const row = this.getStmt.get(sessionKey) as SessionRow | undefined;
+    return row ? rowToRecord(row) : undefined;
   }
 
   async getOrCreate(sessionKey: string, options: SessionUpsertOptions = {}): Promise<SessionRecord> {
@@ -83,16 +148,17 @@ export class SessionStore {
       return existing;
     }
     const now = this.clock().toISOString();
-    const created: SessionRecord = {
-      sessionKey,
-      createdAt: now,
-      lastActiveAt: now,
-      status: "active",
-      ...(options.agentKind ? { agentKind: options.agentKind } : {}),
-      ...(options.name ? { name: options.name } : {})
-    };
-    await this.persist([...this.data.sessions, created]);
-    return { ...created };
+    this.insertStmt.run({
+      session_key: sessionKey,
+      name: options.name ?? null,
+      agent_kind: options.agentKind ?? null,
+      acp_session_id: null,
+      quiet: 0,
+      created_at: now,
+      last_active_at: now,
+      status: "active"
+    });
+    return this.get(sessionKey)!;
   }
 
   /**
@@ -105,29 +171,24 @@ export class SessionStore {
     if (!this.get(sessionKey)) {
       return this.getOrCreate(sessionKey, { agentKind });
     }
-    return this.mutate(sessionKey, (session) => ({
-      ...session,
-      agentKind,
-      lastActiveAt: this.clock().toISOString(),
-      status: "active"
-    }));
+    this.assignAgentStmt.run(agentKind, this.clock().toISOString(), sessionKey);
+    return this.get(sessionKey)!;
   }
 
   async setAcpSessionId(sessionKey: string, acpSessionId: string): Promise<SessionRecord> {
-    return this.mutate(sessionKey, (session) => ({
-      ...session,
-      acpSessionId,
-      lastActiveAt: this.clock().toISOString(),
-      status: "active"
-    }));
+    const result = this.setAcpStmt.run(acpSessionId, this.clock().toISOString(), sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async touch(sessionKey: string): Promise<SessionRecord> {
-    return this.mutate(sessionKey, (session) => ({
-      ...session,
-      lastActiveAt: this.clock().toISOString(),
-      status: "active"
-    }));
+    const result = this.touchStmt.run(this.clock().toISOString(), sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async rename(sessionKey: string, name: string): Promise<SessionRecord> {
@@ -135,63 +196,39 @@ export class SessionStore {
     if (trimmed.length === 0) {
       throw new Error("session name must not be empty");
     }
-    return this.mutate(sessionKey, (session) => ({ ...session, name: trimmed }));
+    const result = this.renameStmt.run(trimmed, sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async setQuiet(sessionKey: string, quiet: boolean): Promise<SessionRecord> {
-    return this.mutate(sessionKey, (session) => ({ ...session, quiet }));
+    const result = this.setQuietStmt.run(quiet ? 1 : 0, sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async close(sessionKey: string): Promise<SessionRecord> {
-    return this.mutate(sessionKey, (session) => ({
-      ...session,
-      status: "closed",
-      lastActiveAt: this.clock().toISOString()
-    }));
+    const result = this.closeStmt.run(this.clock().toISOString(), sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async reopen(sessionKey: string): Promise<SessionRecord> {
-    return this.mutate(sessionKey, (session) => ({
-      ...session,
-      status: "active",
-      lastActiveAt: this.clock().toISOString()
-    }));
+    const result = this.reopenStmt.run(this.clock().toISOString(), sessionKey);
+    if (result.changes === 0) {
+      throw new Error(`session not found: ${sessionKey}`);
+    }
+    return this.get(sessionKey)!;
   }
 
   async remove(sessionKey: string): Promise<boolean> {
-    const remaining = this.data.sessions.filter((session) => session.sessionKey !== sessionKey);
-    if (remaining.length === this.data.sessions.length) {
-      return false;
-    }
-    await this.persist(remaining);
-    return true;
+    const result = this.removeStmt.run(sessionKey);
+    return result.changes > 0;
   }
-
-  private async mutate(
-    sessionKey: string,
-    transform: (session: SessionRecord) => SessionRecord
-  ): Promise<SessionRecord> {
-    const index = this.data.sessions.findIndex((entry) => entry.sessionKey === sessionKey);
-    if (index === -1) {
-      throw new Error(`session not found: ${sessionKey}`);
-    }
-    const next = [...this.data.sessions];
-    next[index] = transform({ ...next[index]! });
-    await this.persist(next);
-    return { ...next[index]! };
-  }
-
-  private async persist(sessions: SessionRecord[]): Promise<void> {
-    const next: SessionsFile = { schemaVersion: 1, sessions };
-    await writeJsonAtomically(this.filePath, next);
-    this.data = next;
-  }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

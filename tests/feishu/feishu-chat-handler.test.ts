@@ -5,11 +5,10 @@ import { ChatHistoryStore } from "../../src/agent/chat-history-store.js";
 import { FeishuChatHandler } from "../../src/feishu/feishu-chat-handler.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import Database from "better-sqlite3";
 import { AgentLoadBalancer } from "../../src/agent/agent-load-balancer.js";
 import { SessionStore } from "../../src/agent/session-store.js";
+import { migrate } from "../../src/app/runtime-db.js";
 
 describe("FeishuChatHandler", () => {
   afterEach(() => {
@@ -311,8 +310,10 @@ describe("FeishuChatHandler", () => {
   });
 
   it("pins a new session to the balanced provider and reuses it on later turns", async () => {
-    const home = await mkdtemp(join(tmpdir(), "feegle-chat-balance-"));
-    const sessionStore = await SessionStore.load(home);
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const sessionStore = new SessionStore(db);
     const balancer = new AgentLoadBalancer();
     const providers = new AgentProviderRegistry();
     const calls: string[] = [];
@@ -344,8 +345,10 @@ describe("FeishuChatHandler", () => {
   });
 
   it("re-pins and surfaces a notice when a session's agent was unregistered", async () => {
-    const home = await mkdtemp(join(tmpdir(), "feegle-chat-repin-"));
-    const sessionStore = await SessionStore.load(home);
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const sessionStore = new SessionStore(db);
     await sessionStore.assignAgent("sk_1", "codex"); // pin to an agent we will NOT register
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
@@ -371,8 +374,10 @@ describe("FeishuChatHandler", () => {
   });
 
   it("persists the ACP session id supplied by the adapter via onAssign and resumes on later turns", async () => {
-    const home = await mkdtemp(join(tmpdir(), "feegle-chat-acp-resume-"));
-    const sessionStore = await SessionStore.load(home);
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const sessionStore = new SessionStore(db);
     const balancer = new AgentLoadBalancer();
     const providers = new AgentProviderRegistry();
     const observedAcpIds: Array<string | undefined> = [];
@@ -409,8 +414,10 @@ describe("FeishuChatHandler", () => {
   });
 
   it("releases the in-flight slot even when the turn throws so the agent is not stuck busy", async () => {
-    const home = await mkdtemp(join(tmpdir(), "feegle-chat-inflight-"));
-    const sessionStore = await SessionStore.load(home);
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const sessionStore = new SessionStore(db);
     const balancer = new AgentLoadBalancer();
     const providers = new AgentProviderRegistry();
     providers.register({

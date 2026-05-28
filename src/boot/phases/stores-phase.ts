@@ -2,9 +2,10 @@ import { existsSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
+import { z } from "zod";
 import { ChatHistoryStore } from "../../agent/chat-history-store.js";
 import { ProviderStore } from "../../agent/provider-store.js";
-import { SessionStore } from "../../agent/session-store.js";
+import { SessionRecordSchema, SessionStore } from "../../agent/session-store.js";
 import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
 import type { RuntimeDb } from "../../app/runtime-db.js";
 import { AliasStore } from "../../platform/commands/alias-store.js";
@@ -26,14 +27,17 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
   return {
     name: "stores",
     run: async (ctx: BootContext) => {
-      ctx.provide("sessionStore", await SessionStore.load(deps.feegleHome));
+      // Sessions live in SQLite (table `sessions`). First boot after upgrade:
+      // import the legacy ~/.feegle/sessions.json then unlink it.
+      const runtimeDb = ctx.require("runtimeDb");
+      await migrateLegacySessionsJson(deps.feegleHome, runtimeDb);
+      ctx.provide("sessionStore", new SessionStore(runtimeDb));
       ctx.provide("chatHistory", new ChatHistoryStore());
       ctx.provide("aliasStore", await AliasStore.load(deps.feegleHome));
       ctx.provide("repositoryStore", await RepositoryStore.load(deps.feegleHome));
 
       // Chat bindings live in SQLite (chat_bindings + chat_binding_repositories).
       // First boot after upgrade: import the legacy JSON then unlink it.
-      const runtimeDb = ctx.require("runtimeDb");
       await migrateLegacyChatBindingsJson(deps.feegleHome, runtimeDb);
       ctx.provide("chatBindingStore", new ChatBindingStore(runtimeDb));
 
@@ -161,4 +165,73 @@ export async function migrateLegacyChatBindingsJson(home: string, db: RuntimeDb)
 
   unlinkSync(filePath);
   console.info(`feegle: migrated chat-bindings.json (${bindings.length} bindings) into SQLite`);
+}
+
+/**
+ * One-shot migration of `~/.feegle/sessions.json` into SQLite (table `sessions`).
+ *  - File absent → no-op (first-run or already migrated).
+ *  - File present + DB already populated → partial-rollback. Move it aside to .bak
+ *    rather than merging — no silent overwrite of in-flight session state.
+ *  - File present + DB empty → import every session inside a single transaction,
+ *    then unlink the file.
+ *  - Corrupt JSON → rename to .bak + throw (mirrors providers.json / chat-bindings.json
+ *    failure-handling): no silent degradation. Operator sees the error + the .bak
+ *    path; next boot becomes a clean no-op.
+ */
+const SessionsFileMigratorSchema = z.object({
+  schemaVersion: z.literal(1),
+  sessions: z.array(SessionRecordSchema)
+});
+
+export async function migrateLegacySessionsJson(home: string, db: RuntimeDb): Promise<void> {
+  const filePath = join(home, "sessions.json");
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  let parsed: { schemaVersion: 1; sessions: Array<z.infer<typeof SessionRecordSchema>> };
+  try {
+    const raw = JSON.parse(readFileSync(filePath, "utf8"));
+    parsed = SessionsFileMigratorSchema.parse(raw);
+  } catch (parseError) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt sessions.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const existing = db.prepare(`select count(*) as n from sessions`).get() as { n: number };
+  if (existing.n > 0) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    console.warn(
+      `feegle: sessions already populated in SQLite; moved sessions.json → ${bak} (no merge)`
+    );
+    return;
+  }
+
+  const insertSession = db.prepare(
+    `insert into sessions(session_key, name, agent_kind, acp_session_id, quiet, created_at, last_active_at, status)
+       values (@session_key, @name, @agent_kind, @acp_session_id, @quiet, @created_at, @last_active_at, @status)`
+  );
+  const tx = db.transaction(() => {
+    for (const session of parsed.sessions) {
+      insertSession.run({
+        session_key: session.sessionKey,
+        name: session.name ?? null,
+        agent_kind: session.agentKind ?? null,
+        acp_session_id: session.acpSessionId ?? null,
+        quiet: session.quiet ? 1 : 0,
+        created_at: session.createdAt,
+        last_active_at: session.lastActiveAt,
+        status: session.status
+      });
+    }
+  });
+  tx();
+
+  unlinkSync(filePath);
+  console.info(`feegle: migrated sessions.json (${parsed.sessions.length} sessions) into SQLite`);
 }
