@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
 import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
 import type { SlashCommandHandler, SlashCommandReply } from "../../src/platform/slash-command-handler.js";
+import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-module.js";
 import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("buildSlashCommandRegistry", () => {
@@ -48,6 +49,40 @@ describe("buildSlashCommandRegistry", () => {
         args: ""
       })
     ).resolves.toEqual({ kind: "text", text: "external module reply" });
+  });
+
+  it("wires /repo list to the persistent repositoryStore so a registered repo is listed", async () => {
+    // Regression: /repo list previously read an empty in-memory registry while
+    // /repo add and /bind_repo wrote to repositoryStore, so a bound repo showed
+    // as "暂无已注册仓库". /repo list must read the same store.
+    const record = {
+      id: "repo_1",
+      name: "kuavo-model-training",
+      remoteUrl: "https://www.lejuhub.com/pc/kuavo-model-training",
+      defaultBaseBranch: "main",
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    const registry = buildSlashCommandRegistry({
+      ...stubSchedulerSlashDeps({
+        repositories: { list: () => [] }, // legacy empty source
+        repositoryStore: { list: () => [record] } as unknown as SlashCommandRegistryDeps["repositoryStore"]
+      })
+    });
+
+    const definition = registry.findById("repo_list")!;
+    const reply = await registry.resolve("repo_list")!.execute({
+      source: "message",
+      chatId: "oc_1",
+      messageId: "om_1",
+      sender: { platform: "feishu", userId: "ou_1" },
+      definition,
+      raw: "/repo list",
+      args: ""
+    });
+    if (reply.kind !== "text") throw new Error("expected text reply");
+    expect(reply.text).toContain("kuavo-model-training");
+    expect(reply.text).not.toContain("暂无已注册仓库");
   });
 
   it("freezes the returned registry so runtime cannot add commands after boot", () => {

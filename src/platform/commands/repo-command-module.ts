@@ -22,7 +22,14 @@ export function repoCommandModule(): SlashCommandModule {
   return {
     id: "repo",
     register: (registry, deps) => {
-      registry.registerCommand(repoListDefinition, new RepoListCommandHandler(deps.repositories));
+      // /repo list must read the SAME persistent store that /repo add and
+      // /bind_repo write to. `deps.repositories` is a legacy in-memory source
+      // that nothing populates; falling back to it only matters for tests that
+      // wire no repositoryStore.
+      registry.registerCommand(
+        repoListDefinition,
+        new RepoListCommandHandler(deps.repositoryStore ?? deps.repositories)
+      );
 
       if (deps.repositoryStore) {
         registry.registerCommand(
