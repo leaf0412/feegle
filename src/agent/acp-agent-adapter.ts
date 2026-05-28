@@ -88,16 +88,34 @@ export class AcpAgentAdapter implements AgentCli {
     const timeoutMs = this.opts.timeoutMs ?? 5 * 60_000;
     const deadline = setTimeout(() => child.kill(), timeoutMs);
     try {
-      await conn.initialize({
+      const initResponse = await conn.initialize({
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: {
           fs: { readTextFile: false, writeTextFile: false },
           terminal: false
         }
       });
-      const session = await conn.newSession({ cwd, mcpServers: [] });
+
+      const sessionCtx = options?.sessionContext;
+      const canResume = initResponse.agentCapabilities?.loadSession === true;
+      let sessionId: string;
+      if (sessionCtx?.acpSessionId && canResume) {
+        await conn.loadSession({
+          sessionId: sessionCtx.acpSessionId,
+          cwd,
+          mcpServers: []
+        });
+        sessionId = sessionCtx.acpSessionId;
+      } else {
+        const session = await conn.newSession({ cwd, mcpServers: [] });
+        sessionId = session.sessionId;
+        if (sessionCtx?.onAssign) {
+          await sessionCtx.onAssign(sessionId);
+        }
+      }
+
       await conn.prompt({
-        sessionId: session.sessionId,
+        sessionId,
         prompt: [{ type: "text", text }]
       });
     } finally {

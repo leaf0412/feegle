@@ -7,6 +7,7 @@ export const SessionRecordSchema = z.object({
   sessionKey: z.string().min(1),
   name: z.string().min(1).optional(),
   agentKind: z.string().min(1).optional(),
+  acpSessionId: z.string().min(1).optional(),
   quiet: z.boolean().optional(),
   createdAt: z.string(),
   lastActiveAt: z.string(),
@@ -107,6 +108,15 @@ export class SessionStore {
     return this.mutate(sessionKey, (session) => ({
       ...session,
       agentKind,
+      lastActiveAt: this.clock().toISOString(),
+      status: "active"
+    }));
+  }
+
+  async setAcpSessionId(sessionKey: string, acpSessionId: string): Promise<SessionRecord> {
+    return this.mutate(sessionKey, (session) => ({
+      ...session,
+      acpSessionId,
       lastActiveAt: this.clock().toISOString(),
       status: "active"
     }));

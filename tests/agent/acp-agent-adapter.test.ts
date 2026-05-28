@@ -27,4 +27,24 @@ describe("AcpAgentAdapter (integration against SDK example agent)", () => {
     expect(kinds.has("tool_use")).toBe(true);
     expect(kinds.has("tool_result")).toBe(true);
   }, 30_000);  // 30s timeout — generous for the subprocess
+
+  it("calls onAssign with the freshly-created ACP session id so the store can persist it", async () => {
+    const adapter = new AcpAgentAdapter({
+      command: "node",
+      args: [exampleAgentPath]
+    });
+    let assigned: string | undefined;
+    await adapter.chat(
+      [{ role: "user", content: "do something" }],
+      {
+        cwd: process.cwd(),
+        sessionContext: {
+          onAssign: (id) => { assigned = id; }
+        }
+      }
+    );
+    expect(assigned).toBeTruthy();
+    expect(typeof assigned).toBe("string");
+    expect(assigned!.length).toBeGreaterThan(0);
+  }, 30_000);
 });

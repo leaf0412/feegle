@@ -88,11 +88,25 @@ export class FeishuChatHandler {
       replyToMessageId: request.triggerMessageId
     });
 
+    const sessionStore = this.deps.sessionStore;
+    const acpSessionId = sessionStore?.get(request.sessionKey)?.acpSessionId;
     const options: AgentRunOptions = {
       cwd,
       onProgress: async (update) => {
         applyProgress(renderState, update);
         await this.safeUpdate(preview, renderState, "working", true);
+      },
+      sessionContext: {
+        acpSessionId,
+        onAssign: sessionStore
+          ? async (id) => {
+              try {
+                await sessionStore.setAcpSessionId(request.sessionKey, id);
+              } catch (error) {
+                console.warn("session acp id persistence failed", errorMessage(error));
+              }
+            }
+          : undefined
       }
     };
     const stopHeartbeat = this.startProgressHeartbeat(preview, renderState);
