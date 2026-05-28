@@ -1,7 +1,8 @@
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
+import type { ProviderStorePort } from "../agent/provider-store.js";
 import type { SessionStore } from "../agent/session-store.js";
-import type { ConfigStorePort } from "../app/config-store.js";
+import type { ConfigStoreProviderWriter } from "../app/config-store.js";
 import type { NotificationBroker } from "../app/notification-broker.js";
 import type { RuntimeDb } from "../app/runtime-db.js";
 import type { GitService } from "../git/git-service.js";
@@ -32,7 +33,7 @@ import type { PlanArtifactStore } from "../workbench/plan-artifact-store.js";
  */
 export interface Capabilities {
   // infra
-  configStore: ConfigStorePort;
+  configStore: ConfigStoreProviderWriter;
   runtimeDb: RuntimeDb;
   planArtifactStore: PlanArtifactStore;
   // stores
@@ -46,6 +47,7 @@ export interface Capabilities {
   runsLog: RunsLog;
   taskStore: TaskStore;
   taskRegistry: TaskRegistry;
+  providerStore: ProviderStorePort;
   // providers
   agents: AgentProviderRegistry;
   gitlab: GitLabClient;

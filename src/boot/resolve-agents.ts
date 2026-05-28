@@ -2,23 +2,6 @@ import type { BootContext } from "./boot-context.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import { buildAgentProviderRegistry } from "../agent/build-agent-provider-registry.js";
 import type { ConfigStorePort } from "../app/config-store.js";
-import type { ProvidersFile, ProviderStorePort } from "../agent/provider-store.js";
-
-export class EmptyProviderStoreReadView implements ProviderStorePort {
-  snapshot(): Readonly<ProvidersFile> {
-    return { schemaVersion: 1, providers: [], activeKind: null };
-  }
-  async setActive(_kind: ProvidersFile["activeKind"]): Promise<void> {}
-  async upsert(): Promise<void> {
-    throw new Error("provider register is disabled when agent providers are configured in config.jsonc");
-  }
-  async updateSettings(): Promise<never> {
-    throw new Error("provider settings are disabled when agent providers are configured in config.jsonc");
-  }
-  async remove(): Promise<never> {
-    throw new Error("provider unregister is disabled when agent providers are configured in config.jsonc");
-  }
-}
 
 export function requireAgentConfig(
   config: Readonly<ReturnType<ConfigStorePort["get"]>>
@@ -43,9 +26,9 @@ export function makeResolveAgents(deps: ResolveAgentsDeps) {
     if (deps.loadAgentProviders) {
       return deps.loadAgentProviders(deps.feegleHome);
     }
-    return buildAgentProviderRegistry({
-      store: new EmptyProviderStoreReadView(),
-      config: requireAgentConfig(ctx.require("configStore").get())
-    });
+    // Single source of truth: ProviderStore IS a view over ConfigStore.agent.providers.
+    // No dual-path fork — if config.jsonc lacks an agent block, requireAgentConfig throws.
+    requireAgentConfig(ctx.require("configStore").get());
+    return buildAgentProviderRegistry({ store: ctx.require("providerStore") });
   };
 }

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import { ProviderStore } from "../../../src/agent/provider-store.js";
+import { ConfigStore } from "../../../src/app/config-store.js";
 import { AliasStore } from "../../../src/platform/commands/alias-store.js";
 import { AliasCommandHandler } from "../../../src/platform/commands/setup/alias-command.js";
 import { ShellCommandHandler } from "../../../src/platform/commands/workspace/shell-command.js";
@@ -29,7 +30,16 @@ let home: string;
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "feegle-shell-alias-"));
+  await writeFile(join(home, "config.jsonc"), `{
+  "schemaVersion": 1,
+  "failureTarget": null
+}
+`, "utf8");
 });
+
+async function loadProviderStore(): Promise<ProviderStore> {
+  return ProviderStore.fromConfig(await ConfigStore.load(home));
+}
 
 afterEach(async () => {
   await rm(home, { recursive: true, force: true });
@@ -37,7 +47,7 @@ afterEach(async () => {
 
 describe("ShellCommandHandler", () => {
   it("rejects empty command with usage hint so blank /shell doesn't spawn anything", async () => {
-    const store = await ProviderStore.load(home);
+    const store = await loadProviderStore();
     const handler = new ShellCommandHandler({
       providers: new AgentProviderRegistry(),
       providerStore: store
@@ -49,7 +59,7 @@ describe("ShellCommandHandler", () => {
 
   it("runs cmd in active provider cwd and reports exit + stdout so users see real result", async () => {
     await writeFile(join(home, "marker.txt"), "found");
-    const store = await ProviderStore.load(home);
+    const store = await loadProviderStore();
     await store.upsert({ kind: "codex", cwd: home });
     const providers = new AgentProviderRegistry();
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
@@ -63,7 +73,7 @@ describe("ShellCommandHandler", () => {
   });
 
   it("requires active provider so /shell does not silently pick a wrong cwd", async () => {
-    const store = await ProviderStore.load(home);
+    const store = await loadProviderStore();
     const handler = new ShellCommandHandler({
       providers: new AgentProviderRegistry(),
       providerStore: store

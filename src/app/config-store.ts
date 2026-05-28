@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { NotificationTarget } from "./notification-port.js";
 import { createDefaultJsonFile, writeTextAtomically } from "./json-file.js";
-import { parseJsonc, setJsoncValue } from "./jsonc.js";
+import { parseJsonc, setJsoncValue, unsetJsoncValue } from "./jsonc.js";
 
 export const NotificationTargetSchema = z.object({
   platform: z.literal("feishu"),
@@ -12,7 +12,9 @@ export const NotificationTargetSchema = z.object({
 
 export const AgentProviderConfigSchema = z
   .object({
-    command: z.string().min(1),
+    // command is optional — buildProviderAdapter falls back to `kind` when absent, and
+    // /provider register accepts kind-only registration. Schema must match that contract.
+    command: z.string().min(1).optional(),
     cwd: z.string().min(1).optional(),
     sandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).optional(),
     approvalPolicy: z.enum(["untrusted", "on-request", "never"]).optional(),
@@ -25,9 +27,14 @@ export const AgentProviderConfigSchema = z
   .passthrough();
 
 export const AgentConfigSchema = z.object({
-  default: z.string().min(1),
+  // Optional + nullable: optional so `/provider register` can land a provider before any
+  // `/provider use` happens (no `default` key needed yet); nullable so `setActive(null)` /
+  // unregister-of-active-provider can persist "no active kind" without removing the key.
+  default: z.string().min(1).nullable().optional(),
   providers: z.record(AgentProviderConfigSchema)
 });
+
+export type AgentProviderConfig = z.infer<typeof AgentProviderConfigSchema>;
 
 export const FeishuConfigSchema = z.object({
   appId: z.string().min(1),
@@ -69,6 +76,17 @@ export type FeegleConfig = z.infer<typeof FeegleConfigSchema>;
 export interface ConfigStorePort {
   get(): Readonly<FeegleConfig>;
   setFailureTarget(target: NotificationTarget | null): Promise<void>;
+}
+
+/**
+ * Extends ConfigStorePort with the surgical-edit methods ProviderStore needs to keep config.jsonc
+ * the single source of truth. Kept distinct so test stubs that don't exercise providers can stay
+ * minimal — only code that actually writes provider records depends on this surface.
+ */
+export interface ConfigStoreProviderWriter extends ConfigStorePort {
+  setAgentProvider(kind: string, record: AgentProviderConfig): Promise<void>;
+  setAgentDefault(kind: string | null): Promise<void>;
+  removeAgentProvider(kind: string): Promise<{ activeCleared: boolean }>;
 }
 
 const DEFAULT_CONFIG: FeegleConfig = {
@@ -140,6 +158,60 @@ export class ConfigStore {
     this.rawText = setJsoncValue(this.rawText, ["failureTarget"], value);
     await writeTextAtomically(this.filePath, this.rawText);
     this.data = { ...this.data, failureTarget: value };
+  }
+
+  /**
+   * Write a single provider record under `agent.providers.<kind>`. Overwrites if the kind already
+   * exists — the "already registered" guard lives in the higher-level ProviderStore.upsert path.
+   * Same surgical-edit guarantee as setFailureTarget: comments, sibling fields and `{env:...}` tokens
+   * survive untouched.
+   */
+  async setAgentProvider(kind: string, record: AgentProviderConfig): Promise<void> {
+    const validated = AgentProviderConfigSchema.parse(record);
+    this.rawText = setJsoncValue(this.rawText, ["agent", "providers", kind], validated);
+    await writeTextAtomically(this.filePath, this.rawText);
+    const previousAgent = this.data.agent ?? { default: null, providers: {} };
+    this.data = {
+      ...this.data,
+      agent: {
+        ...previousAgent,
+        providers: { ...previousAgent.providers, [kind]: { ...validated } }
+      }
+    };
+  }
+
+  async setAgentDefault(kind: string | null): Promise<void> {
+    this.rawText = setJsoncValue(this.rawText, ["agent", "default"], kind);
+    await writeTextAtomically(this.filePath, this.rawText);
+    const previousAgent = this.data.agent ?? { default: null, providers: {} };
+    this.data = {
+      ...this.data,
+      agent: { ...previousAgent, default: kind }
+    };
+  }
+
+  /**
+   * Remove a provider from `agent.providers`. If the removed kind was the active default, also
+   * clears `agent.default` and reports it via `activeCleared`.
+   */
+  async removeAgentProvider(kind: string): Promise<{ activeCleared: boolean }> {
+    this.rawText = unsetJsoncValue(this.rawText, ["agent", "providers", kind]);
+    const wasActive = this.data.agent?.default === kind;
+    if (wasActive) {
+      this.rawText = setJsoncValue(this.rawText, ["agent", "default"], null);
+    }
+    await writeTextAtomically(this.filePath, this.rawText);
+    const previousAgent = this.data.agent ?? { default: null, providers: {} };
+    const { [kind]: _removed, ...rest } = previousAgent.providers;
+    this.data = {
+      ...this.data,
+      agent: {
+        ...previousAgent,
+        providers: rest,
+        default: wasActive ? null : previousAgent.default
+      }
+    };
+    return { activeCleared: wasActive };
   }
 }
 

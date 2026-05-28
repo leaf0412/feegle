@@ -13,7 +13,7 @@ import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
 import type { Task } from "../scheduler/task.js";
 import { defaultQuoteClientId } from "../stock/default-quote-client-modules.js";
 import type { QuoteClientModule } from "../stock/quote-client-module.js";
-import type { ConfigStorePort } from "./config-store.js";
+import type { ConfigStorePort, ConfigStoreProviderWriter } from "./config-store.js";
 import type { HookManager } from "./hooks.js";
 import type { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterModule } from "./notification-adapter-module.js";
@@ -33,7 +33,7 @@ export interface FeegleAppDeps {
   loadAgentProviders?: (feegleHome: string) => Promise<AgentProviderRegistry>;
   runtimeFactory: (handler: FeishuCommandHandler) => Startable;
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
-  loadConfigStore?: (feegleHome: string) => Promise<ConfigStorePort>;
+  loadConfigStore?: (feegleHome: string) => Promise<ConfigStoreProviderWriter>;
   createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort; hooks?: HookManager }) => Startable;
   /** Inject the full plugin set (tests). When set, the default plugins and the injected-module fields below are ignored. */
   plugins?: readonly FeeglePlugin[];

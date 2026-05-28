@@ -205,3 +205,85 @@ describe("ConfigStore environment-variable interpolation", () => {
     }
   });
 });
+
+describe("ConfigStore agent provider edits", () => {
+  it("setAgentProvider edits only the provider record — preserves other fields, comments, and {env:...} tokens", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-cfg-agent-"));
+    try {
+      await writeFile(
+        join(home, "config.jsonc"),
+        `{
+  // operator notes — must survive provider edits
+  "schemaVersion": 1,
+  "failureTarget": null,
+  "ownerEmails": ["a@b.com"],
+  "feishu": {
+    "appId": "{env:FEISHU_APP_ID}",
+    "appSecret": "{env:FEISHU_APP_SECRET}",
+    "enableInteractiveCards": true,
+    "allowFrom": "*", "allowChat": "*",
+    "groupOnly": false, "groupReplyAll": false, "shareSessionInChannel": false,
+    "threadIsolation": false, "replyToTrigger": true,
+    "progressStyle": "card", "reactionEmoji": "OnIt"
+  }
+}
+`,
+        "utf8"
+      );
+      const RESOLVED = "feishu-app-secret-from-env";
+      const env = { FEISHU_APP_ID: "cli_real", FEISHU_APP_SECRET: RESOLVED };
+      const store = await ConfigStore.load(home, env);
+
+      await store.setAgentProvider("codex", { command: "codex", cwd: "/tmp/codex" });
+      await store.setAgentDefault("codex");
+
+      const onDisk = await readFile(join(home, "config.jsonc"), "utf8");
+      expect(onDisk).toContain("// operator notes — must survive provider edits");
+      expect(onDisk).toContain("{env:FEISHU_APP_SECRET}"); // token NOT resolved
+      expect(onDisk).not.toContain(RESOLVED);             // resolved value never written to disk
+      expect(onDisk).toContain('"a@b.com"');
+      expect(onDisk).toContain('"codex"');
+      expect(onDisk).toContain('"default": "codex"');
+
+      const reloaded = await ConfigStore.load(home, env);
+      expect(reloaded.get().agent?.providers.codex).toEqual({ command: "codex", cwd: "/tmp/codex" });
+      expect(reloaded.get().agent?.default).toBe("codex");
+      expect(reloaded.get().feishu?.appSecret).toBe(RESOLVED); // env still resolves on read
+      expect(reloaded.get().ownerEmails).toEqual(["a@b.com"]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("removeAgentProvider drops the kind and clears default when it was the active one", async () => {
+    const home = await mkdtemp(join(tmpdir(), "feegle-cfg-agent-rm-"));
+    try {
+      await writeFile(
+        join(home, "config.jsonc"),
+        `{
+  "schemaVersion": 1,
+  "failureTarget": null,
+  "agent": {
+    "default": "codex",
+    "providers": {
+      "codex": { "command": "codex" },
+      "claude": { "command": "claude" }
+    }
+  }
+}
+`,
+        "utf8"
+      );
+      const store = await ConfigStore.load(home);
+
+      const result = await store.removeAgentProvider("codex");
+      expect(result).toEqual({ activeCleared: true });
+
+      const reloaded = await ConfigStore.load(home);
+      expect(reloaded.get().agent?.providers).toEqual({ claude: { command: "claude" } });
+      expect(reloaded.get().agent?.default).toBeNull();
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});

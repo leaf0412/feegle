@@ -6,6 +6,7 @@ import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.j
 import { FeegleApp, type FeegleAppDeps } from "../../src/app/feegle-app.js";
 import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 
 function fakeCloudDoc(): FeishuCloudDocClientPort {
   return {
@@ -28,10 +29,7 @@ function baseDeps(home: string, overrides: Partial<FeegleAppDeps>): FeegleAppDep
     cloudDoc: fakeCloudDoc(),
     agentProviders: new AgentProviderRegistry(),
     acquireLock: async () => async () => {},
-    loadConfigStore: async () => ({
-      get: () => ({ schemaVersion: 1 as const, failureTarget: null }),
-      setFailureTarget: async () => {}
-    }),
+    loadConfigStore: async () => fakeConfigStore(),
     createScheduler: () => ({ start: async () => {}, stop: async () => {} }),
     ...overrides
   } as FeegleAppDeps;

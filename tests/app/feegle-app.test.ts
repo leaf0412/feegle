@@ -7,6 +7,7 @@ import { FeegleApp } from "../../src/app/feegle-app.js";
 import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import type { FeishuCommandHandler } from "../../src/feishu/feishu-long-connection-runtime.js";
+import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 
 describe("FeegleApp", () => {
   it("starts scheduler-facing services before the Feishu runtime", async () => {
@@ -25,10 +26,7 @@ describe("FeegleApp", () => {
       },
       loadConfigStore: async () => {
         events.push("config");
-        return {
-          get: () => ({ schemaVersion: 1 as const, failureTarget: null }),
-          setFailureTarget: async () => {}
-        };
+        return fakeConfigStore();
       },
       createScheduler: () => ({
         start: async () => {
@@ -80,19 +78,13 @@ describe("FeegleApp", () => {
         feishuClient: {} as FeishuClientPort,
         cloudDoc: fakeCloudDoc(),
         acquireLock: async () => async () => {},
-        loadConfigStore: async () => ({
-          get: () => ({
-            schemaVersion: 1 as const,
-            failureTarget: null,
+        loadConfigStore: async () =>
+          fakeConfigStore({
             agent: {
               default: "codex",
-              providers: {
-                codex: { command: "codex" }
-              }
+              providers: { codex: { command: "codex" } }
             }
           }),
-          setFailureTarget: async () => {}
-        }),
         createScheduler: () => ({
           start: async () => {
             events.push("scheduler:start");
@@ -125,10 +117,7 @@ describe("FeegleApp", () => {
         feishuClient: {} as FeishuClientPort,
         cloudDoc: fakeCloudDoc(),
         acquireLock: async () => async () => {},
-        loadConfigStore: async () => ({
-          get: () => ({ schemaVersion: 1 as const, failureTarget: null }),
-          setFailureTarget: async () => {}
-        }),
+        loadConfigStore: async () => fakeConfigStore(),
         createScheduler: () => ({
           start: async () => {},
           stop: async () => {}

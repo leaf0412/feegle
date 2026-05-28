@@ -1,7 +1,6 @@
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
-import { EmptyProviderStoreReadView } from "../resolve-agents.js";
 import { buildSlashCommandRegistry } from "../../platform/build-slash-command-registry.js";
 import { InMemoryRepositoryRegistry } from "../../repositories/repository-registry.js";
 import type { TaskScheduler } from "../../scheduler/task-scheduler.js";
@@ -30,6 +29,7 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         "scheduler",
         "runsLog",
         "agents",
+        "providerStore",
         "sessionStore",
         "chatHistory",
         "aliasStore"
@@ -49,7 +49,7 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         scheduler: cap.scheduler as TaskScheduler,
         runsLog: cap.runsLog,
         providers: cap.agents,
-        providerStore: new EmptyProviderStoreReadView(),
+        providerStore: cap.providerStore,
         sessionStore: cap.sessionStore,
         chatHistory: cap.chatHistory,
         aliasStore: cap.aliasStore,

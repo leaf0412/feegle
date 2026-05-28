@@ -1,7 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { z } from "zod";
-import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
+import type { ConfigStoreProviderWriter } from "../app/config-store.js";
 
 export const ProviderRecordSchema = z
   .object({
@@ -34,114 +32,73 @@ export interface ProviderStorePort {
   remove(kind: ProviderKind): Promise<{ activeCleared: boolean }>;
 }
 
-const DEFAULT: ProvidersFile = {
-  schemaVersion: 1,
-  providers: [],
-  activeKind: null
-};
-
+/**
+ * ProviderStore is a view over ConfigStore — there is no separate `providers.json` file. Reads
+ * project the `agent.providers` block in config.jsonc into the legacy ProvidersFile shape that
+ * existing callers (slash-command handlers, build-agent-provider-registry) already speak. Writes
+ * route through ConfigStore.setAgentProvider / setAgentDefault / removeAgentProvider, which
+ * preserves comments and `{env:...}` tokens in config.jsonc via surgical JSONC edits.
+ */
 export class ProviderStore implements ProviderStorePort {
-  private constructor(
-    private readonly filePath: string,
-    private data: ProvidersFile
-  ) {}
+  private constructor(private readonly configStore: ConfigStoreProviderWriter) {}
 
-  static async load(home: string): Promise<ProviderStore> {
-    const filePath = join(home, "providers.json");
-    let raw: string;
-    try {
-      raw = await readFile(filePath, "utf8");
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        await createDefaultJsonFile(filePath, DEFAULT);
-        raw = await readFile(filePath, "utf8");
-      } else {
-        throw error;
-      }
-    }
-    try {
-      return new ProviderStore(filePath, ProvidersFileSchema.parse(JSON.parse(raw)));
-    } catch (error) {
-      throw new Error(`Invalid providers.json at ${filePath}: ${errorMessage(error)}`);
-    }
+  static fromConfig(configStore: ConfigStoreProviderWriter): ProviderStore {
+    return new ProviderStore(configStore);
   }
 
   snapshot(): Readonly<ProvidersFile> {
+    const cfg = this.configStore.get();
+    const providersBlock = cfg.agent?.providers ?? {};
+    const providers = Object.entries(providersBlock).map(([kind, record]) =>
+      ProviderRecordSchema.parse({ kind, ...record })
+    );
     return {
-      schemaVersion: this.data.schemaVersion,
-      providers: this.data.providers.map((provider) => ({ ...provider })),
-      activeKind: this.data.activeKind
+      schemaVersion: 1,
+      providers,
+      activeKind: cfg.agent?.default ?? null
     };
   }
 
   async upsert(record: ProviderRecord): Promise<void> {
     const validated = ProviderRecordSchema.parse(record);
-    if (this.data.providers.some((existing) => existing.kind === validated.kind)) {
+    const existing = this.configStore.get().agent?.providers ?? {};
+    if (existing[validated.kind] !== undefined) {
       throw new Error(`provider already registered: ${validated.kind}`);
     }
-    const next: ProvidersFile = {
-      schemaVersion: 1,
-      providers: [...this.data.providers, validated],
-      activeKind: this.data.activeKind
-    };
-    await writeJsonAtomically(this.filePath, next);
-    this.data = next;
+    const { kind, ...rest } = validated;
+    await this.configStore.setAgentProvider(kind, rest);
   }
 
   async setActive(kind: ProviderKind | null): Promise<void> {
-    if (kind !== null && !this.data.providers.some((provider) => provider.kind === kind)) {
-      throw new Error(`provider not registered: ${kind}`);
+    if (kind !== null) {
+      const providers = this.configStore.get().agent?.providers ?? {};
+      if (providers[kind] === undefined) {
+        throw new Error(`provider not registered: ${kind}`);
+      }
     }
-    const next: ProvidersFile = {
-      schemaVersion: 1,
-      providers: this.data.providers.map((provider) => ({ ...provider })),
-      activeKind: kind
-    };
-    await writeJsonAtomically(this.filePath, next);
-    this.data = next;
+    await this.configStore.setAgentDefault(kind);
   }
 
   async updateSettings(
     kind: ProviderKind,
     patch: Record<string, unknown>
   ): Promise<ProviderRecord> {
-    const index = this.data.providers.findIndex((entry) => entry.kind === kind);
-    if (index === -1) {
+    const existing = this.configStore.get().agent?.providers?.[kind];
+    if (existing === undefined) {
       throw new Error(`provider not registered: ${kind}`);
     }
-    const current = this.data.providers[index]!;
-    const merged = { ...current, ...patch, kind: current.kind, cwd: current.cwd };
+    const merged = { ...existing, ...patch, kind, cwd: existing.cwd };
     const validated = ProviderRecordSchema.parse(merged);
-    const next: ProvidersFile = {
-      schemaVersion: 1,
-      providers: this.data.providers.map((entry, i) => (i === index ? validated : entry)),
-      activeKind: this.data.activeKind
-    };
-    await writeJsonAtomically(this.filePath, next);
-    this.data = next;
+    const { kind: _k, ...rest } = validated;
+    await this.configStore.setAgentProvider(kind, rest);
     return { ...validated };
   }
 
   async remove(kind: ProviderKind): Promise<{ activeCleared: boolean }> {
-    if (!this.data.providers.some((provider) => provider.kind === kind)) {
+    const providers = this.configStore.get().agent?.providers ?? {};
+    if (providers[kind] === undefined) {
       throw new Error(`provider not registered: ${kind}`);
     }
-    const activeCleared = this.data.activeKind === kind;
-    const next: ProvidersFile = {
-      schemaVersion: 1,
-      providers: this.data.providers.filter((provider) => provider.kind !== kind),
-      activeKind: activeCleared ? null : this.data.activeKind
-    };
-    await writeJsonAtomically(this.filePath, next);
-    this.data = next;
-    return { activeCleared };
+    return this.configStore.removeAgentProvider(kind);
   }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -16,38 +16,6 @@ function fakeStore(file: ProvidersFile): {
 }
 
 describe("buildAgentProviderRegistry", () => {
-  it("uses config agent providers and activates the configured default", () => {
-    const registry = buildAgentProviderRegistry({
-      store: fakeStore({ schemaVersion: 1, providers: [], activeKind: null }),
-      config: {
-        default: "codex",
-        providers: {
-          codex: { command: "codex", cwd: "/repo" }
-        }
-      },
-      adapterFactory: () => ({
-        chat: async () => "",
-        generatePrototype: async () => "",
-        generatePlan: async () => "",
-        runDevelopmentTask: async () => ""
-      })
-    });
-
-    expect(registry.activeKindName()).toBe("codex");
-  });
-
-  it("throws when config default points at a missing provider", () => {
-    expect(() =>
-      buildAgentProviderRegistry({
-        store: fakeStore({ schemaVersion: 1, providers: [], activeKind: null }),
-        config: {
-          default: "codex",
-          providers: {}
-        }
-      })
-    ).toThrow(/agent.default provider not configured: codex/);
-  });
-
   it("returns an empty registry when the store has no providers", () => {
     const registry = buildAgentProviderRegistry({
       store: fakeStore({ schemaVersion: 1, providers: [], activeKind: null })

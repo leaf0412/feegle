@@ -1,9 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../../src/agent/agent-provider-registry.js";
 import { ProviderStore } from "../../../../src/agent/provider-store.js";
+import { ConfigStore } from "../../../../src/app/config-store.js";
 import {
   ProviderListCommandHandler,
   ProviderRegisterCommandHandler,
@@ -43,7 +44,13 @@ describe("provider command handlers", () => {
 
   beforeEach(async () => {
     home = await mkdtemp(join(tmpdir(), "feegle-provider-cmd-"));
-    store = await ProviderStore.load(home);
+    await writeFile(join(home, "config.jsonc"), `{
+  "schemaVersion": 1,
+  "failureTarget": null
+}
+`, "utf8");
+    const configStore = await ConfigStore.load(home);
+    store = ProviderStore.fromConfig(configStore);
     registry = new AgentProviderRegistry();
   });
 
