@@ -1,7 +1,9 @@
+import Database from "better-sqlite3";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
 import { RepositoryStore } from "../../../src/repositories/repository-store.js";
 import { ChatBindingStore } from "../../../src/repositories/chat-binding-store.js";
 import { RepoRemoveCommandHandler } from "../../../src/platform/commands/repo/repo-remove-command.js";
@@ -10,6 +12,13 @@ import { RepoShowCommandHandler } from "../../../src/platform/commands/repo/repo
 import { RepoClearCommandHandler } from "../../../src/platform/commands/repo/repo-clear-command.js";
 import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
 import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
+
+function makeDb(): RuntimeDb {
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
+  return db;
+}
 
 const def = defineSlashCommand("repo_remove", "/repo remove", "rm", "repo", "cmd:/repo remove");
 
@@ -26,12 +35,15 @@ function makeContext(args = "", email = "a@b.com"): SlashCommandContext {
 }
 
 let home: string;
+let db: RuntimeDb;
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "feegle-repo-mut-"));
+  db = makeDb();
 });
 
 afterEach(async () => {
+  db.close();
   await rm(home, { recursive: true, force: true });
 });
 
@@ -86,7 +98,7 @@ describe("repo binding scope (single chat vs group)", () => {
 
   it("a single-chat bind is keyed by user, invisible to a group on the same chat id", async () => {
     const repos = await RepositoryStore.load(home);
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const show = new RepoShowCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
 
@@ -103,7 +115,7 @@ describe("repo binding scope (single chat vs group)", () => {
 
   it("a group bind is shared and keyed by chat id", async () => {
     const repos = await RepositoryStore.load(home);
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const show = new RepoShowCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
 
@@ -115,7 +127,7 @@ describe("repo binding scope (single chat vs group)", () => {
 
   it("clear removes only the resolved scope's binding", async () => {
     const repos = await RepositoryStore.load(home);
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const clear = new RepoClearCommandHandler({ chatBindingStore: bindings });
 

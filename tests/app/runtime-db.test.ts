@@ -22,8 +22,42 @@ describe("openRuntimeDb", () => {
     db = openRuntimeDb(join(home, "feegle.db"));
 
     expect(tableExists(db, "chat_bindings")).toBe(true);
+    expect(tableExists(db, "chat_binding_repositories")).toBe(true);
     expect(tableExists(db, "pending_interactions")).toBe(true);
     expect(tableExists(db, "plan_artifacts")).toBe(true);
+  });
+
+  it("enables foreign_keys pragma so chat_bindings ON DELETE CASCADE actually fires", () => {
+    // Without this pragma the cascade is silently a no-op — ChatBindingStore.clear()
+    // would leave orphan rows. Verifying it at the connection level catches a regression
+    // where someone removes the pragma in openRuntimeDb.
+    db = openRuntimeDb(join(home, "feegle.db"));
+    const row = db.prepare("pragma foreign_keys").get() as { foreign_keys: number };
+    expect(row.foreign_keys).toBe(1);
+  });
+
+  it("drops the legacy workspace-shape chat_bindings table when migrating an older db", () => {
+    // Old `chat_bindings` had columns (workspace_path, default_provider, ...) from the removed
+    // workspace feature. New shape is (scope_key, updated_at). Migration must replace the table
+    // — leaving the old columns would break ChatBindingStore queries on every legacy install.
+    const dbPath = join(home, "legacy-workspace.db");
+    const legacy = new Database(dbPath);
+    legacy.exec(`
+      create table chat_bindings (
+        chat_id text primary key,
+        workspace_path text not null,
+        default_provider text,
+        updated_by text,
+        updated_at text not null
+      );
+    `);
+    legacy.close();
+
+    db = openRuntimeDb(dbPath);
+    const columns = (db.prepare("pragma table_info(chat_bindings)").all() as Array<{ name: string }>).map(
+      (row) => row.name
+    );
+    expect(columns).toEqual(["scope_key", "updated_at"]);
   });
 
   it("adds doc_token and doc_url columns to plan_artifacts when migrating an older db", () => {

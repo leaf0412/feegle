@@ -1,15 +1,31 @@
+import Database from "better-sqlite3";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { migrate, type RuntimeDb } from "../../../../src/app/runtime-db.js";
 import { RepositoryStore } from "../../../../src/repositories/repository-store.js";
 import { ChatBindingStore } from "../../../../src/repositories/chat-binding-store.js";
 import { UnbindRepoCommandHandler } from "../../../../src/platform/commands/repo/unbind-repo-command.js";
 import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
 
+function makeDb(): RuntimeDb {
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  migrate(db);
+  return db;
+}
+
 let home: string;
-beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "feegle-unbind-")); });
-afterEach(async () => { await rm(home, { recursive: true, force: true }); });
+let db: RuntimeDb;
+beforeEach(async () => {
+  home = await mkdtemp(join(tmpdir(), "feegle-unbind-"));
+  db = makeDb();
+});
+afterEach(async () => {
+  db.close();
+  await rm(home, { recursive: true, force: true });
+});
 
 function ctx(args: string): SlashCommandContext {
   return {
@@ -24,7 +40,7 @@ describe("UnbindRepoCommandHandler", () => {
   it("removes a bound repo by url", async () => {
     const repos = await RepositoryStore.load(home);
     const rec = await repos.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     await bindings.addRepository("oc_g", rec.id);
     const handler = new UnbindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(ctx("https://x/kuavo"));
@@ -36,7 +52,7 @@ describe("UnbindRepoCommandHandler", () => {
   it("reports when the repo was not bound", async () => {
     const repos = await RepositoryStore.load(home);
     await repos.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     const handler = new UnbindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(ctx("https://x/kuavo"));
     if (reply.kind !== "text") throw new Error("expected text");
@@ -45,7 +61,7 @@ describe("UnbindRepoCommandHandler", () => {
 
   it("reports an unrecognised query", async () => {
     const repos = await RepositoryStore.load(home);
-    const bindings = await ChatBindingStore.load(home);
+    const bindings = new ChatBindingStore(db);
     const handler = new UnbindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(ctx("https://nope"));
     if (reply.kind !== "text") throw new Error("expected text");

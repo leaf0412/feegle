@@ -6,6 +6,7 @@ import { ChatHistoryStore } from "../../agent/chat-history-store.js";
 import { ProviderStore } from "../../agent/provider-store.js";
 import { SessionStore } from "../../agent/session-store.js";
 import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
+import type { RuntimeDb } from "../../app/runtime-db.js";
 import { AliasStore } from "../../platform/commands/alias-store.js";
 import { ChatBindingStore } from "../../repositories/chat-binding-store.js";
 import { RepositoryStore } from "../../repositories/repository-store.js";
@@ -29,7 +30,13 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("chatHistory", new ChatHistoryStore());
       ctx.provide("aliasStore", await AliasStore.load(deps.feegleHome));
       ctx.provide("repositoryStore", await RepositoryStore.load(deps.feegleHome));
-      ctx.provide("chatBindingStore", await ChatBindingStore.load(deps.feegleHome));
+
+      // Chat bindings live in SQLite (chat_bindings + chat_binding_repositories).
+      // First boot after upgrade: import the legacy JSON then unlink it.
+      const runtimeDb = ctx.require("runtimeDb");
+      await migrateLegacyChatBindingsJson(deps.feegleHome, runtimeDb);
+      ctx.provide("chatBindingStore", new ChatBindingStore(runtimeDb));
+
       ctx.provide("stockStore", await StockStore.load(deps.feegleHome));
       ctx.provide("dedupStore", await DedupStore.load(deps.feegleHome));
       ctx.provide("runsLog", await RunsLog.open(deps.feegleHome));
@@ -92,4 +99,66 @@ export async function migrateLegacyProvidersJson(home: string, configStore: Conf
   }
   unlinkSync(providersJsonPath);
   console.info(`feegle: migrated providers.json into config.jsonc`);
+}
+
+/**
+ * One-shot migration of `~/.feegle/chat-bindings.json` into SQLite.
+ *  - File absent → no-op (first-run or already migrated).
+ *  - File present + DB already populated → partial-rollback (likely a downgrade left a stale
+ *    file behind). Move it aside to a .bak rather than merging — no silent overwrite.
+ *  - File present + DB empty → import every binding inside a single transaction, then unlink.
+ *  - Corrupt JSON → rename to .bak + throw (mirrors providers.json failure-handling): no silent
+ *    degradation. The operator sees the error and the .bak path; next boot is a clean no-op.
+ */
+export async function migrateLegacyChatBindingsJson(home: string, db: RuntimeDb): Promise<void> {
+  const filePath = join(home, "chat-bindings.json");
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  let parsed: { bindings?: unknown[] };
+  try {
+    parsed = JSON.parse(readFileSync(filePath, "utf8")) as typeof parsed;
+  } catch (parseError) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt chat-bindings.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const existing = db.prepare(`select count(*) as n from chat_bindings`).get() as { n: number };
+  if (existing.n > 0) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    console.warn(
+      `feegle: chat_bindings already populated in SQLite; moved chat-bindings.json → ${bak} (no merge)`
+    );
+    return;
+  }
+
+  const bindings = (parsed.bindings ?? []) as Array<{
+    chatId: string;
+    repositoryIds: string[];
+    updatedAt: string;
+  }>;
+  const insertHeader = db.prepare(
+    `insert into chat_bindings(scope_key, updated_at) values (?, ?)`
+  );
+  const insertRepo = db.prepare(
+    `insert into chat_binding_repositories(scope_key, repository_id, ordinal) values (?, ?, ?)`
+  );
+  const tx = db.transaction(() => {
+    for (const binding of bindings) {
+      insertHeader.run(binding.chatId, binding.updatedAt);
+      binding.repositoryIds.forEach((repositoryId, index) => {
+        insertRepo.run(binding.chatId, repositoryId, index + 1);
+      });
+    }
+  });
+  tx();
+
+  unlinkSync(filePath);
+  console.info(`feegle: migrated chat-bindings.json (${bindings.length} bindings) into SQLite`);
 }

@@ -8,19 +8,34 @@ export function openRuntimeDb(filePath: string): RuntimeDb {
   mkdirSync(dirname(filePath), { recursive: true });
   const db = new Database(filePath);
   db.pragma("journal_mode = WAL");
+  // Foreign keys must be enabled per-connection for `on delete cascade` to fire;
+  // without this, ChatBindingStore.clear() would leave orphan rows in
+  // chat_binding_repositories. Set BEFORE migrate so schema-time constraints apply.
+  db.pragma("foreign_keys = ON");
   migrate(db);
   return db;
 }
 
-function migrate(db: RuntimeDb): void {
+export function migrate(db: RuntimeDb): void {
+  // The old `chat_bindings` table belonged to the now-removed workspace feature
+  // (different shape: workspace_path/default_provider). It has zero consumers and is
+  // empty on every install — drop it unconditionally before creating the new shape.
+  db.exec(`drop table if exists chat_bindings;`);
+
   db.exec(`
     create table if not exists chat_bindings (
-      chat_id text primary key,
-      workspace_path text not null,
-      default_provider text,
-      updated_by text,
+      scope_key text primary key,
       updated_at text not null
     );
+    create table if not exists chat_binding_repositories (
+      scope_key text not null,
+      repository_id text not null,
+      ordinal integer not null,
+      primary key (scope_key, repository_id),
+      foreign key (scope_key) references chat_bindings(scope_key) on delete cascade
+    );
+    create index if not exists chat_binding_repositories_scope_idx
+      on chat_binding_repositories(scope_key, ordinal);
 
     create table if not exists pending_interactions (
       interaction_id text primary key,
