@@ -32,7 +32,7 @@ describe("slash command catalog", () => {
   it("matches aliases", () => {
     const registry = buildSlashCommandRegistry(stubSchedulerSlashDeps());
 
-    expect(registry.findByInput("/bid feature/dev main #1")?.id).toBe("bind");
+    expect(registry.findByInput("/bid https://x/repo")?.id).toBe("bind_repo");
     expect(registry.findByInput("/repo sync")?.id).toBe("repo_scan");
   });
 });

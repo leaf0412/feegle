@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -31,5 +31,16 @@ describe("ChatBindingStore repositories", () => {
     const r = await store.removeRepository("oc_g", "repo_2");
     expect(r.removed).toBe(false);
     expect(store.get("oc_g")?.repositoryIds).toEqual(["repo_1"]);
+  });
+
+  it("reads a legacy file that still has branch/baseBranch, keeping only repositoryIds", async () => {
+    await writeFile(
+      join(home, "chat-bindings.json"),
+      JSON.stringify({ schemaVersion: 1, bindings: [{ chatId: "oc_g", branch: "x", baseBranch: "main", repositoryIds: ["repo_1"], updatedAt: "t" }] }),
+      "utf8"
+    );
+    const store = await ChatBindingStore.load(home);
+    expect(store.get("oc_g")?.repositoryIds).toEqual(["repo_1"]);
+    expect((store.get("oc_g") as Record<string, unknown>).branch).toBeUndefined();
   });
 });

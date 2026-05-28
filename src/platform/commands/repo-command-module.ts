@@ -1,6 +1,6 @@
 import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
-import { BindCommandHandler } from "./repo/bind-command.js";
+import { BindRepoCommandHandler } from "./repo/bind-repo-command.js";
 import { RepoAddCommandHandler } from "./repo/repo-add-command.js";
 import { RepoClearCommandHandler } from "./repo/repo-clear-command.js";
 import { RepoListCommandHandler } from "./repo-list-command.js";
@@ -14,7 +14,7 @@ const repoRemoveDefinition = defineSlashCommand("repo_remove", "/repo remove <#�
 const repoScanDefinition = defineSlashCommand("repo_scan", "/repo scan", "刷新已注册仓库元数据", "repo", "nav:/command repo_scan", ["/repo sync"]);
 const repoShowDefinition = defineSlashCommand("repo_show", "/repo show", "显示当前绑定", "repo", "nav:/command repo_show");
 const repoClearDefinition = defineSlashCommand("repo_clear", "/repo clear", "清除绑定", "repo", "nav:/command repo_clear");
-const bindDefinition = defineSlashCommand("bind", "/bind|/bid <branch> <base> [repo1 ...]", "仓库规则绑定", "repo", "nav:/command bind", ["bid"]);
+const bindRepoDefinition = defineSlashCommand("bind_repo", "/bind_repo|/bind|/bid <url>", "绑定仓库", "repo", "nav:/command bind_repo", ["bind", "bid"]);
 
 export function repoCommandModule(): SlashCommandModule {
   return {
@@ -43,8 +43,8 @@ export function repoCommandModule(): SlashCommandModule {
 
       if (deps.repositoryStore && deps.chatBindingStore) {
         registry.registerCommand(
-          bindDefinition,
-          new BindCommandHandler({
+          bindRepoDefinition,
+          new BindRepoCommandHandler({
             repositoryStore: deps.repositoryStore,
             chatBindingStore: deps.chatBindingStore
           })
@@ -61,7 +61,7 @@ export function repoCommandModule(): SlashCommandModule {
           new RepoClearCommandHandler({ chatBindingStore: deps.chatBindingStore })
         );
       } else {
-        registry.declarePlanned(bindDefinition);
+        registry.declarePlanned(bindRepoDefinition);
         registry.declarePlanned(repoShowDefinition);
         registry.declarePlanned(repoClearDefinition);
       }

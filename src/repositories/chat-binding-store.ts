@@ -5,8 +5,6 @@ import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js"
 
 export const ChatBindingSchema = z.object({
   chatId: z.string().min(1),
-  branch: z.string().min(1).optional(),
-  baseBranch: z.string().min(1).optional(),
   repositoryIds: z.array(z.string().min(1)),
   updatedAt: z.string()
 });
@@ -24,8 +22,6 @@ const DEFAULT: ChatBindingsFile = { schemaVersion: 1, bindings: [] };
 
 export interface BindInput {
   chatId: string;
-  branch?: string;
-  baseBranch?: string;
   repositoryIds?: string[];
 }
 
@@ -66,8 +62,6 @@ export class ChatBindingStore {
     const existing = this.data.bindings.find((entry) => entry.chatId === input.chatId);
     const merged: ChatBinding = {
       chatId: input.chatId,
-      branch: input.branch ?? existing?.branch,
-      baseBranch: input.baseBranch ?? existing?.baseBranch,
       repositoryIds: input.repositoryIds ?? existing?.repositoryIds ?? [],
       updatedAt: now
     };

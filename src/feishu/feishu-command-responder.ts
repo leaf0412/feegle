@@ -156,7 +156,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         await this.traceAsync("reply_text", input, () =>
           this.client.replyText(
             input.messageId,
-            "本群尚未绑定仓库，请先 /bind <branch> <base> <repo...> 绑定仓库后再聊天。"
+            "本群尚未绑定仓库，请先 /bind_repo <仓库url> 绑定仓库后再聊天。"
           )
         );
         this.trace("chat_unbound", input);

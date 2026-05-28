@@ -21,11 +21,9 @@ export class RepoShowCommandHandler implements SlashCommandHandler {
     const scopeNoun = resolveBindingScopeNoun(context);
     const binding = this.deps.chatBindingStore.get(resolveBindingScopeKey(context));
     if (!binding) {
-      return textReply(`${scopeNoun}未绑定任何仓库。运行 /bind <branch> <base> <repo...> 设置。`);
+      return textReply(`${scopeNoun}未绑定任何仓库。运行 /bind_repo <仓库url> 绑定。`);
     }
     const lines: string[] = [`📌 ${scopeNoun}绑定`];
-    if (binding.branch) lines.push(`  branch: ${binding.branch}`);
-    if (binding.baseBranch) lines.push(`  base:   ${binding.baseBranch}`);
     if (binding.repositoryIds.length === 0) {
       lines.push("  repos:  （无）");
     } else {
