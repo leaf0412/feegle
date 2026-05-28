@@ -54,7 +54,7 @@ describe("migrateLegacyProvidersJson", () => {
 
     await migrateLegacyProvidersJson(home, cfg);
 
-    // (a) records landed in config.jsonc (both via in-memory snapshot and via on-disk reload)
+    // (a) records landed in config.jsonc — both via in-memory snapshot AND via on-disk reload.
     expect(cfg.get().agent?.providers).toEqual({
       codex: { command: "codex", cwd: "/tmp/codex" },
       claude_code: { command: "claude" }
@@ -64,6 +64,16 @@ describe("migrateLegacyProvidersJson", () => {
     expect(onDisk).toContain('"codex"');
     expect(onDisk).toContain('"claude_code"');
     expect(onDisk).toContain('"default": "codex"');
+
+    // Round-trip: a fresh ConfigStore must load the migrated providers correctly. Catches a
+    // regression where the migrator writes valid-shape-but-loader-rejecting JSONC and boot would
+    // pass the migration step only to crash on the next ConfigStore.load.
+    const reloaded = await ConfigStore.load(home);
+    expect(reloaded.get().agent?.providers).toMatchObject({
+      codex: { command: "codex", cwd: "/tmp/codex" },
+      claude_code: { command: "claude" }
+    });
+    expect(reloaded.get().agent?.default).toBe("codex");
 
     // (b) providers.json is gone
     expect(existsSync(join(home, "providers.json"))).toBe(false);
@@ -122,14 +132,24 @@ describe("migrateLegacyProvidersJson", () => {
     expect(cfg.get().agent?.providers).toEqual({ codex: { command: "codex" } });
   });
 
-  it("renames providers.json to .bak when JSON is corrupt rather than crashing boot", async () => {
+  it("aborts boot loudly on corrupt providers.json — preserves data via .bak, surfaces error", async () => {
     const cfg = await seedConfig(home);
-    await writeFile(join(home, "providers.json"), "{ not json", "utf8");
+    const providersJsonPath = join(home, "providers.json");
+    await writeFile(providersJsonPath, "{ not json", "utf8");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // (1) boot aborts — no silent degradation into "no providers configured"
+      await expect(migrateLegacyProvidersJson(home, cfg)).rejects.toThrow(/corrupt providers\.json/i);
 
-    await migrateLegacyProvidersJson(home, cfg);
+      // (2) data preserved as .bak; original file gone so the next boot is a clean no-op
+      expect(existsSync(providersJsonPath)).toBe(false);
+      const baks = readdirSync(home).filter((f) => f.startsWith("providers.json.bak."));
+      expect(baks).toHaveLength(1);
 
-    expect(existsSync(join(home, "providers.json"))).toBe(false);
-    const baks = readdirSync(home).filter((f) => f.startsWith("providers.json.bak."));
-    expect(baks).toHaveLength(1);
+      // (3) operator-visible error names the .bak path so they know where their data went
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(baks[0]!));
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

@@ -70,13 +70,16 @@ export async function migrateLegacyProvidersJson(home: string, configStore: Conf
   let parsed: { providers?: unknown[]; activeKind?: string | null };
   try {
     parsed = JSON.parse(readFileSync(providersJsonPath, "utf8")) as typeof parsed;
-  } catch (error) {
+  } catch (parseError) {
+    // No silent degradation: rename so data is preserved AND throw so the operator sees the
+    // failure. On the next boot the file is gone, migration becomes a no-op, and they can restart
+    // cleanly after fixing or restoring the underlying input.
     const bak = `${providersJsonPath}.bak.${Date.now()}`;
     renameSync(providersJsonPath, bak);
-    console.warn(
-      `feegle: providers.json could not be parsed (${errorMessage(error)}); moved to ${bak}`
-    );
-    return;
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt providers.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
   }
   const records = (parsed.providers ?? []) as Array<{ kind: string } & Record<string, unknown>>;
   for (const record of records) {
@@ -89,8 +92,4 @@ export async function migrateLegacyProvidersJson(home: string, configStore: Conf
   }
   unlinkSync(providersJsonPath);
   console.info(`feegle: migrated providers.json into config.jsonc`);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
