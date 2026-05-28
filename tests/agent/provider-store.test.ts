@@ -84,9 +84,22 @@ describe("ProviderStore", () => {
     const filePath = join(home, "providers.json");
     await writeFile(
       filePath,
-      JSON.stringify({ schemaVersion: 1, providers: [{ kind: "unknown" }], activeKind: null }),
+      JSON.stringify({ schemaVersion: 1, providers: [{ kind: "" }], activeKind: null }),
       "utf8"
     );
     await expect(ProviderStore.load(home)).rejects.toThrow(/Invalid providers.json/);
+  });
+
+  it("accepts a provider record with any kind label so users can name their CLIs freely", async () => {
+    const store = await ProviderStore.load(home);
+    await store.upsert({ kind: "cc-deepseek", command: "claude-agent-acp" });
+    expect(store.snapshot().providers[0]?.kind).toBe("cc-deepseek");
+  });
+
+  it("activeKind accepts any string the user chose, not just codex/claude_code", async () => {
+    const store = await ProviderStore.load(home);
+    await store.upsert({ kind: "gemini", command: "gemini" });
+    await store.setActive("gemini");
+    expect(store.snapshot().activeKind).toBe("gemini");
   });
 });

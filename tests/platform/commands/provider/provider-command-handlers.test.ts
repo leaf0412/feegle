@@ -65,14 +65,25 @@ describe("provider command handlers", () => {
       expect(registry.available().map((p) => p.kind)).toEqual(["codex"]);
     });
 
-    it("rejects unknown kind", async () => {
+    it("accepts any well-formed kind so users can declare arbitrary CLI labels", async () => {
       const handler = new ProviderRegisterCommandHandler({
         ownerEmails: OWNER,
         providers: registry,
         providerStore: store
       });
       const reply = await handler.execute(ctx(`gemini cwd=${home}`));
-      expect((reply as { text: string }).text).toContain("未知 kind: gemini");
+      expect((reply as { text: string }).text).toContain("gemini 已注册");
+      expect(store.snapshot().providers.map((p) => p.kind)).toEqual(["gemini"]);
+    });
+
+    it("rejects kinds with illegal characters so typos surface early", async () => {
+      const handler = new ProviderRegisterCommandHandler({
+        ownerEmails: OWNER,
+        providers: registry,
+        providerStore: store
+      });
+      const reply = await handler.execute(ctx(`bad/kind cwd=${home}`));
+      expect((reply as { text: string }).text).toContain("非法 kind");
     });
 
     it("rejects when cwd is missing", async () => {
@@ -107,16 +118,6 @@ describe("provider command handlers", () => {
       expect((reply as { text: string }).text).toContain("已注册");
     });
 
-    it("rejects invalid sandbox enum", async () => {
-      const handler = new ProviderRegisterCommandHandler({
-        ownerEmails: OWNER,
-        providers: registry,
-        providerStore: store
-      });
-      const reply = await handler.execute(ctx(`codex cwd=${home} sandbox=wild`));
-      expect((reply as { text: string }).text).toContain("sandbox");
-    });
-
     it("rejects unknown field", async () => {
       const handler = new ProviderRegisterCommandHandler({
         ownerEmails: OWNER,
@@ -139,8 +140,8 @@ describe("provider command handlers", () => {
       expect((reply as { text: string }).text).toContain("尚未注册任何 provider");
     });
 
-    it("marks the active kind with a star", async () => {
-      await store.upsert({ kind: "codex", cwd: home, approvalPolicy: "on-request" });
+    it("marks the active kind with a star and renders common fields", async () => {
+      await store.upsert({ kind: "codex", cwd: home, command: "codex", model: "gpt-5" });
       await store.setActive("codex");
       registry.register({ kind: "codex", displayName: "Codex", buildAgent: () => ({} as never) });
       registry.setActive("codex");
@@ -152,7 +153,8 @@ describe("provider command handlers", () => {
       const reply = await handler.execute(ctx(""));
       const text = (reply as { text: string }).text;
       expect(text).toContain("codex ★ active");
-      expect(text).toContain("approvalPolicy=on-request");
+      expect(text).toContain("command=codex");
+      expect(text).toContain("model=gpt-5");
     });
   });
 

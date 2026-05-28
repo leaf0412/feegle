@@ -1,10 +1,16 @@
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import {
-  CLAUDE_PERMISSION_MODES,
-  type ClaudePermissionMode,
-  type ProviderKind,
-  type ProviderStorePort
-} from "../../../agent/provider-store.js";
+import type { ProviderKind, ProviderStorePort } from "../../../agent/provider-store.js";
+
+// TODO(task-4): `/mode` is claude-code-specific and should move behind a capability
+// interface. Until then, the enum lives inline rather than on the loose schema.
+const CLAUDE_PERMISSION_MODES = [
+  "default",
+  "acceptEdits",
+  "plan",
+  "auto",
+  "bypassPermissions"
+] as const;
+type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
 import type {
   SlashCommandContext,
   SlashCommandHandler,

@@ -3,52 +3,25 @@ import { join } from "node:path";
 import { z } from "zod";
 import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
 
-export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
-export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
-
-export const CLAUDE_PERMISSION_MODES = [
-  "default",
-  "acceptEdits",
-  "plan",
-  "auto",
-  "bypassPermissions"
-] as const;
-export type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
-
-const CodexRecordSchema = z.object({
-  kind: z.literal("codex"),
-  command: z.string().min(1).optional(),
-  cwd: z.string().min(1).optional(),
-  sandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).optional(),
-  approvalPolicy: z.enum(["untrusted", "on-request", "never"]).optional(),
-  timeoutMs: z.number().positive().optional(),
-  model: z.string().min(1).optional(),
-  reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
-  allowedTools: z.array(z.string().min(1)).optional()
-});
-
-const ClaudeCodeRecordSchema = z.object({
-  kind: z.literal("claude_code"),
-  command: z.string().min(1).optional(),
-  cwd: z.string().min(1).optional(),
-  timeoutMs: z.number().positive().optional(),
-  model: z.string().min(1).optional(),
-  mode: z.enum(CLAUDE_PERMISSION_MODES).optional(),
-  allowedTools: z.array(z.string().min(1)).optional()
-});
-
-export const ProviderRecordSchema = z.discriminatedUnion("kind", [
-  CodexRecordSchema,
-  ClaudeCodeRecordSchema
-]);
+export const ProviderRecordSchema = z
+  .object({
+    kind: z.string().min(1),
+    command: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    cwd: z.string().min(1).optional(),
+    env: z.record(z.string()).optional(),
+    model: z.string().min(1).optional(),
+    timeoutMs: z.number().positive().optional()
+  })
+  .passthrough();
 
 export type ProviderRecord = z.infer<typeof ProviderRecordSchema>;
-export type ProviderKind = ProviderRecord["kind"];
+export type ProviderKind = string;
 
 export const ProvidersFileSchema = z.object({
   schemaVersion: z.literal(1),
   providers: z.array(ProviderRecordSchema),
-  activeKind: z.enum(["codex", "claude_code"]).nullable()
+  activeKind: z.string().nullable()
 });
 
 export type ProvidersFile = z.infer<typeof ProvidersFileSchema>;

@@ -6,7 +6,6 @@ import {
 } from "../../../agent/provider-adapter-factory.js";
 import {
   ProviderRecordSchema,
-  type ProviderKind,
   type ProviderRecord,
   type ProviderStorePort
 } from "../../../agent/provider-store.js";
@@ -24,16 +23,10 @@ export interface ProviderCommandDeps {
   providerStore: ProviderStorePort;
 }
 
-const CODEX_FIELDS = new Set(["cwd", "command", "sandbox", "approvalPolicy", "timeoutMs"]);
-const CLAUDE_CODE_FIELDS = new Set(["cwd", "command", "timeoutMs"]);
-
-// Derive the allowed `kind` set from the persistence schema rather than the
-// in-memory agent registry. Task 2 moved dispatch onto a single ACP adapter,
-// so the registry no longer carries per-kind factories — the schema's
-// discriminator is the remaining source of truth until Task 3 opens it up.
-function knownKinds(): readonly ProviderKind[] {
-  return ProviderRecordSchema.options.map((option) => option.shape.kind.value) as ProviderKind[];
-}
+// `/provider register` recognizes a small set of common keys. Users who need
+// richer config (args, env, adapter-specific fields) edit ~/.feegle/config.jsonc
+// directly — passthrough on the schema lets those fields survive a round trip.
+const REGISTER_FIELDS = new Set(["cwd", "command", "model", "timeoutMs"]);
 
 abstract class ProviderCommand implements SlashCommandHandler {
   readonly ownerOnly = true;
@@ -60,13 +53,13 @@ export class ProviderRegisterCommandHandler extends ProviderCommand {
       return textReply(`参数错误：${errorMessage(error)}\n用法：/provider register <kind> cwd=<path> [k=v...]`);
     }
     if (!isKnownKind(parsed.kind)) {
-      const kinds = knownKinds().join(", ");
-      return textReply(`未知 kind: ${parsed.kind}。可选: ${kinds}`);
+      return textReply(`非法 kind: ${parsed.kind}。kind 只能包含字母、数字、_、-、:。`);
     }
-    const allowedFields = parsed.kind === "codex" ? CODEX_FIELDS : CLAUDE_CODE_FIELDS;
     for (const key of Object.keys(parsed.fields)) {
-      if (!allowedFields.has(key)) {
-        return textReply(`不识别的字段: ${key}`);
+      if (!REGISTER_FIELDS.has(key)) {
+        return textReply(
+          `不识别的字段: ${key}。/provider register 支持 ${[...REGISTER_FIELDS].join(", ")}；其他字段请直接编辑 ~/.feegle/config.jsonc。`
+        );
       }
     }
     if (!parsed.fields.cwd) {
@@ -127,10 +120,7 @@ export class ProviderListCommandHandler extends ProviderCommand {
     for (const record of snapshot.providers) {
       const fields: string[] = [`cwd=${record.cwd}`];
       if (record.command) fields.push(`command=${record.command}`);
-      if (record.kind === "codex") {
-        if (record.sandbox) fields.push(`sandbox=${record.sandbox}`);
-        if (record.approvalPolicy) fields.push(`approvalPolicy=${record.approvalPolicy}`);
-      }
+      if (record.model) fields.push(`model=${record.model}`);
       if (record.timeoutMs) fields.push(`timeoutMs=${record.timeoutMs}`);
       const marker = snapshot.activeKind === record.kind ? "★ active" : "—";
       lines.push(`- ${record.kind} ${marker} ${fields.join(" ")}`);
@@ -148,8 +138,7 @@ export class ProviderUseCommandHandler extends ProviderCommand {
       return textReply("用法：/provider use <kind>");
     }
     if (!isKnownKind(kind)) {
-      const kinds = knownKinds().join(", ");
-      return textReply(`未知 kind: ${kind}。可选: ${kinds}`);
+      return textReply(`非法 kind: ${kind}。kind 只能包含字母、数字、_、-、:。`);
     }
     if (!this.deps.providers.resolve(kind)) {
       return textReply(`未注册: ${kind}。先 /provider register ${kind} cwd=...`);
@@ -175,8 +164,7 @@ export class ProviderUnregisterCommandHandler extends ProviderCommand {
       return textReply("用法：/provider unregister <kind>");
     }
     if (!isKnownKind(kind)) {
-      const kinds = knownKinds().join(", ");
-      return textReply(`未知 kind: ${kind}。可选: ${kinds}`);
+      return textReply(`非法 kind: ${kind}。kind 只能包含字母、数字、_、-、:。`);
     }
     if (!this.deps.providers.resolve(kind)) {
       return textReply(`未注册: ${kind}`);
@@ -196,11 +184,11 @@ export class ProviderUnregisterCommandHandler extends ProviderCommand {
   }
 }
 
-function isKnownKind(kind: string): kind is ProviderKind {
-  return (knownKinds() as readonly string[]).includes(kind);
+function isKnownKind(kind: string): boolean {
+  return /^[a-zA-Z0-9_:-]+$/.test(kind);
 }
 
-function coerceRecord(kind: ProviderKind, fields: Record<string, string>): ProviderRecord {
+function coerceRecord(kind: string, fields: Record<string, string>): ProviderRecord {
   const raw: Record<string, unknown> = { kind, ...fields };
   if (typeof raw.timeoutMs === "string") {
     const numeric = Number(raw.timeoutMs);

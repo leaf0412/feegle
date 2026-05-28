@@ -4,7 +4,7 @@ import {
   defaultProviderDisplayName
 } from "./provider-adapter-factory.js";
 import type { FeegleConfig } from "../app/config-store.js";
-import type { ProviderRecord, ProvidersFile } from "./provider-store.js";
+import { ProviderRecordSchema, type ProviderRecord, type ProvidersFile } from "./provider-store.js";
 
 export interface ProviderStoreReadView {
   snapshot(): Readonly<ProvidersFile>;
@@ -47,8 +47,7 @@ export function buildAgentProviderRegistry(
 }
 
 function providerRecordsFromConfig(config: NonNullable<FeegleConfig["agent"]>): ProviderRecord[] {
-  return Object.entries(config.providers).map(([kind, provider]) => ({
-    kind,
-    ...provider
-  })) as ProviderRecord[];
+  return Object.entries(config.providers).map(([kind, provider]) =>
+    ProviderRecordSchema.parse({ kind, ...provider })
+  );
 }

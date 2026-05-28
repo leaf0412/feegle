@@ -1,10 +1,10 @@
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import {
-  REASONING_EFFORTS,
-  type ProviderKind,
-  type ProviderStorePort,
-  type ReasoningEffort
-} from "../../../agent/provider-store.js";
+import type { ProviderKind, ProviderStorePort } from "../../../agent/provider-store.js";
+
+// TODO(task-4): `/reasoning` is codex-specific and should move behind a capability
+// interface. Until then, the enum lives inline rather than on the loose schema.
+const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 import type {
   SlashCommandContext,
   SlashCommandHandler,

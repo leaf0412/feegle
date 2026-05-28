@@ -23,7 +23,9 @@ export class AllowCommandHandler implements SlashCommandHandler {
       return textReply("未激活 provider。先运行 /provider use <kind>。");
     }
     const record = this.deps.providerStore.snapshot().providers.find((p) => p.kind === active.kind);
-    const current = record?.allowedTools ?? [];
+    // TODO(task-4): `allowedTools` is no longer typed on the loose schema; this cast is a bridge
+    // until per-adapter commands are reworked into capability-based interfaces.
+    const current = ((record as { allowedTools?: string[] } | undefined)?.allowedTools ?? []) as string[];
 
     const arg = context.args.trim();
     if (!arg || arg === "list") {
