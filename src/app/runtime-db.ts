@@ -110,6 +110,29 @@ export function migrate(db: RuntimeDb): void {
   ensureColumn(db, "plan_artifacts", "iteration_notes", "text");
   ensureColumn(db, "plan_artifacts", "progress_card_message_id", "text");
   ensureColumn(db, "plan_artifacts", "error_message", "text");
+
+  db.exec(`
+    create table if not exists tasks (
+      id text primary key,
+      name text not null,
+      kind text not null,
+      cron text not null,
+      timezone text not null,
+      enabled integer not null default 1,
+      source text not null,
+      error_policy text not null,
+      consecutive_failures integer not null default 0,
+      last_error_notified_at text,
+      params_json text not null,
+      active_hours_json text,
+      target_json text,
+      last_run_json text,
+      created_at text not null,
+      updated_at text not null
+    );
+    create index if not exists tasks_kind_idx on tasks(kind);
+    create index if not exists tasks_enabled_idx on tasks(enabled);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {

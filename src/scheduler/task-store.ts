@@ -1,102 +1,205 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { z } from "zod";
-import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
-import { TaskSchema, type Task } from "./task.js";
+import type { Statement } from "better-sqlite3";
+import type { RuntimeDb } from "../app/runtime-db.js";
+import type { Task } from "./task.js";
 
-const TaskStoreFileSchema = z.object({
-  schemaVersion: z.literal(1),
-  tasks: z.array(TaskSchema)
-});
+/**
+ * Persists tasks in the SQLite `tasks` table.
+ *
+ * Marshalling rules:
+ *  - `enabled: boolean`        ↔ integer 0/1
+ *  - `params`, `activeHours`, `target`, `lastRun` ↔ JSON text columns
+ *  - All date fields stay as ISO strings (text)
+ *
+ * Corrupt JSON in a DB row (e.g. from external tampering) throws with the
+ * task id rather than silently returning a default — corruption must be visible.
+ */
 
-interface TaskStoreFile {
-  schemaVersion: 1;
-  tasks: Task[];
+export interface TaskStoreOptions {
+  clock?: () => Date;
 }
 
-export class TaskStore {
-  private constructor(
-    private readonly filePath: string,
-    private data: TaskStoreFile
-  ) {}
-
-  static async load(home: string): Promise<TaskStore> {
-    const filePath = join(home, "task-store.json");
-    let raw: string;
-    try {
-      raw = await readFile(filePath, "utf8");
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        await createDefaultJsonFile(filePath, { schemaVersion: 1, tasks: [] });
-        raw = await readFile(filePath, "utf8");
-      } else {
-        throw error;
-      }
-    }
-    try {
-      return new TaskStore(filePath, TaskStoreFileSchema.parse(JSON.parse(raw)));
-    } catch (error) {
-      throw new Error(`Invalid task-store.json at ${filePath}: ${errorMessage(error)}`);
-    }
-  }
-
-  list(): readonly Task[] {
-    return this.data.tasks.map(cloneTask);
-  }
-
-  get(id: string): Task | undefined {
-    const task = this.data.tasks.find((entry) => entry.id === id);
-    return task ? cloneTask(task) : undefined;
-  }
-
-  async upsert(task: Task): Promise<void> {
-    const index = this.data.tasks.findIndex((entry) => entry.id === task.id);
-    const next = cloneTask({ ...task, updatedAt: new Date().toISOString() });
-    if (index >= 0) {
-      this.data.tasks[index] = next;
-    } else {
-      this.data.tasks.push(next);
-    }
-    await this.persist();
-  }
-
-  async remove(id: string): Promise<void> {
-    this.data.tasks = this.data.tasks.filter((entry) => entry.id !== id);
-    await this.persist();
-  }
-
-  async ensureSeed(seeds: Task[]): Promise<void> {
-    let changed = false;
-    for (const seed of seeds) {
-      if (!this.data.tasks.some((task) => task.id === seed.id)) {
-        this.data.tasks.push(cloneTask(seed));
-        changed = true;
-      }
-    }
-    if (changed) {
-      await this.persist();
-    }
-  }
-
-  private async persist(): Promise<void> {
-    await writeJsonAtomically(this.filePath, this.data);
-  }
+interface TaskRow {
+  id: string;
+  name: string;
+  kind: string;
+  cron: string;
+  timezone: string;
+  enabled: number;
+  source: string;
+  error_policy: string;
+  consecutive_failures: number;
+  last_error_notified_at: string | null;
+  params_json: string;
+  active_hours_json: string | null;
+  target_json: string | null;
+  last_run_json: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function cloneTask(task: Task): Task {
+function rowToTask(row: TaskRow): Task {
+  let params: Record<string, unknown>;
+  try {
+    params = JSON.parse(row.params_json) as Record<string, unknown>;
+  } catch {
+    throw new Error(`task-store: corrupt params_json for task id=${row.id}`);
+  }
+
+  let activeHours: string[] | null = null;
+  if (row.active_hours_json !== null) {
+    try {
+      activeHours = JSON.parse(row.active_hours_json) as string[];
+    } catch {
+      throw new Error(`task-store: corrupt active_hours_json for task id=${row.id}`);
+    }
+  }
+
+  let target: Task["target"] = null;
+  if (row.target_json !== null) {
+    try {
+      target = JSON.parse(row.target_json) as Task["target"];
+    } catch {
+      throw new Error(`task-store: corrupt target_json for task id=${row.id}`);
+    }
+  }
+
+  let lastRun: Task["lastRun"] = null;
+  if (row.last_run_json !== null) {
+    try {
+      lastRun = JSON.parse(row.last_run_json) as Task["lastRun"];
+    } catch {
+      throw new Error(`task-store: corrupt last_run_json for task id=${row.id}`);
+    }
+  }
+
   return {
-    ...task,
-    params: { ...task.params },
-    activeHours: task.activeHours ? [...task.activeHours] : null,
-    target: task.target ? { ...task.target } : null,
-    lastRun: task.lastRun ? { ...task.lastRun } : null
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    cron: row.cron,
+    timezone: row.timezone,
+    enabled: row.enabled === 1,
+    source: row.source as Task["source"],
+    errorPolicy: row.error_policy as Task["errorPolicy"],
+    consecutiveFailures: row.consecutive_failures,
+    lastErrorNotifiedAt: row.last_error_notified_at,
+    params,
+    activeHours,
+    target,
+    lastRun,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
+function taskToBindings(task: Task): Record<string, unknown> {
+  return {
+    id: task.id,
+    name: task.name,
+    kind: task.kind,
+    cron: task.cron,
+    timezone: task.timezone,
+    enabled: task.enabled ? 1 : 0,
+    source: task.source,
+    error_policy: task.errorPolicy,
+    consecutive_failures: task.consecutiveFailures,
+    last_error_notified_at: task.lastErrorNotifiedAt,
+    params_json: JSON.stringify(task.params),
+    active_hours_json: task.activeHours !== null ? JSON.stringify(task.activeHours) : null,
+    target_json: task.target !== null ? JSON.stringify(task.target) : null,
+    last_run_json: task.lastRun !== null ? JSON.stringify(task.lastRun) : null,
+    created_at: task.createdAt,
+    updated_at: task.updatedAt
+  };
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+export class TaskStore {
+  private readonly clock: () => Date;
+  private readonly listStmt: Statement;
+  private readonly getStmt: Statement;
+  private readonly upsertStmt: Statement;
+  private readonly removeStmt: Statement;
+  private readonly existsStmt: Statement;
+
+  constructor(
+    db: RuntimeDb,
+    options: TaskStoreOptions = {}
+  ) {
+    this.clock = options.clock ?? (() => new Date());
+
+    this.listStmt = db.prepare(
+      `select id, name, kind, cron, timezone, enabled, source, error_policy,
+              consecutive_failures, last_error_notified_at,
+              params_json, active_hours_json, target_json, last_run_json,
+              created_at, updated_at
+         from tasks order by created_at`
+    );
+
+    this.getStmt = db.prepare(
+      `select id, name, kind, cron, timezone, enabled, source, error_policy,
+              consecutive_failures, last_error_notified_at,
+              params_json, active_hours_json, target_json, last_run_json,
+              created_at, updated_at
+         from tasks where id = ?`
+    );
+
+    this.upsertStmt = db.prepare(
+      `insert into tasks(id, name, kind, cron, timezone, enabled, source, error_policy,
+                         consecutive_failures, last_error_notified_at,
+                         params_json, active_hours_json, target_json, last_run_json,
+                         created_at, updated_at)
+         values (@id, @name, @kind, @cron, @timezone, @enabled, @source, @error_policy,
+                 @consecutive_failures, @last_error_notified_at,
+                 @params_json, @active_hours_json, @target_json, @last_run_json,
+                 @created_at, @updated_at)
+         on conflict(id) do update set
+           name = excluded.name,
+           kind = excluded.kind,
+           cron = excluded.cron,
+           timezone = excluded.timezone,
+           enabled = excluded.enabled,
+           source = excluded.source,
+           error_policy = excluded.error_policy,
+           consecutive_failures = excluded.consecutive_failures,
+           last_error_notified_at = excluded.last_error_notified_at,
+           params_json = excluded.params_json,
+           active_hours_json = excluded.active_hours_json,
+           target_json = excluded.target_json,
+           last_run_json = excluded.last_run_json,
+           updated_at = excluded.updated_at`
+    );
+
+    this.removeStmt = db.prepare(`delete from tasks where id = ?`);
+
+    this.existsStmt = db.prepare(`select 1 as found from tasks where id = ? limit 1`);
+  }
+
+  list(): readonly Task[] {
+    const rows = this.listStmt.all() as TaskRow[];
+    return rows.map(rowToTask);
+  }
+
+  get(id: string): Task | undefined {
+    const row = this.getStmt.get(id) as TaskRow | undefined;
+    return row ? rowToTask(row) : undefined;
+  }
+
+  async upsert(task: Task): Promise<void> {
+    const now = this.clock().toISOString();
+    const bindings = taskToBindings({ ...task, updatedAt: now });
+    this.upsertStmt.run(bindings);
+  }
+
+  async remove(id: string): Promise<void> {
+    this.removeStmt.run(id);
+  }
+
+  async ensureSeed(seeds: Task[]): Promise<void> {
+    for (const seed of seeds) {
+      const exists = (this.existsStmt.get(seed.id) as { found: number } | undefined) !== undefined;
+      if (!exists) {
+        this.upsertStmt.run(taskToBindings(seed));
+      }
+    }
+  }
 }

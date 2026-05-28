@@ -44,7 +44,11 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("stockStore", await StockStore.load(deps.feegleHome));
       ctx.provide("dedupStore", await DedupStore.load(deps.feegleHome));
       ctx.provide("runsLog", await RunsLog.open(deps.feegleHome));
-      const taskStore = await TaskStore.load(deps.feegleHome);
+
+      // Tasks live in SQLite (table `tasks`). First boot after upgrade:
+      // import the legacy ~/.feegle/task-store.json then unlink it.
+      await migrateLegacyTaskStoreJson(deps.feegleHome, runtimeDb);
+      const taskStore = new TaskStore(runtimeDb);
       await taskStore.ensureSeed(deps.seedTasks);
       ctx.provide("taskStore", taskStore);
       ctx.provide("taskRegistry", new TaskRegistry(taskStore));
@@ -234,4 +238,119 @@ export async function migrateLegacySessionsJson(home: string, db: RuntimeDb): Pr
 
   unlinkSync(filePath);
   console.info(`feegle: migrated sessions.json (${parsed.sessions.length} sessions) into SQLite`);
+}
+
+/**
+ * One-shot migration of `~/.feegle/task-store.json` into SQLite (table `tasks`).
+ *  - File absent → no-op (first-run or already migrated).
+ *  - File present + DB already populated → partial-rollback. Move it aside to .bak
+ *    rather than merging — no silent overwrite of existing task state.
+ *  - File present + DB empty → import every task inside a single transaction,
+ *    then unlink the file.
+ *  - Corrupt JSON → rename to .bak + throw (mirrors the established failure-handling
+ *    pattern): no silent degradation. Operator sees the error + the .bak path; next
+ *    boot becomes a clean no-op.
+ */
+const TaskLastRunMigratorSchema = z.object({
+  at: z.string(),
+  status: z.enum(["ok", "silent", "noop", "skipped", "failed"]),
+  durationMs: z.number().nonnegative(),
+  note: z.string().optional()
+});
+
+const TaskMigratorSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.string().min(1),
+  params: z.record(z.unknown()),
+  cron: z.string().min(1),
+  timezone: z.string().min(1),
+  activeHours: z.array(z.string().min(1)).nullable(),
+  target: z
+    .object({
+      platform: z.string().min(1),
+      chatId: z.string().min(1)
+    })
+    .nullable(),
+  enabled: z.boolean(),
+  source: z.enum(["seed", "domain", "user"]),
+  errorPolicy: z.enum(["always", "on-change", "silent"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  lastRun: TaskLastRunMigratorSchema.nullable(),
+  consecutiveFailures: z.number().int().nonnegative(),
+  lastErrorNotifiedAt: z.string().nullable()
+});
+
+const TaskStoreFileMigratorSchema = z.object({
+  schemaVersion: z.literal(1),
+  tasks: z.array(TaskMigratorSchema)
+});
+
+export async function migrateLegacyTaskStoreJson(home: string, db: RuntimeDb): Promise<void> {
+  const filePath = join(home, "task-store.json");
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  let parsed: z.infer<typeof TaskStoreFileMigratorSchema>;
+  try {
+    const raw = JSON.parse(readFileSync(filePath, "utf8"));
+    parsed = TaskStoreFileMigratorSchema.parse(raw);
+  } catch (parseError) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt task-store.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const existing = db.prepare(`select count(*) as n from tasks`).get() as { n: number };
+  if (existing.n > 0) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    console.warn(
+      `feegle: tasks already populated in SQLite; moved task-store.json → ${bak} (no merge)`
+    );
+    return;
+  }
+
+  const insertTask = db.prepare(
+    `insert into tasks(id, name, kind, cron, timezone, enabled, source, error_policy,
+                       consecutive_failures, last_error_notified_at,
+                       params_json, active_hours_json, target_json, last_run_json,
+                       created_at, updated_at)
+       values (@id, @name, @kind, @cron, @timezone, @enabled, @source, @error_policy,
+               @consecutive_failures, @last_error_notified_at,
+               @params_json, @active_hours_json, @target_json, @last_run_json,
+               @created_at, @updated_at)`
+  );
+
+  const tx = db.transaction(() => {
+    for (const task of parsed.tasks) {
+      insertTask.run({
+        id: task.id,
+        name: task.name,
+        kind: task.kind,
+        cron: task.cron,
+        timezone: task.timezone,
+        enabled: task.enabled ? 1 : 0,
+        source: task.source,
+        error_policy: task.errorPolicy,
+        consecutive_failures: task.consecutiveFailures,
+        last_error_notified_at: task.lastErrorNotifiedAt,
+        params_json: JSON.stringify(task.params),
+        active_hours_json: task.activeHours !== null ? JSON.stringify(task.activeHours) : null,
+        target_json: task.target !== null ? JSON.stringify(task.target) : null,
+        last_run_json: task.lastRun !== null ? JSON.stringify(task.lastRun) : null,
+        created_at: task.createdAt,
+        updated_at: task.updatedAt
+      });
+    }
+  });
+  tx();
+
+  unlinkSync(filePath);
+  console.info(`feegle: migrated task-store.json (${parsed.tasks.length} tasks) into SQLite`);
 }
