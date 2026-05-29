@@ -14,7 +14,12 @@ import type { FeishuUserDirectory } from "./feishu-user-directory.js";
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
 import { bindRepositoryToScope, formatBoundRepoLines } from "../platform/commands/repo/repo-binding.js";
-import { buildBindRepoPromptCard, buildRepoBoundCard } from "./feishu-workbench-cards.js";
+import {
+  buildBindPromptSupersededCard,
+  buildBindRepoPromptCard,
+  buildRepoBindCancelledCard,
+  buildRepoBoundCard
+} from "./feishu-workbench-cards.js";
 
 type FeishuCommandSender = { platform: "feishu"; userId: string; email?: string };
 
@@ -118,10 +123,46 @@ interface DispatchInput {
 }
 
 export class FeishuCommandResponder implements FeishuCommandHandler {
+  // scopeKey → message ids of the unbound-repo prompt cards still outstanding in
+  // that chat. In-memory only: lost on restart, at which point a stale card is
+  // harmless (re-binding the same url is a DB no-op).
+  private readonly outstandingBindPrompts = new Map<string, Set<string>>();
+
   constructor(
     private readonly client: FeishuClientPort,
     private readonly options: FeishuCommandResponderOptions
   ) {}
+
+  private addBindPrompt(scopeKey: string, messageId: string): void {
+    const ids = this.outstandingBindPrompts.get(scopeKey) ?? new Set<string>();
+    ids.add(messageId);
+    this.outstandingBindPrompts.set(scopeKey, ids);
+  }
+
+  private removeBindPrompt(scopeKey: string, messageId: string): void {
+    const ids = this.outstandingBindPrompts.get(scopeKey);
+    if (!ids) return;
+    ids.delete(messageId);
+    if (ids.size === 0) {
+      this.outstandingBindPrompts.delete(scopeKey);
+    }
+  }
+
+  /**
+   * Once a scope is bound, update every still-outstanding prompt card to an
+   * inert "已失效" state and stop tracking them. `exceptMessageId` is the card
+   * the user acted on — it gets its own success update via the normal reply, so
+   * we skip it here.
+   */
+  private async sweepBindPrompts(scopeKey: string, exceptMessageId?: string): Promise<void> {
+    const ids = this.outstandingBindPrompts.get(scopeKey);
+    if (!ids) return;
+    for (const id of ids) {
+      if (id === exceptMessageId) continue;
+      await this.client.updateInteractiveCard(id, buildBindPromptSupersededCard());
+    }
+    this.outstandingBindPrompts.delete(scopeKey);
+  }
 
   async handleCommand(input: DispatchInput & { shouldRespond?: boolean }): Promise<void> {
     this.trace("received", input);
@@ -160,12 +201,18 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         // Group binding scope is the chat id (see resolveBindingScopeKey); embed
         // it in the card so the bind on submit lands here, not on the clicker.
         const card = buildBindRepoPromptCard({ scopeKey: input.chatId, scopeNoun: "本群" });
-        await this.traceAsync("reply_card", input, () =>
+        const promptId = await this.traceAsync("reply_card", input, () =>
           this.client.replyInteractiveCard(input.messageId, card)
         );
+        if (typeof promptId === "string" && promptId !== "") {
+          this.addBindPrompt(input.chatId, promptId);
+        }
         this.trace("chat_unbound", input);
         return;
       }
+      // Group is bound now; resolve any prompt cards still floating around
+      // (e.g. it was bound via /bind_repo, not through one of these cards).
+      await this.sweepBindPrompts(input.chatId);
     }
     await this.traceAsync("chat", input, () =>
       this.options.chatHandler!.handle({
@@ -209,7 +256,9 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "workbench_plan_revise_execution_submit":
         return this.dispatchPlanReviseExecutionSubmit(input, command);
       case "bind_repo_submit":
-        return this.dispatchBindRepoSubmit(command);
+        return this.dispatchBindRepoSubmit(input, command);
+      case "bind_repo_cancel":
+        return this.dispatchBindRepoCancel(input, command);
       case "chat":
         return undefined;
       case "repo_select":
@@ -315,6 +364,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
   }
 
   private async dispatchBindRepoSubmit(
+    input: DispatchInput,
     command: Extract<FeishuCommand, { type: "bind_repo_submit" }>
   ): Promise<FeishuWorkbenchReply> {
     if (!this.options.repositoryStore || !this.options.chatBindingStore) {
@@ -325,6 +375,8 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       command.scopeKey,
       command.url
     );
+    // Resolve the other prompt cards in this chat; this one updates via the reply.
+    await this.sweepBindPrompts(command.scopeKey, input.messageId);
     return {
       kind: "feishu_card_update",
       card: buildRepoBoundCard({
@@ -334,6 +386,15 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         boundLines: formatBoundRepoLines(this.options.repositoryStore, binding)
       })
     };
+  }
+
+  private async dispatchBindRepoCancel(
+    input: DispatchInput,
+    command: Extract<FeishuCommand, { type: "bind_repo_cancel" }>
+  ): Promise<FeishuWorkbenchReply> {
+    // Untrack so a later bind's sweep can't overwrite this deliberately-cancelled card.
+    this.removeBindPrompt(command.scopeKey, input.messageId);
+    return { kind: "feishu_card_update", card: buildRepoBindCancelledCard() };
   }
 
   private async dispatchSlashCommand(

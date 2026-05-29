@@ -44,6 +44,7 @@ export type FeishuCommand =
       scopeKey: string;
       scopeNoun: string;
     }
+  | { type: "bind_repo_cancel"; scopeKey: string }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -193,6 +194,14 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       return { type: "unknown", raw: stringifyUnknown(value) };
     }
     return { type: "bind_repo_submit", url, scopeKey, scopeNoun };
+  }
+
+  if (value.action === "act:/repo bind_cancel") {
+    const scopeKey = typeof value.scope_key === "string" ? value.scope_key : "";
+    if (scopeKey === "") {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return { type: "bind_repo_cancel", scopeKey };
   }
 
   if (typeof value.action === "string") {

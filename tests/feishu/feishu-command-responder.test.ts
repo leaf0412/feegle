@@ -544,6 +544,71 @@ describe("FeishuCommandResponder", () => {
     expect(replies[0].text).toContain("尚未接入");
   });
 
+  it("sweeps sibling prompt cards to an inert state when one of them binds", async () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const repositoryStore = new RepositoryStore(db);
+    const chatBindingStore = new ChatBindingStore(db);
+    const events = trackingClient();
+    const chatHandler = { handle: async () => ({ status: "delivered" as const }) } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(events.client, { registry: testRegistry(), repositoryStore, chatBindingStore, chatHandler });
+
+    // two people chat in an unbound group → two prompt cards (card_1, card_2)
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m1", chatType: "group", command: { type: "chat", raw: "hi" } });
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m2", chatType: "group", command: { type: "chat", raw: "hi again" } });
+    // bind via the second card
+    await responder.handleCommand({ source: "card", chatId: "oc_g", messageId: "card_2", command: { type: "bind_repo_submit", url: "https://x/kuavo", scopeKey: "oc_g", scopeNoun: "本群" } });
+
+    expect(events.update("card_2")).toContain("已为本群绑定仓库"); // the clicked card
+    expect(events.update("card_1")).toContain("已失效"); // the swept sibling
+    db.close();
+  });
+
+  it("cancel resolves only its own card and is excluded from a later sweep", async () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const repositoryStore = new RepositoryStore(db);
+    const chatBindingStore = new ChatBindingStore(db);
+    const events = trackingClient();
+    const chatHandler = { handle: async () => ({ status: "delivered" as const }) } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(events.client, { registry: testRegistry(), repositoryStore, chatBindingStore, chatHandler });
+
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m1", chatType: "group", command: { type: "chat", raw: "hi" } });
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m2", chatType: "group", command: { type: "chat", raw: "hi again" } });
+    // cancel card_1, then bind via card_2
+    await responder.handleCommand({ source: "card", chatId: "oc_g", messageId: "card_1", command: { type: "bind_repo_cancel", scopeKey: "oc_g" } });
+    await responder.handleCommand({ source: "card", chatId: "oc_g", messageId: "card_2", command: { type: "bind_repo_submit", url: "https://x/kuavo", scopeKey: "oc_g", scopeNoun: "本群" } });
+
+    // card_1 was cancelled and untracked → the later bind must not overwrite it with 已失效
+    expect(events.updates("card_1")).toEqual(["已取消"]);
+    db.close();
+  });
+
+  it("sweeps leftover prompt cards on the next chat once the group is bound elsewhere", async () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const repositoryStore = new RepositoryStore(db);
+    const chatBindingStore = new ChatBindingStore(db);
+    const events = trackingClient();
+    const handled: unknown[] = [];
+    const chatHandler = { handle: async (r: unknown) => { handled.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
+    const responder = new FeishuCommandResponder(events.client, { registry: testRegistry(), repositoryStore, chatBindingStore, chatHandler });
+
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m1", chatType: "group", command: { type: "chat", raw: "hi" } });
+    // bind out-of-band (e.g. via /bind_repo) — the floating card_1 is now stale
+    const repo = await repositoryStore.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
+    await chatBindingStore.addRepository("oc_g", repo.id);
+    // next chat in the now-bound group
+    await responder.handleCommand({ source: "message", chatId: "oc_g", messageId: "m2", chatType: "group", command: { type: "chat", raw: "let's go" } });
+
+    expect(events.update("card_1")).toContain("已失效");
+    expect(handled).toHaveLength(1); // chat proceeded normally
+    db.close();
+  });
+
   it("does not gate single (p2p) chat — it runs without a binding", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
     const calls: unknown[] = [];
@@ -639,6 +704,42 @@ describe("FeishuCommandResponder", () => {
     }
   });
 });
+
+/**
+ * A fake client that hands out a fresh, distinct id for every interactive-card
+ * reply (card_1, card_2, …) and records every card update, so tests can assert
+ * which specific card was swept / updated.
+ */
+function trackingClient(): {
+  client: FeishuClientPort;
+  update(messageId: string): string;
+  updates(messageId: string): string[];
+} {
+  let counter = 0;
+  const updatesByMessage = new Map<string, string[]>();
+  const client = makeFakeFeishuClient({
+    async replyText() {
+      return "om_reply";
+    },
+    async replyInteractiveCard() {
+      counter += 1;
+      return `card_${counter}`;
+    },
+    async updateInteractiveCard(messageId, card) {
+      const list = updatesByMessage.get(messageId) ?? [];
+      list.push(JSON.stringify(card));
+      updatesByMessage.set(messageId, list);
+    }
+  });
+  return {
+    client,
+    update: (messageId) => (updatesByMessage.get(messageId) ?? []).join("\n"),
+    updates: (messageId) =>
+      (updatesByMessage.get(messageId) ?? []).map((json) =>
+        json.includes("已取消") ? "已取消" : json.includes("已失效") ? "已失效" : json.includes("已为") ? "已绑定" : json
+      )
+  };
+}
 
 function fakeBindingStore(
   bindings: Record<string, { repositoryIds: string[] }>

@@ -525,6 +525,54 @@ export function buildBindRepoPromptCard(input: BindRepoPromptCardInput): FeishuW
               }
             }
           ]
+        },
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: plainText("取消"),
+              type: "default",
+              value: { action: "act:/repo bind_cancel", scope_key: input.scopeKey }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildRepoBindCancelledCard(): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "grey", title: plainText("已取消绑定") },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: "已取消。如需绑定仓库，重新发条消息再点卡片，或直接 /bind_repo <仓库url>。"
+        }
+      ]
+    }
+  };
+}
+
+/**
+ * Shown on the *other* outstanding prompt cards once any one of them (or a
+ * /bind_repo) has bound the scope — it makes the now-redundant cards inert so a
+ * stray click can't re-trigger the form.
+ */
+export function buildBindPromptSupersededCard(): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "grey", title: plainText("仓库已绑定") },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: "本群已绑定仓库，此卡片已失效。"
         }
       ]
     }

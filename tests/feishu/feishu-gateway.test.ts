@@ -183,6 +183,19 @@ describe("parseFeishuCommand", () => {
     ).toEqual({ type: "unknown", raw: expect.any(String) });
   });
 
+  it("parses a bind-repo cancel with its scope", () => {
+    expect(
+      parseFeishuCardActionValue({ action: "act:/repo bind_cancel", scope_key: "oc_g" })
+    ).toEqual({ type: "bind_repo_cancel", scopeKey: "oc_g" });
+  });
+
+  it("treats a bind-repo cancel with no scope_key as unknown", () => {
+    expect(parseFeishuCardActionValue({ action: "act:/repo bind_cancel" })).toEqual({
+      type: "unknown",
+      raw: expect.any(String)
+    });
+  });
+
   it("parses workbench plan revise requests", () => {
     expect(
       parseFeishuCardActionValue({
