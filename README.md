@@ -131,20 +131,26 @@ npm i -g @agentclientprotocol/codex-acp
 
 Gemini CLI and Qwen Code speak ACP natively and need no wrapper.
 
-Sessions are resumed across turns via ACP's `loadSession` when the agent advertises that capability; feegle persists the ACP `sessionId` in `~/.feegle/sessions.json`.
+Sessions are resumed across turns via ACP's `loadSession` when the agent advertises that capability; feegle persists the ACP `sessionId` in the runtime SQLite database (`~/.feegle/feegle.db`).
 
 ## Scheduler And Stock Commands
 
-Feegle persists scheduler state under `~/.feegle` unless `FEEGLE_HOME` is set:
+## Data Storage
 
-```text
-config.json
-task-store.json
-stock-store.json
-dedup.json
-runs.log.jsonl
-.locks/feegle.lock
-```
+Feegle persists state under `~/.feegle` unless `FEEGLE_HOME` is set:
+
+| File / database | What lives there |
+|---|---|
+| `feegle.db` | SQLite runtime database — sessions, chat bindings, repositories, tasks, dedup keys, plan artifacts, GitLab follow entries |
+| `config.jsonc` | Operator config — agent providers, failure target, owner emails |
+| `aliases.json` | User-defined slash command aliases |
+| `stock-store.json` | Bound stock codes and portfolio entries |
+| `runs.log.jsonl` | Append-only cron run history |
+| `.locks/feegle.lock` | Single-instance lockfile |
+
+Old JSON store files from earlier installs (`sessions.json`, `chat-bindings.json`, `repositories.json`, `task-store.json`, `dedup.json`, `providers.json`) are automatically migrated into SQLite / `config.jsonc` on first boot and then deleted. A corrupt legacy file is renamed to `.bak.<timestamp>` and boot fails explicitly — no silent degradation.
+
+Feegle persists scheduler state under `~/.feegle` unless `FEEGLE_HOME` is set.
 
 Bind the failure notification group before enabling tasks:
 

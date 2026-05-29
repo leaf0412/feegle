@@ -31,6 +31,8 @@
 
 > ⚠️ 注意 `scheduler-command-module.ts` 一个 module 同时覆盖了 cron-admin / stock-monitor / stock-portfolio / error-target 四个 feature 的命令注册——这是当前最反内聚的位置。
 
+> **持久化分层(store unification, 2026-05)**:运行态数据在 SQLite(`~/.feegle/feegle.db`):`sessions` / `chat_bindings` + `chat_binding_repositories` / `repositories` + `repository_id_counter` / `tasks` / `dedup_keys` / `plan_artifacts` / `gitlab_follow_entries`。Provider 配置唯一源是 `config.jsonc` 的 `agent` 段(无独立 providers.json)。仍为文件的:`config.jsonc`(用户配置)、`aliases.json`、`stock-store.json`、`runs.log.jsonl`(append-only 日志)。旧的 JSON store 文件(sessions/chat-bindings/repositories/task-store/dedup/providers)在首次 boot 时自动迁移进 SQLite/config.jsonc 后删除;损坏的旧文件会重命名为 `.bak.<ts>` 并让 boot 显式失败(不静默降级)。`workspaces.json` 是已移除功能的孤儿文件,boot 时直接删。
+
 ## Cross-cutting Infrastructure
 
 | 扩展点 | 默认模块 | 自定义钩子（FeegleAppDeps） |

@@ -67,6 +67,10 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       const configStore = ctx.require("configStore");
       await migrateLegacyProvidersJson(deps.feegleHome, configStore);
       ctx.provide("providerStore", ProviderStore.fromConfig(configStore));
+
+      // workspaces.json is a leftover from the removed named-workspace feature.
+      // Nothing reads it. Delete it unconditionally — no migration target needed.
+      deleteOrphanWorkspacesJson(deps.feegleHome);
     }
   };
 }
@@ -515,4 +519,17 @@ export async function migrateLegacyRepositoriesJson(home: string, db: RuntimeDb)
   console.info(
     `feegle: migrated repositories.json (${parsed.repositories.length} repositories, nextId ${parsed.nextId}) into SQLite`
   );
+}
+
+/**
+ * One-shot cleanup. `~/.feegle/workspaces.json` is a leftover from the
+ * named-workspace feature that was removed. No migration target exists —
+ * the data is meaningless. Delete it when found; no-op when absent.
+ */
+export function deleteOrphanWorkspacesJson(home: string): void {
+  const filePath = join(home, "workspaces.json");
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+    console.info("feegle: removed orphan workspaces.json (named-workspace feature was removed)");
+  }
 }
