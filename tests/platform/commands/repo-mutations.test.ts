@@ -49,7 +49,7 @@ afterEach(async () => {
 
 describe("RepoRemoveCommandHandler", () => {
   it("returns hint when query empty so accidental /repo remove does not silently fail", async () => {
-    const store = await RepositoryStore.load(home);
+    const store = new RepositoryStore(db);
     const handler = new RepoRemoveCommandHandler({
       repositoryStore: store,
       ownerEmails: new Set(["a@b.com"])
@@ -60,7 +60,7 @@ describe("RepoRemoveCommandHandler", () => {
   });
 
   it("reports not-found so users see explicit feedback for typos", async () => {
-    const store = await RepositoryStore.load(home);
+    const store = new RepositoryStore(db);
     const handler = new RepoRemoveCommandHandler({
       repositoryStore: store,
       ownerEmails: new Set(["a@b.com"])
@@ -71,7 +71,7 @@ describe("RepoRemoveCommandHandler", () => {
   });
 
   it("removes matched repo by #index so the listed-then-remove flow works", async () => {
-    const store = await RepositoryStore.load(home);
+    const store = new RepositoryStore(db);
     await store.add({ name: "alpha", remoteUrl: "https://x/a", defaultBaseBranch: "main" });
     const handler = new RepoRemoveCommandHandler({
       repositoryStore: store,
@@ -97,7 +97,7 @@ describe("repo binding scope (single chat vs group)", () => {
   }
 
   it("a single-chat bind is keyed by user, invisible to a group on the same chat id", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const show = new RepoShowCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
@@ -114,7 +114,7 @@ describe("repo binding scope (single chat vs group)", () => {
   });
 
   it("a group bind is shared and keyed by chat id", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const show = new RepoShowCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
@@ -126,7 +126,7 @@ describe("repo binding scope (single chat vs group)", () => {
   });
 
   it("clear removes only the resolved scope's binding", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const bind = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const clear = new RepoClearCommandHandler({ chatBindingStore: bindings });

@@ -140,6 +140,22 @@ export function migrate(db: RuntimeDb): void {
       primary key (task_id, condition_key, date_in_tz)
     );
     create index if not exists dedup_keys_date_idx on dedup_keys(date_in_tz);
+
+    create table if not exists repositories (
+      id text primary key,
+      name text not null,
+      remote_url text not null,
+      default_base_branch text not null,
+      created_at text not null,
+      updated_at text not null
+    );
+    create index if not exists repositories_remote_url_idx on repositories(remote_url);
+    create index if not exists repositories_name_idx on repositories(name);
+
+    create table if not exists repository_id_counter (
+      id integer primary key check (id = 1),
+      next_id integer not null
+    );
   `);
 }
 

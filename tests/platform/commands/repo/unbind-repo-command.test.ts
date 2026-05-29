@@ -38,7 +38,7 @@ function ctx(args: string): SlashCommandContext {
 
 describe("UnbindRepoCommandHandler", () => {
   it("removes a bound repo by url", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const rec = await repos.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
     const bindings = new ChatBindingStore(db);
     await bindings.addRepository("oc_g", rec.id);
@@ -50,7 +50,7 @@ describe("UnbindRepoCommandHandler", () => {
   });
 
   it("reports when the repo was not bound", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     await repos.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
     const bindings = new ChatBindingStore(db);
     const handler = new UnbindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
@@ -60,7 +60,7 @@ describe("UnbindRepoCommandHandler", () => {
   });
 
   it("reports an unrecognised query", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const handler = new UnbindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(ctx("https://nope"));

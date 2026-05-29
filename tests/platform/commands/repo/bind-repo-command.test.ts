@@ -38,7 +38,7 @@ function ctx(args: string, chatType = "group", userId = "ou_a"): SlashCommandCon
 
 describe("BindRepoCommandHandler", () => {
   it("auto-registers an unknown url (no network) and binds it to the group", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const handler = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     const reply = await handler.execute(ctx("https://www.lejuhub.com/pc/kuavo-model-training"));
@@ -50,7 +50,7 @@ describe("BindRepoCommandHandler", () => {
   });
 
   it("reuses an already-registered url and is idempotent on a second bind", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const existing = await repos.add({ name: "kuavo", remoteUrl: "https://x/kuavo", defaultBaseBranch: "main" });
     const bindings = new ChatBindingStore(db);
     const handler = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
@@ -61,7 +61,7 @@ describe("BindRepoCommandHandler", () => {
   });
 
   it("keys single chat by user, not the conversation id", async () => {
-    const repos = await RepositoryStore.load(home);
+    const repos = new RepositoryStore(db);
     const bindings = new ChatBindingStore(db);
     const handler = new BindRepoCommandHandler({ repositoryStore: repos, chatBindingStore: bindings });
     await handler.execute(ctx("https://x/solo", "p2p", "ou_a"));

@@ -10,7 +10,7 @@ import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
 import type { RuntimeDb } from "../../app/runtime-db.js";
 import { AliasStore } from "../../platform/commands/alias-store.js";
 import { ChatBindingStore } from "../../repositories/chat-binding-store.js";
-import { RepositoryStore } from "../../repositories/repository-store.js";
+import { RepositoryRecordSchema, RepositoryStore } from "../../repositories/repository-store.js";
 import { DedupStore } from "../../scheduler/dedup-store.js";
 import { RunsLog } from "../../scheduler/runs-log.js";
 import { TaskRegistry } from "../../scheduler/task-registry.js";
@@ -34,7 +34,12 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("sessionStore", new SessionStore(runtimeDb));
       ctx.provide("chatHistory", new ChatHistoryStore());
       ctx.provide("aliasStore", await AliasStore.load(deps.feegleHome));
-      ctx.provide("repositoryStore", await RepositoryStore.load(deps.feegleHome));
+
+      // Repositories live in SQLite (table `repositories` + `repository_id_counter`).
+      // First boot after upgrade: import the legacy ~/.feegle/repositories.json
+      // (rows AND the nextId counter) then unlink it.
+      await migrateLegacyRepositoriesJson(deps.feegleHome, runtimeDb);
+      ctx.provide("repositoryStore", new RepositoryStore(runtimeDb));
 
       // Chat bindings live in SQLite (chat_bindings + chat_binding_repositories).
       // First boot after upgrade: import the legacy JSON then unlink it.
@@ -430,4 +435,84 @@ export async function migrateLegacyDedupJson(home: string, db: RuntimeDb): Promi
 
   unlinkSync(filePath);
   console.info(`feegle: migrated dedup.json (${markCount} marks for date ${parsed.date}) into SQLite`);
+}
+
+/**
+ * One-shot migration of `~/.feegle/repositories.json` into SQLite (table
+ * `repositories` + `repository_id_counter`).
+ *  - File absent → no-op (first-run or already migrated).
+ *  - File present + DB already populated → partial-rollback. Move it aside to .bak
+ *    rather than merging — no silent overwrite of existing repositories.
+ *  - File present + DB empty → import every repository AND restore the nextId
+ *    counter inside a single transaction, then unlink the file. Restoring the
+ *    counter is essential: a reset-to-1 counter would mint `repo_1` again and
+ *    collide with a migrated row.
+ *  - Corrupt JSON → rename to .bak + throw (mirrors the established failure-handling
+ *    pattern): no silent degradation. Operator sees the error + the .bak path; next
+ *    boot becomes a clean no-op.
+ */
+const RepositoriesFileMigratorSchema = z.object({
+  schemaVersion: z.literal(1),
+  nextId: z.number().int().nonnegative(),
+  repositories: z.array(RepositoryRecordSchema)
+});
+
+export async function migrateLegacyRepositoriesJson(home: string, db: RuntimeDb): Promise<void> {
+  const filePath = join(home, "repositories.json");
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  let parsed: z.infer<typeof RepositoriesFileMigratorSchema>;
+  try {
+    const raw = JSON.parse(readFileSync(filePath, "utf8"));
+    parsed = RepositoriesFileMigratorSchema.parse(raw);
+  } catch (parseError) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt repositories.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const existing = db.prepare(`select count(*) as n from repositories`).get() as { n: number };
+  if (existing.n > 0) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    console.warn(
+      `feegle: repositories already populated in SQLite; moved repositories.json → ${bak} (no merge)`
+    );
+    return;
+  }
+
+  const insertRepo = db.prepare(
+    `insert into repositories(id, name, remote_url, default_base_branch, created_at, updated_at)
+       values (@id, @name, @remote_url, @default_base_branch, @created_at, @updated_at)`
+  );
+  // Restore the counter to the legacy nextId so post-migration add() does not
+  // collide with migrated ids. `insert or replace` overwrites the lazily-seeded
+  // (id=1, next_id=1) row that RepositoryStore's constructor would otherwise create.
+  const setCounter = db.prepare(
+    `insert or replace into repository_id_counter(id, next_id) values (1, ?)`
+  );
+  const tx = db.transaction(() => {
+    for (const repository of parsed.repositories) {
+      insertRepo.run({
+        id: repository.id,
+        name: repository.name,
+        remote_url: repository.remoteUrl,
+        default_base_branch: repository.defaultBaseBranch,
+        created_at: repository.createdAt,
+        updated_at: repository.updatedAt
+      });
+    }
+    setCounter.run(parsed.nextId);
+  });
+  tx();
+
+  unlinkSync(filePath);
+  console.info(
+    `feegle: migrated repositories.json (${parsed.repositories.length} repositories, nextId ${parsed.nextId}) into SQLite`
+  );
 }
