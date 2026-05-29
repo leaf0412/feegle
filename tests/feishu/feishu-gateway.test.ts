@@ -183,9 +183,13 @@ describe("parseFeishuCommand", () => {
     ).toEqual({ type: "unknown", raw: expect.any(String) });
   });
 
-  it("parses a bind-repo cancel with its scope", () => {
+  it("parses a bind-repo cancel with its scope (ignoring the carried form input)", () => {
     expect(
-      parseFeishuCardActionValue({ action: "act:/repo bind_cancel", scope_key: "oc_g" })
+      parseFeishuCardActionValue({
+        action: "act:/repo bind_cancel",
+        scope_key: "oc_g",
+        form_value: { repo_url: "" }
+      })
     ).toEqual({ type: "bind_repo_cancel", scopeKey: "oc_g" });
   });
 

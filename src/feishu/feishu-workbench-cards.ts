@@ -137,7 +137,7 @@ interface FeishuSelectOption {
 interface FeishuFormSubmitButton {
   tag: "button";
   text: FeishuPlainText;
-  type: "primary";
+  type: "default" | "primary" | "danger";
   action_type: "form_submit";
   name: string;
   value: Record<string, string>;
@@ -523,16 +523,16 @@ export function buildBindRepoPromptCard(input: BindRepoPromptCardInput): FeishuW
                 scope_key: input.scopeKey,
                 scope_noun: input.scopeNoun
               }
-            }
-          ]
-        },
-        {
-          tag: "action",
-          actions: [
+            },
             {
+              // Cancel lives in the form as a second submit button: schema 2.0
+              // dropped the standalone `tag: action` block. repo_url isn't
+              // required, so submitting via cancel never trips input validation.
               tag: "button",
               text: plainText("取消"),
               type: "default",
+              action_type: "form_submit",
+              name: "cancel_bind_repo",
               value: { action: "act:/repo bind_cancel", scope_key: input.scopeKey }
             }
           ]

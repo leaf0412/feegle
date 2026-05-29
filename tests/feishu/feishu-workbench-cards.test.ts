@@ -225,19 +225,23 @@ describe("workbench cards", () => {
     expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
-  it("offers a cancel action (outside the form) on the bind-repo prompt card", () => {
+  it("offers a cancel button as a second form-submit (schema 2.0 has no action block)", () => {
     const card = buildBindRepoPromptCard({ scopeKey: "oc_g", scopeNoun: "本群" });
-    const json = JSON.stringify(card);
 
-    expect(json).toContain("取消");
-    expect(json).toContain("act:/repo bind_cancel");
-    // cancel sits in an action block, not the form, so it never validates repo_url
-    const actionBlocks = card.body.elements.filter((el) => el.tag === "action");
-    expect(actionBlocks).toHaveLength(1);
-    // cancel carries the scope so the responder can untrack the right card
-    expect(JSON.stringify(actionBlocks)).toContain("act:/repo bind_cancel");
-    expect(JSON.stringify(actionBlocks)).toContain("\"scope_key\":\"oc_g\"");
-    expect(JSON.stringify(formContainers(card))).not.toContain("bind_cancel");
+    // schema 2.0 rejects `tag: action`; cancel must live inside the form
+    expect(card.body.elements.some((el) => el.tag === "action")).toBe(false);
+    expect(formElements(card)).toContainEqual(
+      expect.objectContaining({
+        tag: "button",
+        action_type: "form_submit",
+        name: "cancel_bind_repo",
+        value: expect.objectContaining({
+          action: "act:/repo bind_cancel",
+          scope_key: "oc_g"
+        })
+      })
+    );
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
   });
 
   it("builds a grey repo-bind cancelled card", () => {
