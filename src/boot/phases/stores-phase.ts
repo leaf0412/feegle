@@ -42,7 +42,11 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("chatBindingStore", new ChatBindingStore(runtimeDb));
 
       ctx.provide("stockStore", await StockStore.load(deps.feegleHome));
-      ctx.provide("dedupStore", await DedupStore.load(deps.feegleHome));
+
+      // Dedup marks live in SQLite (table `dedup_keys`). First boot after upgrade:
+      // import the legacy ~/.feegle/dedup.json then unlink it.
+      await migrateLegacyDedupJson(deps.feegleHome, runtimeDb);
+      ctx.provide("dedupStore", new DedupStore(runtimeDb));
       ctx.provide("runsLog", await RunsLog.open(deps.feegleHome));
 
       // Tasks live in SQLite (table `tasks`). First boot after upgrade:
@@ -353,4 +357,77 @@ export async function migrateLegacyTaskStoreJson(home: string, db: RuntimeDb): P
 
   unlinkSync(filePath);
   console.info(`feegle: migrated task-store.json (${parsed.tasks.length} tasks) into SQLite`);
+}
+
+/**
+ * One-shot migration of `~/.feegle/dedup.json` into SQLite (table `dedup_keys`).
+ *  - File absent → no-op (first-run or already migrated).
+ *  - File present + DB already populated → partial-rollback. Move it aside to .bak
+ *    rather than merging — no silent overwrite of existing dedup state.
+ *  - File present + DB empty → import every mark inside a single transaction,
+ *    then unlink the file.
+ *  - Corrupt JSON → rename to .bak + throw (mirrors the established failure-handling
+ *    pattern): no silent degradation. Operator sees the error + the .bak path; next
+ *    boot becomes a clean no-op.
+ */
+const DedupFileMigratorSchema = z.object({
+  schemaVersion: z.literal(1),
+  date: z.string(),
+  marks: z.record(z.array(z.string()))
+});
+
+export async function migrateLegacyDedupJson(home: string, db: RuntimeDb): Promise<void> {
+  const filePath = join(home, "dedup.json");
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  let parsed: z.infer<typeof DedupFileMigratorSchema>;
+  try {
+    const raw = JSON.parse(readFileSync(filePath, "utf8"));
+    parsed = DedupFileMigratorSchema.parse(raw);
+  } catch (parseError) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    const cause = parseError instanceof Error ? parseError.message : String(parseError);
+    const msg = `corrupt dedup.json — renamed to ${bak}; boot aborted. cause: ${cause}`;
+    console.error(`feegle: ${msg}`);
+    throw new Error(msg);
+  }
+
+  const existing = db.prepare(`select count(*) as n from dedup_keys`).get() as { n: number };
+  if (existing.n > 0) {
+    const bak = `${filePath}.bak.${Date.now()}`;
+    renameSync(filePath, bak);
+    console.warn(
+      `feegle: dedup_keys already populated in SQLite; moved dedup.json → ${bak} (no merge)`
+    );
+    return;
+  }
+
+  // Only migrate marks that belong to a non-empty date; an empty date means the store
+  // was initialised but never used — nothing to import.
+  if (!parsed.date) {
+    unlinkSync(filePath);
+    console.info(`feegle: dedup.json had no active date; skipped import, file unlinked`);
+    return;
+  }
+
+  const insertMark = db.prepare(
+    `insert or ignore into dedup_keys(task_id, condition_key, date_in_tz) values (?, ?, ?)`
+  );
+
+  let markCount = 0;
+  const tx = db.transaction(() => {
+    for (const [taskId, conditionKeys] of Object.entries(parsed.marks)) {
+      for (const conditionKey of conditionKeys) {
+        insertMark.run(taskId, conditionKey, parsed.date);
+        markCount++;
+      }
+    }
+  });
+  tx();
+
+  unlinkSync(filePath);
+  console.info(`feegle: migrated dedup.json (${markCount} marks for date ${parsed.date}) into SQLite`);
 }

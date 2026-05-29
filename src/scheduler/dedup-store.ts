@@ -1,69 +1,53 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { z } from "zod";
-import { createDefaultJsonFile, writeJsonAtomically } from "../app/json-file.js";
+import type { Statement } from "better-sqlite3";
+import type { RuntimeDb } from "../app/runtime-db.js";
 
-const DedupFileSchema = z.object({
-  schemaVersion: z.literal(1),
-  date: z.string(),
-  marks: z.record(z.array(z.string()))
-});
-
-type DedupFile = z.infer<typeof DedupFileSchema>;
+/**
+ * Persists daily dedup marks in the SQLite `dedup_keys` table.
+ *
+ * The dedup model is date-partitioned: each `(taskId, conditionKey, dateInTz)` triple
+ * is unique. Rows from previous dates are pruned lazily inside `checkAndMark` to
+ * keep the table small without a separate background job.
+ *
+ * `checkAndMark` returns `true` (and inserts the row) when the mark is new for that
+ * date, `false` when the mark already exists — mirroring the old JSON store's semantics.
+ */
 
 export class DedupStore {
-  private constructor(
-    private readonly filePath: string,
-    private data: DedupFile
-  ) {}
+  private readonly checkStmt: Statement;
+  private readonly insertStmt: Statement;
+  private readonly pruneStmt: Statement;
+  private readonly clearAllStmt: Statement;
 
-  static async load(home: string): Promise<DedupStore> {
-    const filePath = join(home, "dedup.json");
-    let raw: string;
-    try {
-      raw = await readFile(filePath, "utf8");
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        await createDefaultJsonFile(filePath, { schemaVersion: 1, date: "", marks: {} });
-        raw = await readFile(filePath, "utf8");
-      } else {
-        throw error;
-      }
-    }
-    try {
-      return new DedupStore(filePath, DedupFileSchema.parse(JSON.parse(raw)));
-    } catch (error) {
-      throw new Error(`Invalid dedup.json at ${filePath}: ${errorMessage(error)}`);
-    }
+  constructor(db: RuntimeDb) {
+    this.checkStmt = db.prepare(
+      `select 1 as found from dedup_keys
+         where task_id = ? and condition_key = ? and date_in_tz = ?
+         limit 1`
+    );
+
+    this.insertStmt = db.prepare(
+      `insert or ignore into dedup_keys(task_id, condition_key, date_in_tz)
+         values (?, ?, ?)`
+    );
+
+    this.pruneStmt = db.prepare(
+      `delete from dedup_keys where date_in_tz <> ?`
+    );
+
+    this.clearAllStmt = db.prepare(`delete from dedup_keys`);
   }
 
   async checkAndMark(taskId: string, conditionKey: string, dateInTz: string): Promise<boolean> {
-    if (this.data.date !== dateInTz) {
-      this.data = { schemaVersion: 1, date: dateInTz, marks: {} };
-    }
-    const marks = this.data.marks[taskId] ?? [];
-    if (marks.includes(conditionKey)) {
+    const exists = (this.checkStmt.get(taskId, conditionKey, dateInTz) as { found: number } | undefined) !== undefined;
+    if (exists) {
       return false;
     }
-    this.data.marks[taskId] = [...marks, conditionKey];
-    await this.persist();
+    this.insertStmt.run(taskId, conditionKey, dateInTz);
+    this.pruneStmt.run(dateInTz);
     return true;
   }
 
   async clearAll(): Promise<void> {
-    this.data = { schemaVersion: 1, date: "", marks: {} };
-    await this.persist();
+    this.clearAllStmt.run();
   }
-
-  private async persist(): Promise<void> {
-    await writeJsonAtomically(this.filePath, this.data);
-  }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

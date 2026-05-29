@@ -132,6 +132,14 @@ export function migrate(db: RuntimeDb): void {
     );
     create index if not exists tasks_kind_idx on tasks(kind);
     create index if not exists tasks_enabled_idx on tasks(enabled);
+
+    create table if not exists dedup_keys (
+      task_id text not null,
+      condition_key text not null,
+      date_in_tz text not null,
+      primary key (task_id, condition_key, date_in_tz)
+    );
+    create index if not exists dedup_keys_date_idx on dedup_keys(date_in_tz);
   `);
 }
 
