@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   assertValidFeishuWorkbenchCard,
   buildBaseBranchPromptCard,
+  buildBindRepoPromptCard,
   buildPlanCompletedCard,
   buildPlanExecutionRevisionCard,
   buildPlanProgressCard,
   buildPlanPushResultCard,
   buildPlanReviewCard,
-  buildPlanRevisionRequestCard
+  buildPlanRevisionRequestCard,
+  buildRepoBoundCard
 } from "../../src/feishu/feishu-workbench-cards.js";
 
 describe("workbench cards", () => {
@@ -193,6 +195,47 @@ describe("workbench cards", () => {
     expect(json).toContain("已推送");
     expect(json).toContain("act:/workbench plan cleanup");
     expect(json).not.toContain("act:/workbench plan push");
+    assertValidFeishuWorkbenchCard(card);
+  });
+
+  it("builds a bind-repo prompt card: url input + submit carrying the embedded scope", () => {
+    const card = buildBindRepoPromptCard({ scopeKey: "oc_g", scopeNoun: "本群" });
+    const json = JSON.stringify(card);
+
+    expect(json).toContain("绑定仓库");
+    expect(json).toContain("repo_url");
+    expect(json).toContain("input");
+    // The scope is baked into the submit value so the bind lands where the
+    // prompt appeared — card callbacks do not carry chat_type to re-derive it.
+    expect(formElements(card)).toContainEqual(
+      expect.objectContaining({
+        tag: "button",
+        action_type: "form_submit",
+        value: expect.objectContaining({
+          action: "act:/repo bind_submit",
+          scope_key: "oc_g",
+          scope_noun: "本群"
+        })
+      })
+    );
+    expect(formContainers(card).some((form) => hasOwnProperty(form, "submit"))).toBe(false);
+    expect(formElements(card).some((element) => hasOwnProperty(element, "label"))).toBe(false);
+    expect(() => assertValidFeishuWorkbenchCard(card)).not.toThrow();
+  });
+
+  it("builds a green repo-bound confirmation card", () => {
+    const card = buildRepoBoundCard({
+      scopeNoun: "本群",
+      repoName: "kuavo",
+      repoId: "3",
+      boundLines: "    - kuavo (3)"
+    });
+    const json = JSON.stringify(card);
+
+    expect(card.header.template).toBe("green");
+    expect(json).toContain("已为本群绑定仓库");
+    expect(json).toContain("kuavo (3)");
+    expect(json).toContain("现在可以直接发消息");
     assertValidFeishuWorkbenchCard(card);
   });
 

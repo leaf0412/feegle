@@ -38,6 +38,12 @@ export type FeishuCommand =
       version: number;
       note: string;
     }
+  | {
+      type: "bind_repo_submit";
+      url: string;
+      scopeKey: string;
+      scopeNoun: string;
+    }
   | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
   | { type: "unknown"; raw: string };
 
@@ -176,6 +182,17 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       version,
       note
     };
+  }
+
+  if (value.action === "act:/repo bind_submit") {
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    const url = typeof formValue.repo_url === "string" ? formValue.repo_url.trim() : "";
+    const scopeKey = typeof value.scope_key === "string" ? value.scope_key : "";
+    const scopeNoun = typeof value.scope_noun === "string" && value.scope_noun !== "" ? value.scope_noun : "本群";
+    if (url === "" || scopeKey === "") {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return { type: "bind_repo_submit", url, scopeKey, scopeNoun };
   }
 
   if (typeof value.action === "string") {

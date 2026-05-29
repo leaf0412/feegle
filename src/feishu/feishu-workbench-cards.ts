@@ -78,6 +78,18 @@ export interface PlanPushResultCardInput {
   stderr?: string;
 }
 
+export interface BindRepoPromptCardInput {
+  scopeKey: string;
+  scopeNoun: string;
+}
+
+export interface RepoBoundCardInput {
+  scopeNoun: string;
+  repoName: string;
+  repoId: string;
+  boundLines: string;
+}
+
 export interface FeishuWorkbenchCard {
   schema: "2.0";
   config: {
@@ -471,6 +483,70 @@ export function buildPlanPushResultCard(input: PlanPushResultCardInput): FeishuW
               }
             }
           ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildBindRepoPromptCard(input: BindRepoPromptCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "orange", title: plainText(`${input.scopeNoun}尚未绑定仓库`) },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            "聊天前需要先绑定一个 Git 仓库。",
+            "粘贴仓库 URL，点下方按钮即可绑定。"
+          ].join("\n")
+        },
+        {
+          tag: "form",
+          name: "bind_repo",
+          elements: [
+            {
+              tag: "input",
+              name: "repo_url",
+              placeholder: plainText("例如 git@github.com:org/repo.git")
+            },
+            {
+              tag: "button",
+              text: plainText("绑定仓库"),
+              type: "primary",
+              action_type: "form_submit",
+              name: "submit_bind_repo",
+              value: {
+                action: "act:/repo bind_submit",
+                scope_key: input.scopeKey,
+                scope_noun: input.scopeNoun
+              }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}
+
+export function buildRepoBoundCard(input: RepoBoundCardInput): FeishuWorkbenchCard {
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "green", title: plainText("仓库绑定成功") },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: [
+            `✅ 已为${input.scopeNoun}绑定仓库：${input.repoName} (${input.repoId})`,
+            "当前绑定：",
+            input.boundLines,
+            "",
+            "现在可以直接发消息开始聊天。"
+          ].join("\n")
         }
       ]
     }

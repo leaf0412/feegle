@@ -1,4 +1,8 @@
+import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
+import { migrate } from "../../src/app/runtime-db.js";
+import { RepositoryStore } from "../../src/repositories/repository-store.js";
+import { ChatBindingStore } from "../../src/repositories/chat-binding-store.js";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
@@ -427,11 +431,12 @@ describe("FeishuCommandResponder", () => {
     expect(replies).toEqual([]);
   });
 
-  it("blocks group chat and prompts /bind when the group has no bound repo", async () => {
+  it("prompts an interactive bind-repo card (not text) when the group has no bound repo", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
     const calls: unknown[] = [];
     const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
-    const responder = new FeishuCommandResponder(fakeClient(replies), {
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
       registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({})
     });
     await responder.handleCommand({
@@ -439,15 +444,22 @@ describe("FeishuCommandResponder", () => {
       command: { type: "chat", raw: "帮我看看这个 bug" }
     });
     expect(calls).toEqual([]);
-    expect(replies).toHaveLength(1);
-    expect(replies[0].text).toContain("/bind_repo");
+    expect(replies).toEqual([]);
+    expect(progress).toHaveLength(1);
+    expect((progress[0] as { kind: string }).kind).toBe("replyCard");
+    const json = JSON.stringify(progress[0]);
+    expect(json).toContain("绑定仓库");
+    expect(json).toContain("act:/repo bind_submit");
+    // scope baked in so the eventual bind lands on this group, not the clicker
+    expect(json).toContain("\"scope_key\":\"oc_g\"");
   });
 
-  it("blocks group chat when the binding has zero repos", async () => {
+  it("prompts the bind-repo card when the binding has zero repos", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
     const calls: unknown[] = [];
     const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
-    const responder = new FeishuCommandResponder(fakeClient(replies), {
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
       registry: testRegistry(), chatHandler, chatBindingStore: fakeBindingStore({ oc_g: { repositoryIds: [] } })
     });
     await responder.handleCommand({
@@ -455,7 +467,8 @@ describe("FeishuCommandResponder", () => {
       command: { type: "chat", raw: "hi" }
     });
     expect(calls).toEqual([]);
-    expect(replies[0].text).toContain("绑定仓库");
+    expect(replies).toEqual([]);
+    expect(JSON.stringify(progress)).toContain("绑定仓库");
   });
 
   it("allows group chat once a repo is bound", async () => {
@@ -475,9 +488,10 @@ describe("FeishuCommandResponder", () => {
 
   it("blocks group chat when no binding store is wired (safe default, not a bypass)", async () => {
     const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
     const calls: unknown[] = [];
     const chatHandler = { handle: async (r: unknown) => { calls.push(r); return { status: "delivered" as const }; } } as unknown as import("../../src/feishu/feishu-chat-handler.js").FeishuChatHandler;
-    const responder = new FeishuCommandResponder(fakeClient(replies), {
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
       registry: testRegistry(), chatHandler // no chatBindingStore
     });
     await responder.handleCommand({
@@ -485,7 +499,49 @@ describe("FeishuCommandResponder", () => {
       command: { type: "chat", raw: "hi" }
     });
     expect(calls).toEqual([]);
-    expect(replies[0].text).toContain("/bind_repo");
+    expect(replies).toEqual([]);
+    expect(JSON.stringify(progress)).toContain("绑定仓库");
+  });
+
+  it("binds the repo and updates the card in place on a bind_repo_submit", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const progress: unknown[] = [];
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    migrate(db);
+    const repositoryStore = new RepositoryStore(db);
+    const chatBindingStore = new ChatBindingStore(db);
+    const responder = new FeishuCommandResponder(fakeClient(replies, [], progress), {
+      registry: testRegistry(), repositoryStore, chatBindingStore
+    });
+
+    await responder.handleCommand({
+      source: "card", chatId: "oc_g", messageId: "om_card",
+      command: { type: "bind_repo_submit", url: "https://x/kuavo", scopeKey: "oc_g", scopeNoun: "本群" }
+    });
+
+    const record = repositoryStore.findByUrl("https://x/kuavo");
+    expect(record).toBeDefined();
+    expect(chatBindingStore.get("oc_g")?.repositoryIds).toEqual([record!.id]);
+    expect(replies).toEqual([]);
+    expect(progress).toHaveLength(1);
+    expect((progress[0] as { kind: string }).kind).toBe("updateCard");
+    expect((progress[0] as { messageId: string }).messageId).toBe("om_card");
+    expect(JSON.stringify(progress[0])).toContain("已为本群绑定仓库");
+    db.close();
+  });
+
+  it("reports gracefully when bind_repo_submit arrives without stores wired", async () => {
+    const replies: Array<{ messageId: string; text: string }> = [];
+    const responder = new FeishuCommandResponder(fakeClient(replies), { registry: testRegistry() });
+
+    await responder.handleCommand({
+      source: "card", chatId: "oc_g", messageId: "om_card",
+      command: { type: "bind_repo_submit", url: "https://x/kuavo", scopeKey: "oc_g", scopeNoun: "本群" }
+    });
+
+    expect(replies).toHaveLength(1);
+    expect(replies[0].text).toContain("尚未接入");
   });
 
   it("does not gate single (p2p) chat — it runs without a binding", async () => {

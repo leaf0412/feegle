@@ -6,7 +6,7 @@ import type {
   SlashCommandReply
 } from "../../slash-command-handler.js";
 import { resolveBindingScopeKey, resolveBindingScopeNoun } from "./binding-scope-key.js";
-import { deriveRepositoryName } from "./repo-url.js";
+import { bindRepositoryToScope, formatBoundRepoLines } from "./repo-binding.js";
 
 export interface BindRepoCommandDeps {
   repositoryStore: RepositoryStore;
@@ -24,22 +24,10 @@ export class BindRepoCommandHandler implements SlashCommandHandler {
     if (!url) {
       return textReply("用法：/bind_repo <git url>");
     }
-    const record =
-      this.deps.repositoryStore.findByUrl(url) ??
-      (await this.deps.repositoryStore.add({
-        name: deriveRepositoryName(url),
-        remoteUrl: url,
-        defaultBaseBranch: "main"
-      }));
     const scopeKey = resolveBindingScopeKey(context);
-    const binding = await this.deps.chatBindingStore.addRepository(scopeKey, record.id);
+    const { record, binding } = await bindRepositoryToScope(this.deps, scopeKey, url);
     const scopeNoun = resolveBindingScopeNoun(context);
-    const repoLines = binding.repositoryIds
-      .map((id) => {
-        const repo = this.deps.repositoryStore.get(id);
-        return `    - ${repo ? `${repo.name} (${id})` : `${id} (已删除)`}`;
-      })
-      .join("\n");
+    const repoLines = formatBoundRepoLines(this.deps.repositoryStore, binding);
     return textReply(`✅ 已为${scopeNoun}绑定仓库：${record.name} (${record.id})\n当前绑定：\n${repoLines}`);
   }
 }

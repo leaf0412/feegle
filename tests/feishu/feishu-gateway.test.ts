@@ -147,6 +147,42 @@ describe("parseFeishuCommand", () => {
     });
   });
 
+  it("parses a bind-repo card submit: url from form_value + embedded scope", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/repo bind_submit",
+        scope_key: "oc_g",
+        scope_noun: "本群",
+        form_value: { repo_url: "  git@github.com:org/repo.git  " }
+      })
+    ).toEqual({
+      type: "bind_repo_submit",
+      url: "git@github.com:org/repo.git",
+      scopeKey: "oc_g",
+      scopeNoun: "本群"
+    });
+  });
+
+  it("treats a bind-repo submit with an empty url as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/repo bind_submit",
+        scope_key: "oc_g",
+        scope_noun: "本群",
+        form_value: { repo_url: "   " }
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("treats a bind-repo submit with no scope_key as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/repo bind_submit",
+        form_value: { repo_url: "git@github.com:org/repo.git" }
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
   it("parses workbench plan revise requests", () => {
     expect(
       parseFeishuCardActionValue({

@@ -12,6 +12,9 @@ import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
 import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
+import type { RepositoryStore } from "../repositories/repository-store.js";
+import { bindRepositoryToScope, formatBoundRepoLines } from "../platform/commands/repo/repo-binding.js";
+import { buildBindRepoPromptCard, buildRepoBoundCard } from "./feishu-workbench-cards.js";
 
 type FeishuCommandSender = { platform: "feishu"; userId: string; email?: string };
 
@@ -40,6 +43,7 @@ export interface FeishuCommandResponderOptions {
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
   userDirectory?: FeishuUserDirectory;
   chatBindingStore?: ChatBindingStore;
+  repositoryStore?: RepositoryStore;
   workbench?: FeishuWorkbenchHandler;
 }
 
@@ -153,11 +157,11 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
     if (input.chatType === "group") {
       const binding = this.options.chatBindingStore?.get(input.chatId);
       if (!binding || binding.repositoryIds.length === 0) {
-        await this.traceAsync("reply_text", input, () =>
-          this.client.replyText(
-            input.messageId,
-            "本群尚未绑定仓库，请先 /bind_repo <仓库url> 绑定仓库后再聊天。"
-          )
+        // Group binding scope is the chat id (see resolveBindingScopeKey); embed
+        // it in the card so the bind on submit lands here, not on the clicker.
+        const card = buildBindRepoPromptCard({ scopeKey: input.chatId, scopeNoun: "本群" });
+        await this.traceAsync("reply_card", input, () =>
+          this.client.replyInteractiveCard(input.messageId, card)
         );
         this.trace("chat_unbound", input);
         return;
@@ -204,6 +208,8 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchPlanBaseBranchSubmit(input, command);
       case "workbench_plan_revise_execution_submit":
         return this.dispatchPlanReviseExecutionSubmit(input, command);
+      case "bind_repo_submit":
+        return this.dispatchBindRepoSubmit(command);
       case "chat":
         return undefined;
       case "repo_select":
@@ -306,6 +312,28 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       messageId: input.messageId,
       command
     });
+  }
+
+  private async dispatchBindRepoSubmit(
+    command: Extract<FeishuCommand, { type: "bind_repo_submit" }>
+  ): Promise<FeishuWorkbenchReply> {
+    if (!this.options.repositoryStore || !this.options.chatBindingStore) {
+      return { kind: "text", text: "仓库绑定能力尚未接入。" };
+    }
+    const { record, binding } = await bindRepositoryToScope(
+      { repositoryStore: this.options.repositoryStore, chatBindingStore: this.options.chatBindingStore },
+      command.scopeKey,
+      command.url
+    );
+    return {
+      kind: "feishu_card_update",
+      card: buildRepoBoundCard({
+        scopeNoun: command.scopeNoun,
+        repoName: record.name,
+        repoId: record.id,
+        boundLines: formatBoundRepoLines(this.options.repositoryStore, binding)
+      })
+    };
   }
 
   private async dispatchSlashCommand(
