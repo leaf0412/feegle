@@ -336,6 +336,28 @@ export function migrate(db: RuntimeDb): void {
     );
     create index if not exists artifacts_workspace_kind_idx on artifacts(workspace_id, kind);
   `);
+
+  db.exec(`
+    create table if not exists memory_records (
+      id text primary key,
+      workspace_id text not null,
+      project_id text,
+      scope text not null,
+      kind text not null,
+      status text not null,
+      content text not null,
+      source_json text not null,
+      confidence real not null,
+      visibility text not null,
+      expires_at text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade,
+      foreign key (project_id) references projects(id) on delete set null
+    );
+    create index if not exists memory_records_scope_idx
+      on memory_records(workspace_id, project_id, scope, kind, status);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
