@@ -124,6 +124,68 @@ describe("FeishuLongConnectionRuntime", () => {
     }
   });
 
+  it("dispatches accepted message events to runtime ingress when configured", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const dispatched: unknown[] = [];
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig(),
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      },
+      {
+        dispatch: async (event) => {
+          dispatched.push(event);
+          return { status: "succeeded" };
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["im.message.receive_v1"]?.({
+      sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+      message: {
+        message_id: "om_1",
+        chat_id: "oc_1",
+        chat_type: "p2p",
+        message_type: "text",
+        content: JSON.stringify({ text: "hello" })
+      }
+    });
+
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      triggerEventId: "feishu:om_1",
+      source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
+      external: { chatId: "oc_1", messageId: "om_1" },
+      actorHint: { platform: "feishu", userId: "ou_1" },
+      conversationHint: { chatId: "oc_1" },
+      payloadSummary: { commandType: "chat", textLength: 5 }
+    });
+    expect(handled).toHaveLength(1);
+  });
+
   it("routes bot menu clicks through the command handler as slash commands", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;

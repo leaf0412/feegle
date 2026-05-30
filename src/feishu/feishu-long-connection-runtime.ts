@@ -1,5 +1,6 @@
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuPlatformConfig } from "./feishu-platform-config.js";
+import { feishuMessageEnvelopeToTriggerEvent } from "./feishu-trigger-event-adapter.js";
 import {
   extractBotMenuCommand,
   extractCardActionCommand,
@@ -11,6 +12,7 @@ import {
 } from "./feishu-event-adapter.js";
 import { FeishuMessageDedup } from "./feishu-dedup.js";
 import { FeishuRecallTracker } from "./feishu-recall-tracker.js";
+import type { TriggerEvent } from "../ingress/trigger-event.js";
 
 export interface FeishuLongConnectionConfig extends FeishuPlatformConfig {}
 
@@ -51,6 +53,10 @@ export interface FeishuWsClient {
   start(input: { eventDispatcher: FeishuEventDispatcher }): Promise<void>;
 }
 
+export interface FeishuRuntimeIngress {
+  dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" }>;
+}
+
 export class FeishuLongConnectionRuntime {
   private readonly dedup = new FeishuMessageDedup();
   private readonly platformConfig: FeishuPlatformConfig;
@@ -59,7 +65,8 @@ export class FeishuLongConnectionRuntime {
   constructor(
     private readonly config: FeishuLongConnectionConfig,
     private readonly sdk: FeishuLongConnectionSdk,
-    private readonly handler: FeishuCommandHandler
+    private readonly handler: FeishuCommandHandler,
+    private readonly ingress?: FeishuRuntimeIngress
   ) {
     // config is already the parsed/resolved platform config (entry → resolveFeishuEntryConfig);
     // consume it directly instead of re-parsing (re-parsing would resurrect reactionEmoji="none" → "OnIt").
@@ -99,6 +106,19 @@ export class FeishuLongConnectionRuntime {
           shouldRespond: envelope.shouldRespond
         });
         if (envelope && this.markUnhandled("message", envelope.messageId)) {
+          if (this.ingress) {
+            await this.ingress.dispatch(
+              feishuMessageEnvelopeToTriggerEvent({
+                triggerEventId: `feishu:${envelope.messageId}`,
+                receivedAt: new Date().toISOString(),
+                chatId: envelope.chatId,
+                messageId: envelope.messageId,
+                senderUserId: envelope.sender?.userId,
+                commandType: envelope.command.type,
+                textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0
+              })
+            );
+          }
           void this.handler
             .handleCommand({
               source: "message",
