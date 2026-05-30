@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { intentKinds } from "../../src/ingress/intent.js";
 import type { Intent } from "../../src/ingress/intent.js";
+import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
 import { triggerEventModelVersion } from "../../src/ingress/trigger-event.js";
 import type { TriggerEvent } from "../../src/ingress/trigger-event.js";
 
@@ -31,6 +32,34 @@ describe("ingress models", () => {
       actor: { kind: "user", userId: "user_1" },
       payload: { text: "hello" }
     };
+
+    expect(intent.kind).toBe("chat");
+  });
+});
+
+describe("IntentResolverRegistry", () => {
+  it("uses the first resolver that can turn a trigger into an intent", async () => {
+    const registry = new IntentResolverRegistry();
+    registry.register({
+      id: "feishu-chat",
+      canResolve: (event) => event.source.pluginId === "feishu",
+      resolve: async () => ({
+        intentId: "intent_1",
+        kind: "chat",
+        workspaceId: "ws_1",
+        projectId: null,
+        actor: { kind: "user", userId: "user_1" },
+        payload: { text: "hello" }
+      })
+    });
+
+    const intent = await registry.resolve({
+      triggerEventId: "trg_1",
+      source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
+      receivedAt: "2026-05-30T00:00:00.000Z",
+      external: {},
+      payloadSummary: {}
+    });
 
     expect(intent.kind).toBe("chat");
   });
