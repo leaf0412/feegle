@@ -3,23 +3,23 @@ import {
   buildProviderAdapter,
   defaultProviderDisplayName
 } from "../../src/agent/provider-adapter-factory.js";
-import { AcpAgentAdapter } from "../../src/agent/acp-agent-adapter.js";
+import { DirectCliAdapter } from "../../src/agent/direct-cli-adapter.js";
 
 describe("provider-adapter-factory", () => {
-  it("builds an AcpAgentAdapter for codex records", () => {
+  it("builds a DirectCliAdapter for codex records", () => {
     const adapter = buildProviderAdapter({
       kind: "codex",
       cwd: "/tmp/codex"
     });
-    expect(adapter).toBeInstanceOf(AcpAgentAdapter);
+    expect(adapter).toBeInstanceOf(DirectCliAdapter);
   });
 
-  it("builds an AcpAgentAdapter for claude_code records", () => {
+  it("builds a DirectCliAdapter for claude_code records", () => {
     const adapter = buildProviderAdapter({
       kind: "claude_code",
       cwd: "/tmp/claude"
     });
-    expect(adapter).toBeInstanceOf(AcpAgentAdapter);
+    expect(adapter).toBeInstanceOf(DirectCliAdapter);
   });
 
   it("uses the kind label as the display name", () => {
