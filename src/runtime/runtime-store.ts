@@ -137,6 +137,35 @@ export class RuntimeStore {
       .get(id) as { id: string; status: RunAttemptStatus } | undefined;
   }
 
+  finishRunAttempt(input: {
+    id: string;
+    status: RunAttemptStatus;
+    error: RuntimeError | null;
+    now: string;
+  }): void {
+    this.db
+      .prepare("update run_attempts set status = ?, error_json = ?, finished_at = ?, updated_at = ? where id = ?")
+      .run(input.status, encodeJson(input.error), input.now, input.now, input.id);
+  }
+
+  updateWorkflowInstanceStatus(input: {
+    id: string;
+    status: string;
+    currentStepId: string | null;
+    now: string;
+  }): void {
+    this.db
+      .prepare("update workflow_instances set status = ?, current_step_id = ?, updated_at = ? where id = ?")
+      .run(input.status, input.currentStepId, input.now, input.id);
+  }
+
+  getWorkflowInstance(id: string): { id: string; status: string; currentStepId: string | null } | undefined {
+    const row = this.db
+      .prepare("select id, status, current_step_id from workflow_instances where id = ?")
+      .get(id) as { id: string; status: string; current_step_id: string | null } | undefined;
+    return row ? { id: row.id, status: row.status, currentStepId: row.current_step_id } : undefined;
+  }
+
   createStepState(input: {
     id: string;
     workflowInstanceId: string;
@@ -235,7 +264,7 @@ export class RuntimeStore {
         `select id, type, payload_json
          from runtime_events
          where workflow_instance_id = ?
-         order by created_at asc, id asc`
+         order by created_at asc, rowid asc`
       )
       .all(workflowInstanceId) as Array<{ id: string; type: string; payload_json: string }>;
     return rows.map((row) => ({

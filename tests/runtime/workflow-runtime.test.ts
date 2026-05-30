@@ -47,4 +47,38 @@ describe("WorkflowRuntime", () => {
 
     expect(result.status).toBe("succeeded");
   });
+
+  it("records step events and final attempt state when a workflow completes", async () => {
+    const registry = new WorkflowRegistry();
+    registry.register({
+      definitionId: "test.complete.with.events",
+      version: 1,
+      concurrencyPolicy: "reject_if_running",
+      steps: [{ stepId: "finish", run: () => ({ kind: "complete", output: { ok: true } }) }]
+    });
+
+    const store = new RuntimeStore(db);
+    const runtime = new WorkflowRuntime(store, registry);
+    const result = await runtime.start({
+      workflowInstanceId: "wfi_2",
+      runAttemptId: "run_2",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "test.complete.with.events",
+      input: { message: "hello" },
+      now: "2026-05-31T00:01:00.000Z"
+    });
+
+    expect(result.status).toBe("succeeded");
+    expect(store.getRunAttempt("run_2")?.status).toBe("succeeded");
+    expect(store.getWorkflowInstance("wfi_2")?.status).toBe("succeeded");
+    expect(store.listRuntimeEvents("wfi_2").map((event) => event.type)).toEqual([
+      "workflow_instance.created",
+      "attempt.started",
+      "step.started",
+      "step.succeeded",
+      "attempt.completed",
+      "workflow_instance.state_changed"
+    ]);
+  });
 });
