@@ -50,7 +50,8 @@ export function schedulerPhase(deps: SchedulerPhaseDeps): BootPhase {
           host: new RuntimeHostInfoProvider(),
           clock: { now: () => new Date() },
           logger: new ConsoleJsonLogger(),
-          hooks: deps.hooks
+          hooks: deps.hooks,
+          runtimeObserver: undefined
         });
       await scheduler.start();
       deps.hooks?.emit({ event: "scheduler.started" });

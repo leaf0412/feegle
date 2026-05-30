@@ -10,6 +10,7 @@ import { UndeliveredFailureCounter } from "./undelivered-counter.js";
 import { withinActiveHours } from "./active-hours.js";
 import type { HandlerKindRegistry } from "./handler-kind-registry.js";
 import { SingleFlight } from "./single-flight.js";
+import type { SchedulerRuntimeObserver } from "./scheduler-runtime-observer.js";
 import type { RunsLog, RunsLogEntry } from "./runs-log.js";
 import type { Task, TaskLastRun, TaskRunStatus } from "./task.js";
 import type { Clock, DailyDedupStore, HostInfoProvider, Logger } from "./task-context.js";
@@ -32,6 +33,7 @@ export interface TaskSchedulerDeps {
   logger: Logger;
   undeliveredFailures?: UndeliveredFailureCounter;
   hooks?: HookManager;
+  runtimeObserver?: Pick<SchedulerRuntimeObserver, "beforeTaskRun">;
 }
 
 export class TaskScheduler implements TaskMutationObserver {
@@ -127,6 +129,11 @@ export class TaskScheduler implements TaskMutationObserver {
       if (!kind) {
         throw new Error(`Unknown kind: ${task.kind}`);
       }
+      await this.deps.runtimeObserver?.beforeTaskRun({
+        taskId: task.id,
+        taskName: task.name,
+        kind: task.kind
+      });
       const params = kind.parseParams(task.params);
       const result = await kind.run(
         {

@@ -102,6 +102,44 @@ describe("TaskScheduler", () => {
     expect(written.at(-1)?.consecutiveFailures).toBe(1);
     expect(history[0]).toMatchObject({ taskId: "task-fail", outcome: "failed", note: "boom" });
   });
+
+  it("notifies runtime observer before executing a scheduled task", async () => {
+    const task = makeTask("task-observed");
+    const registry = new TaskRegistry(memoryStore([task], []));
+    const calls: string[] = [];
+    const kind: HandlerKind<Record<string, never>> = {
+      id: "heartbeat",
+      title: "Heartbeat",
+      description: "test",
+      parseParams: () => ({}),
+      describeParams: () => "none",
+      run: async () => {
+        calls.push("handler");
+        return { outcome: "sent" };
+      }
+    };
+    const scheduler = new TaskScheduler({
+      registry,
+      kinds: new HandlerKindRegistry().register(kind),
+      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
+      dedup: { checkAndMark: async () => true },
+      runsLog: { append: async () => {} },
+      notify: { sendText: async () => {}, sendCard: async () => {} },
+      agents: new AgentProviderRegistry(),
+      host: { read: async () => ({ hostname: "local", pid: 1 }) },
+      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
+      logger: silentLogger,
+      runtimeObserver: {
+        beforeTaskRun: async () => {
+          calls.push("runtime");
+        }
+      }
+    });
+
+    await scheduler.runOnce("task-observed");
+
+    expect(calls).toEqual(["runtime", "handler"]);
+  });
 });
 
 const silentLogger = {
