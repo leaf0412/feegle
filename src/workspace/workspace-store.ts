@@ -1,6 +1,7 @@
 import type { RuntimeDb } from "../app/runtime-db.js";
 import type {
   ConversationBindingRecord,
+  ExternalIdentityRecord,
   MembershipRecord,
   ProjectRecord,
   UserRecord,
@@ -128,6 +129,61 @@ export class WorkspaceStore {
 
     return row ? mapConversationBinding(row) : undefined;
   }
+
+  getExternalIdentity(provider: string, externalUserId: string): ExternalIdentityRecord | undefined {
+    const row = this.db
+      .prepare(
+        `select id, user_id, provider, external_user_id, created_at, updated_at
+         from external_identities
+         where provider = ? and external_user_id = ?`
+      )
+      .get(provider, externalUserId) as DbExternalIdentityRow | undefined;
+
+    return row ? mapExternalIdentity(row) : undefined;
+  }
+
+  getUser(userId: string): UserRecord | undefined {
+    const row = this.db
+      .prepare("select id, display_name, created_at, updated_at from users where id = ?")
+      .get(userId) as DbUserRow | undefined;
+
+    return row ? { id: row.id, displayName: row.display_name, createdAt: row.created_at, updatedAt: row.updated_at } : undefined;
+  }
+
+  getWorkspace(workspaceId: string): WorkspaceRecord | undefined {
+    const row = this.db
+      .prepare("select id, name, created_at, updated_at from workspaces where id = ?")
+      .get(workspaceId) as DbWorkspaceRow | undefined;
+
+    return row ? { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at } : undefined;
+  }
+
+  linkExternalIdentity(input: {
+    provider: string;
+    externalUserId: string;
+    userId: string;
+    now: string;
+  }): ExternalIdentityRecord {
+    const id = `ext_${input.provider}_${input.externalUserId}`;
+    this.db
+      .prepare(
+        `insert into external_identities (id, user_id, provider, external_user_id, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?)
+         on conflict(provider, external_user_id) do update set
+          user_id = excluded.user_id,
+          updated_at = excluded.updated_at`
+      )
+      .run(id, input.userId, input.provider, input.externalUserId, input.now, input.now);
+
+    return {
+      id,
+      userId: input.userId,
+      provider: input.provider,
+      externalUserId: input.externalUserId,
+      createdAt: input.now,
+      updatedAt: input.now
+    };
+  }
 }
 
 interface DbMembershipRow {
@@ -138,12 +194,46 @@ interface DbMembershipRow {
   updated_at: string;
 }
 
+interface DbExternalIdentityRow {
+  id: string;
+  user_id: string;
+  provider: string;
+  external_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbUserRow {
+  id: string;
+  display_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbWorkspaceRow {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DbConversationBindingRow {
   conversation_key: string;
   workspace_id: string;
   project_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+function mapExternalIdentity(row: DbExternalIdentityRow): ExternalIdentityRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    provider: row.provider,
+    externalUserId: row.external_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 function mapMembership(row: DbMembershipRow): MembershipRecord {
