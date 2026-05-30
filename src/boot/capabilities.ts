@@ -7,6 +7,7 @@ import type { NotificationBroker } from "../app/notification-broker.js";
 import type { RuntimeDb } from "../app/runtime-db.js";
 import type { ArtifactService } from "../artifacts/artifact-service.js";
 import type { ArtifactStore } from "../artifacts/artifact-store.js";
+import type { ControlActionProcessor } from "../control/control-action-processor.js";
 import type { ControlActionStore } from "../control/control-action-store.js";
 import type { GitService } from "../git/git-service.js";
 import type { GitLabClient } from "../gitlab/gitlab-client.js";
@@ -76,6 +77,7 @@ export interface Capabilities {
   artifactService: ArtifactService;
   memoryStore: MemoryStore;
   controlActionStore: ControlActionStore;
+  controlActionProcessor: ControlActionProcessor;
   // providers
   agents: AgentProviderRegistry;
   gitlab: GitLabClient;

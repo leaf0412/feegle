@@ -10,6 +10,7 @@ import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
 import type { RuntimeDb } from "../../app/runtime-db.js";
 import { ArtifactService } from "../../artifacts/artifact-service.js";
 import { ArtifactStore } from "../../artifacts/artifact-store.js";
+import { ControlActionProcessor } from "../../control/control-action-processor.js";
 import { ControlActionStore } from "../../control/control-action-store.js";
 import { IdentityResolver } from "../../ingress/identity-resolver.js";
 import { IntentResolverRegistry } from "../../ingress/intent-resolver-registry.js";
@@ -66,7 +67,26 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("artifactStore", artifactStore);
       ctx.provide("artifactService", new ArtifactService(artifactStore, join(deps.feegleHome, "artifacts")));
       ctx.provide("memoryStore", new MemoryStore(runtimeDb));
-      ctx.provide("controlActionStore", new ControlActionStore(runtimeDb));
+      const controlActionStore = new ControlActionStore(runtimeDb);
+      ctx.provide("controlActionStore", controlActionStore);
+      ctx.provide(
+        "controlActionProcessor",
+        new ControlActionProcessor(controlActionStore, {}, {
+          emit: (input) =>
+            runtimeStore.appendRuntimeEvent({
+              id: input.id,
+              workspaceId: input.workspaceId,
+              workflowInstanceId: input.workflowInstanceId,
+              runAttemptId: input.runAttemptId,
+              stepStateId: input.stepStateId,
+              effectExecutionId: input.effectExecutionId,
+              category: input.category,
+              type: input.type,
+              payload: input.payload,
+              now: input.now
+            })
+        })
+      );
 
       await migrateLegacySessionsJson(deps.feegleHome, runtimeDb);
       ctx.provide("sessionStore", new SessionStore(runtimeDb));

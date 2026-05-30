@@ -374,6 +374,8 @@ export function migrate(db: RuntimeDb): void {
     create index if not exists control_actions_workspace_status_idx
       on control_actions(workspace_id, status, created_at);
   `);
+
+  ensureColumn(db, "control_actions", "error_message", "text");
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
