@@ -170,4 +170,68 @@ describe("runtime schema", () => {
     });
     expect(store.listRuntimeEvents("wfi_1").map((event) => event.type)).toEqual(["step.succeeded"]);
   });
+
+  it("records effect executions with idempotency keys before external IO is retried", () => {
+    db.prepare(
+      `insert into workspaces (id, name, created_at, updated_at)
+       values ('ws_1', 'Personal', '2026-05-31T00:00:00.000Z', '2026-05-31T00:00:00.000Z')`
+    ).run();
+    const store = new RuntimeStore(db);
+    store.registerWorkflowDefinition({
+      id: "test.effect",
+      version: 1,
+      concurrencyPolicy: "reject_if_running",
+      now: "2026-05-31T00:00:01.000Z"
+    });
+    store.createWorkflowInstance({
+      id: "wfi_1",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "test.effect",
+      definitionVersion: 1,
+      status: "running",
+      now: "2026-05-31T00:00:02.000Z"
+    });
+    store.createRunAttempt({
+      id: "run_1",
+      workflowInstanceId: "wfi_1",
+      status: "running",
+      triggerEventId: null,
+      now: "2026-05-31T00:00:03.000Z"
+    });
+    store.createStepState({
+      id: "step_state_1",
+      workflowInstanceId: "wfi_1",
+      runAttemptId: "run_1",
+      stepId: "reply",
+      status: "running",
+      input: {},
+      now: "2026-05-31T00:00:04.000Z"
+    });
+
+    store.createEffectExecution({
+      id: "eff_1",
+      runAttemptId: "run_1",
+      stepStateId: "step_state_1",
+      pluginId: "feishu",
+      effectType: "message.reply",
+      status: "running",
+      idempotencyKey: "feishu:reply:om_1",
+      inputSummary: { textLength: 2 },
+      now: "2026-05-31T00:00:05.000Z"
+    });
+    store.updateEffectExecution({
+      id: "eff_1",
+      status: "succeeded",
+      outputSummary: { messageId: "om_reply" },
+      error: null,
+      now: "2026-05-31T00:00:06.000Z"
+    });
+
+    expect(store.getEffectExecution("eff_1")).toMatchObject({
+      id: "eff_1",
+      status: "succeeded",
+      outputSummary: { messageId: "om_reply" }
+    });
+  });
 });

@@ -244,4 +244,68 @@ export class RuntimeStore {
       payload: JSON.parse(row.payload_json)
     }));
   }
+
+  createEffectExecution(input: {
+    id: string;
+    runAttemptId: string;
+    stepStateId: string | null;
+    pluginId: string;
+    effectType: string;
+    status: EffectStatus;
+    idempotencyKey: string | null;
+    inputSummary: unknown;
+    now: string;
+  }): void {
+    this.db
+      .prepare(
+        `insert into effect_executions
+          (id, run_attempt_id, step_state_id, plugin_id, effect_type, status, idempotency_key, input_summary_json, started_at, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.id,
+        input.runAttemptId,
+        input.stepStateId,
+        input.pluginId,
+        input.effectType,
+        input.status,
+        input.idempotencyKey,
+        encodeJson(input.inputSummary),
+        input.now,
+        input.now,
+        input.now
+      );
+  }
+
+  updateEffectExecution(input: {
+    id: string;
+    status: EffectStatus;
+    outputSummary: unknown;
+    error: RuntimeError | null;
+    now: string;
+  }): void {
+    this.db
+      .prepare(
+        `update effect_executions
+         set status = ?, output_summary_json = ?, error_json = ?, finished_at = ?, updated_at = ?
+         where id = ?`
+      )
+      .run(
+        input.status,
+        encodeJson(input.outputSummary),
+        encodeJson(input.error),
+        input.now,
+        input.now,
+        input.id
+      );
+  }
+
+  getEffectExecution(id: string): EffectExecutionView | undefined {
+    const row = this.db
+      .prepare("select id, status, output_summary_json from effect_executions where id = ?")
+      .get(id) as { id: string; status: EffectStatus; output_summary_json: string | null } | undefined;
+    return row
+      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
+      : undefined;
+  }
 }
