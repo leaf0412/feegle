@@ -12,6 +12,7 @@ export function runtimePhase(deps: RuntimePhaseDeps): BootPhase {
   return {
     name: "runtime",
     run: async (ctx: BootContext) => {
+      ctx.require("runtimeStore").markRunningAttemptsInterrupted(new Date().toISOString());
       const runtimes = deps.contributions.platformRuntimes.map((module) => module.create(ctx));
       for (const runtime of runtimes) {
         await runtime.start();
