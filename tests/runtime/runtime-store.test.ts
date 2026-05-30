@@ -68,4 +68,39 @@ describe("runtime schema", () => {
 
     expect(store.getActiveMutatingAttempt("wfi_1")?.id).toBe("run_1");
   });
+
+  it("marks running attempts interrupted on startup instead of treating them as successful", () => {
+    db.prepare(
+      `insert into workspaces (id, name, created_at, updated_at)
+       values ('ws_1', 'Personal', '2026-05-30T00:00:00.000Z', '2026-05-30T00:00:00.000Z')`
+    ).run();
+    const store = new RuntimeStore(db);
+    store.registerWorkflowDefinition({
+      id: "test.echo",
+      version: 1,
+      concurrencyPolicy: "reject_if_running",
+      now: "2026-05-30T00:00:01.000Z"
+    });
+    store.createWorkflowInstance({
+      id: "wfi_1",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "test.echo",
+      definitionVersion: 1,
+      status: "running",
+      now: "2026-05-30T00:00:02.000Z"
+    });
+    store.createRunAttempt({
+      id: "run_1",
+      workflowInstanceId: "wfi_1",
+      status: "running",
+      triggerEventId: null,
+      now: "2026-05-30T00:00:03.000Z"
+    });
+
+    const count = store.markRunningAttemptsInterrupted("2026-05-30T00:05:00.000Z");
+
+    expect(count).toBe(1);
+    expect(store.getRunAttempt("run_1")?.status).toBe("interrupted");
+  });
 });

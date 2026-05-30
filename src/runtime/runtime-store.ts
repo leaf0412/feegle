@@ -85,4 +85,22 @@ export class RuntimeStore {
       )
       .get(workflowInstanceId) as { id: string; status: RunAttemptStatus } | undefined;
   }
+
+  markRunningAttemptsInterrupted(now: string): number {
+    const result = this.db
+      .prepare(
+        `update run_attempts
+         set status = 'interrupted', finished_at = ?, updated_at = ?
+         where status = 'running'`
+      )
+      .run(now, now);
+
+    return result.changes;
+  }
+
+  getRunAttempt(id: string): { id: string; status: RunAttemptStatus } | undefined {
+    return this.db
+      .prepare("select id, status from run_attempts where id = ?")
+      .get(id) as { id: string; status: RunAttemptStatus } | undefined;
+  }
 }
