@@ -18,6 +18,12 @@ export interface PluginProvision {
   run(ctx: BootContext): void | Promise<void>;
 }
 
+/** First-class runtime contribution hook for future ingress/effect/workflow roles. */
+export interface RuntimeContributionModule {
+  readonly id: string;
+  register(ctx: unknown): void | Promise<void>;
+}
+
 /** A feature, grouping its contributions to extension points. */
 export interface FeeglePlugin {
   readonly id: string;
@@ -28,6 +34,7 @@ export interface FeeglePlugin {
   readonly notificationAdapters?: readonly NotificationAdapterModule[];
   readonly platformRuntimes?: readonly PlatformRuntimeModule[];
   readonly provides?: readonly PluginProvision[];
+  readonly runtimeContributions?: readonly RuntimeContributionModule[];
 }
 
 export interface Contributions {
@@ -37,6 +44,7 @@ export interface Contributions {
   notificationAdapters: NotificationAdapterModule[];
   platformRuntimes: PlatformRuntimeModule[];
   provisions: PluginProvision[];
+  runtimeContributions: RuntimeContributionModule[];
 }
 
 export function collectContributions(plugins: readonly FeeglePlugin[]): Contributions {
@@ -46,6 +54,7 @@ export function collectContributions(plugins: readonly FeeglePlugin[]): Contribu
     quoteClients: plugins.flatMap((p) => [...(p.quoteClients ?? [])]),
     notificationAdapters: plugins.flatMap((p) => [...(p.notificationAdapters ?? [])]),
     platformRuntimes: plugins.flatMap((p) => [...(p.platformRuntimes ?? [])]),
-    provisions: plugins.flatMap((p) => [...(p.provides ?? [])])
+    provisions: plugins.flatMap((p) => [...(p.provides ?? [])]),
+    runtimeContributions: plugins.flatMap((p) => [...(p.runtimeContributions ?? [])])
   };
 }

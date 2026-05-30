@@ -16,4 +16,22 @@ describe("collectContributions", () => {
     expect(result.quoteClients.map((m) => m.id)).toEqual(["q1"]);
     expect(result.slashCommands).toEqual([]);
   });
+
+  it("collects runtime contribution modules separately from existing boot-time modules", () => {
+    const contributions = collectContributions([
+      {
+        id: "runtime-test",
+        runtimeContributions: [
+          {
+            id: "runtime-test-contribution",
+            register: () => undefined
+          }
+        ]
+      }
+    ]);
+
+    expect(contributions.runtimeContributions.map((item) => item.id)).toEqual([
+      "runtime-test-contribution"
+    ]);
+  });
 });
