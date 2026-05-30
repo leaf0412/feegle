@@ -27,6 +27,17 @@ describe("openRuntimeDb", () => {
     expect(tableExists(db, "plan_artifacts")).toBe(true);
   });
 
+  it("creates workspace resource boundary tables so runtime records have an owner", () => {
+    db = openRuntimeDb(join(home, "feegle.db"));
+
+    expect(tableExists(db, "workspaces")).toBe(true);
+    expect(tableExists(db, "users")).toBe(true);
+    expect(tableExists(db, "external_identities")).toBe(true);
+    expect(tableExists(db, "memberships")).toBe(true);
+    expect(tableExists(db, "projects")).toBe(true);
+    expect(tableExists(db, "conversation_bindings_v2")).toBe(true);
+  });
+
   it("enables foreign_keys pragma so chat_bindings ON DELETE CASCADE actually fires", () => {
     // Without this pragma the cascade is silently a no-op — ChatBindingStore.clear()
     // would leave orphan rows. Verifying it at the connection level catches a regression

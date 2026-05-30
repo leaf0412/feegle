@@ -157,6 +157,66 @@ export function migrate(db: RuntimeDb): void {
       next_id integer not null
     );
   `);
+
+  db.exec(`
+    create table if not exists workspaces (
+      id text primary key,
+      name text not null,
+      created_at text not null,
+      updated_at text not null
+    );
+
+    create table if not exists users (
+      id text primary key,
+      display_name text not null,
+      created_at text not null,
+      updated_at text not null
+    );
+
+    create table if not exists external_identities (
+      id text primary key,
+      user_id text not null,
+      provider text not null,
+      external_user_id text not null,
+      created_at text not null,
+      updated_at text not null,
+      unique(provider, external_user_id),
+      foreign key (user_id) references users(id) on delete cascade
+    );
+
+    create table if not exists memberships (
+      workspace_id text not null,
+      user_id text not null,
+      role text not null check (role in ('owner', 'admin', 'maintainer', 'member', 'viewer')),
+      created_at text not null,
+      updated_at text not null,
+      primary key (workspace_id, user_id),
+      foreign key (workspace_id) references workspaces(id) on delete cascade,
+      foreign key (user_id) references users(id) on delete cascade
+    );
+
+    create table if not exists projects (
+      id text primary key,
+      workspace_id text not null,
+      name text not null,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+    create index if not exists projects_workspace_idx on projects(workspace_id);
+
+    create table if not exists conversation_bindings_v2 (
+      conversation_key text primary key,
+      workspace_id text not null,
+      project_id text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade,
+      foreign key (project_id) references projects(id) on delete set null
+    );
+    create index if not exists conversation_bindings_v2_workspace_idx
+      on conversation_bindings_v2(workspace_id);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
