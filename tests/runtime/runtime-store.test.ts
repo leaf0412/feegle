@@ -103,4 +103,71 @@ describe("runtime schema", () => {
     expect(count).toBe(1);
     expect(store.getRunAttempt("run_1")?.status).toBe("interrupted");
   });
+
+  it("records step state transitions and runtime events for diagnostics", () => {
+    db.prepare(
+      `insert into workspaces (id, name, created_at, updated_at)
+       values ('ws_1', 'Personal', '2026-05-31T00:00:00.000Z', '2026-05-31T00:00:00.000Z')`
+    ).run();
+    const store = new RuntimeStore(db);
+    store.registerWorkflowDefinition({
+      id: "test.diagnostic",
+      version: 1,
+      concurrencyPolicy: "reject_if_running",
+      now: "2026-05-31T00:00:01.000Z"
+    });
+    store.createWorkflowInstance({
+      id: "wfi_1",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "test.diagnostic",
+      definitionVersion: 1,
+      status: "running",
+      now: "2026-05-31T00:00:02.000Z"
+    });
+    store.createRunAttempt({
+      id: "run_1",
+      workflowInstanceId: "wfi_1",
+      status: "running",
+      triggerEventId: "trg_1",
+      now: "2026-05-31T00:00:03.000Z"
+    });
+
+    store.createStepState({
+      id: "step_state_1",
+      workflowInstanceId: "wfi_1",
+      runAttemptId: "run_1",
+      stepId: "collect",
+      status: "running",
+      input: { text: "hello" },
+      now: "2026-05-31T00:00:04.000Z"
+    });
+    store.updateStepState({
+      id: "step_state_1",
+      status: "succeeded",
+      output: { ok: true },
+      waitCondition: null,
+      error: null,
+      now: "2026-05-31T00:00:05.000Z"
+    });
+    store.appendRuntimeEvent({
+      id: "evt_1",
+      workspaceId: "ws_1",
+      workflowInstanceId: "wfi_1",
+      runAttemptId: "run_1",
+      stepStateId: "step_state_1",
+      effectExecutionId: null,
+      category: "required",
+      type: "step.succeeded",
+      payload: { stepId: "collect" },
+      now: "2026-05-31T00:00:05.000Z"
+    });
+
+    expect(store.getStepState("step_state_1")).toMatchObject({
+      id: "step_state_1",
+      status: "succeeded",
+      output: { ok: true }
+    });
+    expect(store.listRuntimeEvents("wfi_1").map((event) => event.type)).toEqual(["step.succeeded"]);
+  });
 });
