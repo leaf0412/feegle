@@ -8,9 +8,19 @@ import { ProviderStore } from "../../agent/provider-store.js";
 import { SessionRecordSchema, SessionStore } from "../../agent/session-store.js";
 import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
 import type { RuntimeDb } from "../../app/runtime-db.js";
+import { ArtifactService } from "../../artifacts/artifact-service.js";
+import { ArtifactStore } from "../../artifacts/artifact-store.js";
+import { ControlActionStore } from "../../control/control-action-store.js";
+import { IntentResolverRegistry } from "../../ingress/intent-resolver-registry.js";
+import { WorkflowSelector } from "../../ingress/workflow-selector.js";
+import { MemoryStore } from "../../memory/memory-store.js";
 import { AliasStore } from "../../platform/commands/alias-store.js";
 import { ChatBindingStore } from "../../repositories/chat-binding-store.js";
 import { RepositoryRecordSchema, RepositoryStore } from "../../repositories/repository-store.js";
+import { EffectHandlerRegistry } from "../../runtime/effect-handler-registry.js";
+import { RuntimeStore } from "../../runtime/runtime-store.js";
+import { WorkflowRegistry } from "../../runtime/workflow-registry.js";
+import { WorkflowRuntime } from "../../runtime/workflow-runtime.js";
 import { DedupStore } from "../../scheduler/dedup-store.js";
 import { RunsLog } from "../../scheduler/runs-log.js";
 import { TaskRegistry } from "../../scheduler/task-registry.js";
@@ -30,6 +40,23 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       // Sessions live in SQLite (table `sessions`). First boot after upgrade:
       // import the legacy ~/.feegle/sessions.json then unlink it.
       const runtimeDb = ctx.require("runtimeDb");
+      const runtimeStore = new RuntimeStore(runtimeDb);
+      const workflowRegistry = new WorkflowRegistry();
+      const intentResolvers = new IntentResolverRegistry();
+      const workflowSelector = new WorkflowSelector();
+      const effectHandlers = new EffectHandlerRegistry();
+      const artifactStore = new ArtifactStore(runtimeDb);
+      ctx.provide("runtimeStore", runtimeStore);
+      ctx.provide("workflowRegistry", workflowRegistry);
+      ctx.provide("intentResolvers", intentResolvers);
+      ctx.provide("workflowSelector", workflowSelector);
+      ctx.provide("effectHandlers", effectHandlers);
+      ctx.provide("workflowRuntime", new WorkflowRuntime(runtimeStore, workflowRegistry));
+      ctx.provide("artifactStore", artifactStore);
+      ctx.provide("artifactService", new ArtifactService(artifactStore, join(deps.feegleHome, "artifacts")));
+      ctx.provide("memoryStore", new MemoryStore(runtimeDb));
+      ctx.provide("controlActionStore", new ControlActionStore(runtimeDb));
+
       await migrateLegacySessionsJson(deps.feegleHome, runtimeDb);
       ctx.provide("sessionStore", new SessionStore(runtimeDb));
       ctx.provide("chatHistory", new ChatHistoryStore());

@@ -27,4 +27,13 @@ describe("BootContext", () => {
     ctx.provide("b" as never, 2 as never);
     expect(ctx.pick("a" as never, "b" as never)).toEqual({ a: 1, b: 2 });
   });
+
+  it("can provide and require runtime orchestration capabilities", () => {
+    const ctx = new BootContext();
+    const value = { marker: "runtime" } as never;
+
+    ctx.provide("workflowRegistry", value);
+
+    expect(ctx.require("workflowRegistry")).toBe(value);
+  });
 });
