@@ -3,6 +3,7 @@ import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js"
 import type { FeegleConfig } from "../app/config-store.js";
 import type { HookManager } from "../app/hooks.js";
 import type { NotificationPort } from "../app/notification-port.js";
+import type { RuntimeError } from "../runtime/runtime-models.js";
 import { buildFailureCard } from "./build-failure-card.js";
 import { buildRecoveryCard } from "./build-recovery-card.js";
 import { decideShouldNotifyFailure } from "./failure-policy.js";
@@ -34,6 +35,38 @@ export interface TaskSchedulerDeps {
   undeliveredFailures?: UndeliveredFailureCounter;
   hooks?: HookManager;
   runtimeObserver?: Pick<SchedulerRuntimeObserver, "beforeTaskRun">;
+  runtimeWorkspaceId?: string;
+  recovery?: {
+    createDiagnosticBundle(input: {
+      artifactId: string;
+      workspaceId: string;
+      runAttemptId?: string;
+      error: RuntimeError;
+      now: string;
+    }): Promise<unknown>;
+  };
+  memory?: {
+    createCandidate(input: {
+      id: string;
+      workspaceId: string;
+      scope: "workspace";
+      kind: "failure_pattern";
+      content: string;
+      source: Record<string, unknown>;
+      confidence: number;
+      now: string;
+    }): unknown;
+  };
+  controlActions?: {
+    create(input: {
+      id: string;
+      workspaceId: string;
+      actorUserId: string | null;
+      actionType: string;
+      payload: Record<string, unknown>;
+      now: string;
+    }): unknown;
+  };
 }
 
 export class TaskScheduler implements TaskMutationObserver {
@@ -198,6 +231,7 @@ export class TaskScheduler implements TaskMutationObserver {
     const consecutiveFailures = task.consecutiveFailures + 1;
     const note = errorMessage(error);
     const lastRun = await this.record(task, "failed", durationMs, note, now, { consecutiveFailures });
+    await this.recordRuntimeFailureArtifacts(task, note, consecutiveFailures, now);
     if (decideShouldNotifyFailure(task.errorPolicy, consecutiveFailures, task.lastErrorNotifiedAt, now)) {
       const target = this.deps.configStore.get().failureTarget;
       if (!target) {
@@ -217,6 +251,56 @@ export class TaskScheduler implements TaskMutationObserver {
       }
     }
     return lastRun;
+  }
+
+  private async recordRuntimeFailureArtifacts(
+    task: Task,
+    note: string,
+    consecutiveFailures: number,
+    now: Date
+  ): Promise<void> {
+    const runtimeWorkspaceId = this.deps.runtimeWorkspaceId;
+    if (!runtimeWorkspaceId) {
+      return;
+    }
+    const nowIso = now.toISOString();
+    const runtimeError: RuntimeError = {
+      code: "SCHEDULED_TASK_FAILED",
+      category: "capability",
+      message: note,
+      retryable: true,
+      recoverable: true,
+      evidence: { taskId: task.id, kind: task.kind }
+    };
+    if (this.deps.recovery) {
+      await this.deps.recovery.createDiagnosticBundle({
+        artifactId: `diag:${task.id}:${nowIso}`,
+        workspaceId: runtimeWorkspaceId,
+        error: runtimeError,
+        now: nowIso
+      });
+    }
+    if (consecutiveFailures < 2) {
+      return;
+    }
+    this.deps.memory?.createCandidate({
+      id: `mem:${task.id}:${nowIso}`,
+      workspaceId: runtimeWorkspaceId,
+      scope: "workspace",
+      kind: "failure_pattern",
+      content: `Task ${task.name} (${task.kind}) failed ${consecutiveFailures} consecutive times: ${note}`,
+      source: { taskId: task.id, kind: task.kind },
+      confidence: 0.7,
+      now: nowIso
+    });
+    this.deps.controlActions?.create({
+      id: `ctrl:${task.id}:${nowIso}`,
+      workspaceId: runtimeWorkspaceId,
+      actorUserId: null,
+      actionType: "trigger_recovery",
+      payload: { taskId: task.id, kind: task.kind, consecutiveFailures },
+      now: nowIso
+    });
   }
 
   private async record(

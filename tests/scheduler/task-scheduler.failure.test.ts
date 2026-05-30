@@ -51,6 +51,46 @@ describe("TaskScheduler failure policy", () => {
 
     expect(counter.get(task.id)).toBe(1);
   });
+
+  it("creates diagnostics on failures and recovery candidates for repeated failures", async () => {
+    const task = makeTask({ errorPolicy: "always" });
+    const clock = mutableClock("2026-05-18T01:00:00.000Z");
+    const diagnosticBundles: unknown[] = [];
+    const memoryCandidates: unknown[] = [];
+    const controlActions: unknown[] = [];
+    const scheduler = makeScheduler(task, {
+      clock,
+      failureTarget: null,
+      kind: { run: async () => { throw new Error("boom"); } },
+      runtimeWorkspaceId: "ws_runtime",
+      recovery: {
+        createDiagnosticBundle: async (input: unknown) => {
+          diagnosticBundles.push(input);
+          return { id: "diag_1" };
+        }
+      },
+      memory: {
+        createCandidate: (input: unknown) => {
+          memoryCandidates.push(input);
+          return { id: "mem_1" };
+        }
+      },
+      controlActions: {
+        create: (input: unknown) => {
+          controlActions.push(input);
+          return { id: "ctrl_1" };
+        }
+      }
+    });
+
+    await expect(scheduler.runOnce(task.id)).rejects.toThrow("boom");
+    clock.set("2026-05-18T01:01:00.000Z");
+    await expect(scheduler.runOnce(task.id)).rejects.toThrow("boom");
+
+    expect(diagnosticBundles).toHaveLength(2);
+    expect(memoryCandidates).toHaveLength(1);
+    expect(controlActions).toHaveLength(1);
+  });
 });
 
 function makeScheduler(
@@ -61,6 +101,10 @@ function makeScheduler(
     clock?: ReturnType<typeof mutableClock>;
     notify?: { sendText(_target: unknown, _text: string): Promise<void>; sendCard(_target: unknown, _card: unknown): Promise<void> };
     kind: Partial<HandlerKind<Record<string, never>>>;
+    runtimeWorkspaceId?: string;
+    recovery?: { createDiagnosticBundle(input: unknown): Promise<unknown> };
+    memory?: { createCandidate(input: unknown): unknown };
+    controlActions?: { create(input: unknown): unknown };
   }
 ) {
   const tasks: Task[] = [task];
@@ -97,7 +141,11 @@ function makeScheduler(
     host: { read: async () => ({ hostname: "local", pid: 1 }) },
     clock: options.clock ?? mutableClock("2026-05-18T01:00:00.000Z"),
     logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
-    undeliveredFailures: options.counter
+    undeliveredFailures: options.counter,
+    runtimeWorkspaceId: options.runtimeWorkspaceId,
+    recovery: options.recovery,
+    memory: options.memory,
+    controlActions: options.controlActions
   });
 }
 
