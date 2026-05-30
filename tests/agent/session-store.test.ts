@@ -108,19 +108,6 @@ describe("SessionStore", () => {
     expect(store.list()).toHaveLength(1);
   });
 
-  it("setAcpSessionId stores the ACP session id so later turns can resume", async () => {
-    const store = new SessionStore(db, { clock: makeClock() });
-    await store.getOrCreate("k", { agentKind: "x" });
-    const r = await store.setAcpSessionId("k", "acp_abc");
-    expect(r.acpSessionId).toBe("acp_abc");
-    expect(store.get("k")?.acpSessionId).toBe("acp_abc");
-  });
-
-  it("setAcpSessionId throws when the session does not exist (no silent create)", async () => {
-    const store = new SessionStore(db, { clock: makeClock() });
-    await expect(store.setAcpSessionId("missing", "acp_x")).rejects.toThrow(/not found/i);
-  });
-
   it("setQuiet round-trips boolean ↔ integer so quiet mode persists across queries", async () => {
     const store = new SessionStore(db, { clock: makeClock() });
     await store.getOrCreate("k");

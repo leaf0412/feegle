@@ -10,7 +10,6 @@
     "start:feishu": "npm run build && node dist/src/feishu/feishu-long-connection-entry.js"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.22.1",
     "@larksuiteoapi/node-sdk": "^1.64.0",
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.10.0",

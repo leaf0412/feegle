@@ -19,9 +19,7 @@ export function buildProviderAdapter(record: ProviderRecord): AgentCli {
 }
 
 /**
- * The user's chosen `kind` label IS the display name. A future improvement
- * could enrich this by reading `agentInfo.title` from the ACP `initialize`
- * response, but that requires spawning the agent — defer.
+ * The user's chosen `kind` label IS the display name.
  */
 export function defaultProviderDisplayName(kind: string): string {
   return kind;

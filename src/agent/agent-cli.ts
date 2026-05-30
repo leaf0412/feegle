@@ -20,18 +20,9 @@ export interface AgentProgressUpdate {
   tool?: string;
 }
 
-export interface AgentSessionContext {
-  /** Resume this ACP session if the agent advertises loadSession capability. */
-  acpSessionId?: string;
-  /** Called once when the adapter receives a freshly-created ACP session id
-   *  (newSession was used, not loadSession). The caller should persist it. */
-  onAssign?: (acpSessionId: string) => void | Promise<void>;
-}
-
 export interface AgentRunOptions {
   onProgress?: (update: AgentProgressUpdate) => void | Promise<void>;
   cwd?: string;
-  sessionContext?: AgentSessionContext;
 }
 
 export interface AgentChatMessage {

@@ -373,46 +373,6 @@ describe("FeishuChatHandler", () => {
     expect(JSON.stringify(client.cards.update.at(-1))).toContain("已下线");
   });
 
-  it("persists the ACP session id supplied by the adapter via onAssign and resumes on later turns", async () => {
-    const db = new Database(":memory:");
-    db.pragma("foreign_keys = ON");
-    migrate(db);
-    const sessionStore = new SessionStore(db);
-    const balancer = new AgentLoadBalancer();
-    const providers = new AgentProviderRegistry();
-    const observedAcpIds: Array<string | undefined> = [];
-    providers.register({
-      kind: "codex",
-      displayName: "Codex",
-      buildAgent: () =>
-        stubAgent({
-          chat: async (_messages, options) => {
-            observedAcpIds.push(options?.sessionContext?.acpSessionId);
-            // Simulate the adapter creating a fresh ACP session on the first turn.
-            if (options?.sessionContext?.onAssign) {
-              await options.sessionContext.onAssign("acp_session_42");
-            }
-            return "ok";
-          }
-        })
-    });
-    const handler = new FeishuChatHandler({
-      client: trackingClient(),
-      providers,
-      history: new ChatHistoryStore(),
-      sessionStore,
-      balancer,
-      workspaceDir: "/tmp/ws"
-    });
-
-    await handler.handle({ chatId: "oc_1", triggerMessageId: "m1", sessionKey: "sk_1", userText: "one" });
-    expect(sessionStore.get("sk_1")?.acpSessionId).toBe("acp_session_42");
-    expect(observedAcpIds).toEqual([undefined]);
-
-    await handler.handle({ chatId: "oc_1", triggerMessageId: "m2", sessionKey: "sk_1", userText: "two" });
-    expect(observedAcpIds).toEqual([undefined, "acp_session_42"]);
-  });
-
   it("releases the in-flight slot even when the turn throws so the agent is not stuck busy", async () => {
     const db = new Database(":memory:");
     db.pragma("foreign_keys = ON");

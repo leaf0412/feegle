@@ -4,8 +4,10 @@ import type { RuntimeDb } from "../app/runtime-db.js";
 
 /**
  * A SessionRecord captures the per-chat session state: which agent kind is
- * pinned, optional human label, optional ACP session id for resume, and the
- * usual created/last-active timestamps + active/closed status.
+ * pinned, optional human label, and the usual created/last-active timestamps +
+ * active/closed status. (`acpSessionId` / the `acp_session_id` column are a
+ * legacy orphan kept only so old sessions.json migrations don't lose data; no
+ * live code writes them anymore.)
  *
  * Storage: SQLite table `sessions`. The zod schema is kept exported so external
  * code that imported the type (e.g. for command handlers) keeps compiling; it
@@ -73,7 +75,6 @@ export class SessionStore {
   private readonly getStmt: Statement;
   private readonly insertStmt: Statement;
   private readonly assignAgentStmt: Statement;
-  private readonly setAcpStmt: Statement;
   private readonly touchStmt: Statement;
   private readonly renameStmt: Statement;
   private readonly setQuietStmt: Statement;
@@ -104,9 +105,6 @@ export class SessionStore {
     );
     this.assignAgentStmt = db.prepare(
       `update sessions set agent_kind = ?, last_active_at = ?, status = 'active' where session_key = ?`
-    );
-    this.setAcpStmt = db.prepare(
-      `update sessions set acp_session_id = ?, last_active_at = ?, status = 'active' where session_key = ?`
     );
     this.touchStmt = db.prepare(
       `update sessions set last_active_at = ?, status = 'active' where session_key = ?`
@@ -172,14 +170,6 @@ export class SessionStore {
       return this.getOrCreate(sessionKey, { agentKind });
     }
     this.assignAgentStmt.run(agentKind, this.clock().toISOString(), sessionKey);
-    return this.get(sessionKey)!;
-  }
-
-  async setAcpSessionId(sessionKey: string, acpSessionId: string): Promise<SessionRecord> {
-    const result = this.setAcpStmt.run(acpSessionId, this.clock().toISOString(), sessionKey);
-    if (result.changes === 0) {
-      throw new Error(`session not found: ${sessionKey}`);
-    }
     return this.get(sessionKey)!;
   }
 
