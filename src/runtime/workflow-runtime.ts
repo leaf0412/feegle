@@ -52,28 +52,32 @@ export class WorkflowRuntime {
     });
     this.appendEvent(input, eventId("attempt-started"), "attempt.started", {});
 
+    let currentInput: unknown = input.input;
+
     for (const step of definition.steps) {
-      const stateId = this.startStep(input, step, eventId);
-      const ctx = this.buildContext(input, stateId);
+      const stepInput: WorkflowRuntimeStartInput = { ...input, input: currentInput };
+      const stateId = this.startStep(stepInput, step, eventId);
+      const ctx = this.buildContext(stepInput, stateId);
       const result = await step.run(ctx);
 
       if (result.kind === "wait") {
-        this.waitStep(input, step, stateId, result.output, result.waitFor, eventId);
-        this.finish(input, "waiting", step.stepId, null, eventId);
+        this.waitStep(stepInput, step, stateId, result.output, result.waitFor, eventId);
+        this.finish(stepInput, "waiting", step.stepId, null, eventId);
         return { status: "waiting" };
       }
       if (result.kind === "fail") {
-        this.failStep(input, step, stateId, result.error, eventId);
-        this.finish(input, "failed", step.stepId, result.error, eventId);
+        this.failStep(stepInput, step, stateId, result.error, eventId);
+        this.finish(stepInput, "failed", step.stepId, result.error, eventId);
         return { status: "failed" };
       }
       if (result.kind === "complete") {
-        this.succeedStep(input, step, stateId, result.output, eventId);
-        this.finish(input, "succeeded", null, null, eventId);
+        this.succeedStep(stepInput, step, stateId, result.output, eventId);
+        this.finish(stepInput, "succeeded", null, null, eventId);
         return { status: "succeeded" };
       }
 
-      this.succeedStep(input, step, stateId, result.output, eventId);
+      this.succeedStep(stepInput, step, stateId, result.output, eventId);
+      currentInput = { ...(currentInput as Record<string, unknown> ?? {}), ...(result.output as Record<string, unknown> ?? {}) };
     }
 
     this.finish(input, "succeeded", null, null, eventId);

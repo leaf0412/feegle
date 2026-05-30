@@ -31,7 +31,7 @@ export function buildBootPhases(deps: BuildBootPhasesDeps): BootPhase[] {
       loadConfigStore: appDeps.loadConfigStore,
       onLockRelease: deps.onLockRelease
     }),
-    storesPhase({ feegleHome: appDeps.feegleHome, seedTasks: deps.seedTasks }),
+    storesPhase({ feegleHome: appDeps.feegleHome, seedTasks: deps.seedTasks, provisions: deps.contributions.provisions }),
     providersPhase({
       feishuClient: appDeps.feishuClient,
       quoteClientId: deps.quoteClientId,

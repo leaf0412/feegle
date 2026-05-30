@@ -34,9 +34,12 @@ import { TaskStore } from "../../scheduler/task-store.js";
 import type { Task } from "../../scheduler/task.js";
 import { StockStore } from "../../stock/stock-store.js";
 
+import type { PluginProvision } from "../feegle-plugin.js";
+
 export interface StoresPhaseDeps {
   feegleHome: string;
   seedTasks: Task[];
+  provisions: PluginProvision[];
 }
 
 export function storesPhase(deps: StoresPhaseDeps): BootPhase {
@@ -129,6 +132,11 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       // workspaces.json is a leftover from the removed named-workspace feature.
       // Nothing reads it. Delete it unconditionally — no migration target needed.
       deleteOrphanWorkspacesJson(deps.feegleHome);
+
+      // Run stores-phase provisions so plugins can wire into registries
+      for (const provision of deps.provisions.filter((p) => p.phase === "stores")) {
+        await provision.run(ctx);
+      }
     }
   };
 }
