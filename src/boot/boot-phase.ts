@@ -7,6 +7,7 @@ export type BootPhaseName =
   | "kinds"
   | "scheduler"
   | "commands"
+  | "runtime-contributions"
   | "runtime";
 
 export interface BootPhase {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { BootContext } from "../../src/boot/boot-context.js";
+import { runtimeContributionsPhase } from "../../src/boot/phases/runtime-contributions-phase.js";
 import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
 import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
 import { EffectHandlerRegistry } from "../../src/runtime/effect-handler-registry.js";
@@ -18,5 +20,41 @@ describe("RuntimeContributionContext", () => {
     expect(ctx.intentResolvers).toBeInstanceOf(IntentResolverRegistry);
     expect(ctx.workflowSelector).toBeInstanceOf(WorkflowSelector);
     expect(ctx.effectHandlers).toBeInstanceOf(EffectHandlerRegistry);
+  });
+
+  it("runs runtime contribution modules with runtime registries", async () => {
+    const boot = new BootContext();
+    boot.provide("workflowRegistry", new WorkflowRegistry());
+    boot.provide("intentResolvers", new IntentResolverRegistry());
+    boot.provide("workflowSelector", new WorkflowSelector());
+    boot.provide("effectHandlers", new EffectHandlerRegistry());
+
+    const phase = runtimeContributionsPhase({
+      contributions: {
+        handlerKinds: [],
+        slashCommands: [],
+        quoteClients: [],
+        notificationAdapters: [],
+        platformRuntimes: [],
+        provisions: [],
+        runtimeContributions: [
+          {
+            id: "test-runtime-contribution",
+            register: (ctx) => {
+              ctx.workflows.register({
+                definitionId: "test.registered",
+                version: 1,
+                concurrencyPolicy: "reject_if_running",
+                steps: [{ stepId: "done", run: () => ({ kind: "complete" }) }]
+              });
+            }
+          }
+        ]
+      }
+    });
+
+    await phase.run(boot);
+
+    expect(boot.require("workflowRegistry").require("test.registered").definitionId).toBe("test.registered");
   });
 });

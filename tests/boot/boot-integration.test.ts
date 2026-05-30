@@ -36,7 +36,7 @@ function baseDeps(home: string, overrides: Partial<FeegleAppDeps>): FeegleAppDep
 }
 
 describe("FeegleApp boot", () => {
-  it("runs all seven phases to ok and starts the platform runtime", async () => {
+  it("runs all boot phases to ok and starts the platform runtime", async () => {
     const home = await mkdtemp(join(tmpdir(), "feegle-boot-ok-"));
     try {
       let started = false;
@@ -61,6 +61,7 @@ describe("FeegleApp boot", () => {
         "kinds",
         "scheduler",
         "commands",
+        "runtime-contributions",
         "runtime"
       ]);
       expect(report?.phases.every((p) => p.status === "ok")).toBe(true);

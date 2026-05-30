@@ -7,6 +7,7 @@ import { providersPhase } from "./phases/providers-phase.js";
 import { kindsPhase } from "./phases/kinds-phase.js";
 import { schedulerPhase } from "./phases/scheduler-phase.js";
 import { commandsPhase } from "./phases/commands-phase.js";
+import { runtimeContributionsPhase } from "./phases/runtime-contributions-phase.js";
 import { runtimePhase } from "./phases/runtime-phase.js";
 import type { FeegleAppDeps, Startable } from "../app/feegle-app.js";
 import type { Task } from "../scheduler/task.js";
@@ -53,6 +54,7 @@ export function buildBootPhases(deps: BuildBootPhasesDeps): BootPhase[] {
       ownerEmails: appDeps.ownerEmails,
       contributions: deps.contributions
     }),
+    runtimeContributionsPhase({ contributions: deps.contributions }),
     runtimePhase({ contributions: deps.contributions, onRuntime: deps.onRuntime })
   ];
 }

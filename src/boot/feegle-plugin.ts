@@ -1,6 +1,7 @@
 import type { Startable } from "../app/feegle-app.js";
 import type { NotificationAdapterModule } from "../app/notification-adapter-module.js";
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
+import type { RuntimeContributionContext } from "../runtime/runtime-contribution-context.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
 import type { QuoteClientModule } from "../stock/quote-client-module.js";
 import type { BootContext, CapabilityContext } from "./boot-context.js";
@@ -21,7 +22,7 @@ export interface PluginProvision {
 /** First-class runtime contribution hook for future ingress/effect/workflow roles. */
 export interface RuntimeContributionModule {
   readonly id: string;
-  register(ctx: unknown): void | Promise<void>;
+  register(ctx: RuntimeContributionContext): void | Promise<void>;
 }
 
 /** A feature, grouping its contributions to extension points. */
