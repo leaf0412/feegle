@@ -57,9 +57,13 @@ export class WorkflowRuntime {
       });
 
       if (result.kind === "wait") {
+        this.waitStep(input, step, stateId, result.output, result.waitFor, eventId);
+        this.finish(input, "waiting", step.stepId, null, eventId);
         return { status: "waiting" };
       }
       if (result.kind === "fail") {
+        this.failStep(input, step, stateId, result.error, eventId);
+        this.finish(input, "failed", step.stepId, result.error, eventId);
         return { status: "failed" };
       }
       if (result.kind === "complete") {
@@ -107,6 +111,48 @@ export class WorkflowRuntime {
     });
     this.appendEvent(input, eventId(`step-succeeded-${step.stepId}`), "step.succeeded", {
       stepId: step.stepId
+    }, stateId);
+  }
+
+  private waitStep(
+    input: WorkflowRuntimeStartInput,
+    step: WorkflowStep,
+    stateId: string,
+    output: unknown,
+    waitCondition: Parameters<RuntimeStore["updateStepState"]>[0]["waitCondition"],
+    eventId: (suffix: string) => string
+  ): void {
+    this.store.updateStepState({
+      id: stateId,
+      status: "waiting",
+      output,
+      waitCondition,
+      error: null,
+      now: input.now
+    });
+    this.appendEvent(input, eventId(`step-waiting-${step.stepId}`), "step.waiting", {
+      stepId: step.stepId
+    }, stateId);
+  }
+
+  private failStep(
+    input: WorkflowRuntimeStartInput,
+    step: WorkflowStep,
+    stateId: string,
+    error: RuntimeError,
+    eventId: (suffix: string) => string
+  ): void {
+    this.store.updateStepState({
+      id: stateId,
+      status: "failed",
+      output: undefined,
+      waitCondition: null,
+      error,
+      now: input.now
+    });
+    this.appendEvent(input, eventId(`step-failed-${step.stepId}`), "step.failed", {
+      stepId: step.stepId,
+      errorCode: error.code
     }, stateId);
   }
 
