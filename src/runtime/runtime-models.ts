@@ -60,6 +60,17 @@ export type WaitCondition =
   | { kind: "external_callback"; callbackType: string }
   | { kind: "delay"; resumeAt: string };
 
+export interface WorkflowSignal {
+  signalId: string;
+  kind: "control_action" | "external_callback";
+  payload: {
+    action?: string;
+    callbackType?: string;
+    [key: string]: unknown;
+  };
+  actor?: { kind: "user"; userId: string } | { kind: "system" };
+}
+
 export type StepResult =
   | { kind: "continue"; output?: unknown; next?: string }
   | { kind: "wait"; reason: string; waitFor: WaitCondition; output?: unknown }

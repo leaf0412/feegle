@@ -159,11 +159,11 @@ export class RuntimeStore {
       .run(input.status, input.currentStepId, input.now, input.id);
   }
 
-  getWorkflowInstance(id: string): { id: string; status: string; currentStepId: string | null } | undefined {
+  getWorkflowInstance(id: string): { id: string; status: string; currentStepId: string | null; definitionId: string | null } | undefined {
     const row = this.db
-      .prepare("select id, status, current_step_id from workflow_instances where id = ?")
-      .get(id) as { id: string; status: string; current_step_id: string | null } | undefined;
-    return row ? { id: row.id, status: row.status, currentStepId: row.current_step_id } : undefined;
+      .prepare("select id, status, current_step_id, definition_id from workflow_instances where id = ?")
+      .get(id) as { id: string; status: string; current_step_id: string | null; definition_id: string | null } | undefined;
+    return row ? { id: row.id, status: row.status, currentStepId: row.current_step_id, definitionId: row.definition_id } : undefined;
   }
 
   createStepState(input: {
@@ -249,6 +249,48 @@ export class RuntimeStore {
         JSON.stringify(input.payload),
         input.now
       );
+  }
+
+  listWaitingStepStates(workflowInstanceId: string): Array<{
+    id: string;
+    workflowInstanceId: string;
+    runAttemptId: string;
+    stepId: string;
+    status: "waiting";
+    waitCondition: WaitCondition | null;
+    input: unknown;
+    output: unknown;
+  }> {
+    const rows = this.db
+      .prepare(
+        `select id, workflow_instance_id, run_attempt_id, step_id, status, wait_condition_json, input_json, output_json
+         from step_states
+         where workflow_instance_id = ? and status = 'waiting'
+         order by created_at asc`
+      )
+      .all(workflowInstanceId) as Array<{
+        id: string;
+        workflow_instance_id: string;
+        run_attempt_id: string;
+        step_id: string;
+        status: "waiting";
+        wait_condition_json: string | null;
+        input_json: string | null;
+        output_json: string | null;
+      }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      workflowInstanceId: row.workflow_instance_id,
+      runAttemptId: row.run_attempt_id,
+      stepId: row.step_id,
+      status: "waiting" as const,
+      waitCondition: row.wait_condition_json !== null
+        ? (JSON.parse(row.wait_condition_json) as WaitCondition)
+        : null,
+      input: decodeJson(row.input_json),
+      output: decodeJson(row.output_json)
+    }));
   }
 
   getStepState(id: string): StepStateView | undefined {
