@@ -217,6 +217,106 @@ export function migrate(db: RuntimeDb): void {
     create index if not exists conversation_bindings_v2_workspace_idx
       on conversation_bindings_v2(workspace_id);
   `);
+
+  db.exec(`
+    create table if not exists workflow_definitions (
+      id text primary key,
+      version integer not null,
+      concurrency_policy text not null,
+      created_at text not null,
+      updated_at text not null
+    );
+
+    create table if not exists workflow_instances (
+      id text primary key,
+      workspace_id text not null,
+      project_id text,
+      definition_id text not null,
+      definition_version integer not null,
+      status text not null,
+      current_step_id text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade,
+      foreign key (project_id) references projects(id) on delete set null
+    );
+    create index if not exists workflow_instances_workspace_idx on workflow_instances(workspace_id);
+
+    create table if not exists run_attempts (
+      id text primary key,
+      workflow_instance_id text not null,
+      status text not null,
+      trigger_event_id text,
+      lease_owner text,
+      lease_expires_at text,
+      attempt_count integer not null default 0,
+      next_run_at text,
+      locked_at text,
+      started_at text,
+      finished_at text,
+      error_json text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workflow_instance_id) references workflow_instances(id) on delete cascade
+    );
+    create index if not exists run_attempts_instance_status_idx
+      on run_attempts(workflow_instance_id, status);
+
+    create table if not exists step_states (
+      id text primary key,
+      workflow_instance_id text not null,
+      run_attempt_id text,
+      step_id text not null,
+      status text not null,
+      input_json text,
+      output_json text,
+      wait_condition_json text,
+      error_json text,
+      started_at text,
+      finished_at text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workflow_instance_id) references workflow_instances(id) on delete cascade,
+      foreign key (run_attempt_id) references run_attempts(id) on delete set null
+    );
+
+    create table if not exists effect_executions (
+      id text primary key,
+      run_attempt_id text not null,
+      step_state_id text,
+      plugin_id text not null,
+      effect_type text not null,
+      status text not null,
+      idempotency_key text,
+      input_summary_json text,
+      output_summary_json text,
+      error_json text,
+      started_at text,
+      finished_at text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (run_attempt_id) references run_attempts(id) on delete cascade,
+      foreign key (step_state_id) references step_states(id) on delete set null
+    );
+    create unique index if not exists effect_executions_idempotency_idx
+      on effect_executions(idempotency_key)
+      where idempotency_key is not null;
+
+    create table if not exists runtime_events (
+      id text primary key,
+      workspace_id text not null,
+      workflow_instance_id text,
+      run_attempt_id text,
+      step_state_id text,
+      effect_execution_id text,
+      category text not null,
+      type text not null,
+      payload_json text not null,
+      created_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+    create index if not exists runtime_events_instance_idx on runtime_events(workflow_instance_id, created_at);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
