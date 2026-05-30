@@ -358,6 +358,22 @@ export function migrate(db: RuntimeDb): void {
     create index if not exists memory_records_scope_idx
       on memory_records(workspace_id, project_id, scope, kind, status);
   `);
+
+  db.exec(`
+    create table if not exists control_actions (
+      id text primary key,
+      workspace_id text not null,
+      actor_user_id text,
+      action_type text not null,
+      status text not null,
+      payload_json text not null,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+    create index if not exists control_actions_workspace_status_idx
+      on control_actions(workspace_id, status, created_at);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
