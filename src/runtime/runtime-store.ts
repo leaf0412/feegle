@@ -371,6 +371,43 @@ export class RuntimeStore {
       );
   }
 
+  listEffectExecutions(runAttemptId: string): Array<{
+    id: string;
+    pluginId: string;
+    effectType: string;
+    status: EffectStatus;
+    idempotencyKey: string | null;
+    outputSummary: unknown;
+    error: RuntimeError | null;
+  }> {
+    const rows = this.db
+      .prepare(
+        `select id, plugin_id, effect_type, status, idempotency_key, output_summary_json, error_json
+         from effect_executions
+         where run_attempt_id = ?
+         order by created_at asc`
+      )
+      .all(runAttemptId) as Array<{
+        id: string;
+        plugin_id: string;
+        effect_type: string;
+        status: EffectStatus;
+        idempotency_key: string | null;
+        output_summary_json: string | null;
+        error_json: string | null;
+      }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      pluginId: row.plugin_id,
+      effectType: row.effect_type,
+      status: row.status,
+      idempotencyKey: row.idempotency_key,
+      outputSummary: decodeJson(row.output_summary_json),
+      error: row.error_json !== null ? (JSON.parse(row.error_json) as RuntimeError) : null
+    }));
+  }
+
   getEffectExecution(id: string): EffectExecutionView | undefined {
     const row = this.db
       .prepare("select id, status, output_summary_json from effect_executions where id = ?")

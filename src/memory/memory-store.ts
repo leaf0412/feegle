@@ -58,4 +58,22 @@ export class MemoryStore {
 
     return record;
   }
+
+  listActive(workspaceId: string): Array<{ id: string; kind: MemoryKind; scope: MemoryScope; content: string }> {
+    const rows = this.db
+      .prepare(
+        `select id, kind, scope, content
+         from memory_records
+         where workspace_id = ? and status = 'active'
+         order by created_at desc`
+      )
+      .all(workspaceId) as Array<{ id: string; kind: MemoryKind; scope: MemoryScope; content: string }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      scope: row.scope,
+      content: row.content
+    }));
+  }
 }

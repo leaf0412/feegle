@@ -30,4 +30,38 @@ export class ArtifactStore {
         record.updatedAt
       );
   }
+
+  listByRun(workspaceId: string, runAttemptId: string): Array<{ id: string; kind: string; filePath: string }> {
+    const rows = this.db
+      .prepare(
+        `select id, kind, file_path
+         from artifacts
+         where workspace_id = ? and run_attempt_id = ?
+         order by created_at asc`
+      )
+      .all(workspaceId, runAttemptId) as Array<{ id: string; kind: string; file_path: string }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      filePath: row.file_path
+    }));
+  }
+
+  listByWorkflow(workspaceId: string, workflowInstanceId: string): Array<{ id: string; kind: string; filePath: string }> {
+    const rows = this.db
+      .prepare(
+        `select id, kind, file_path
+         from artifacts
+         where workspace_id = ? and workflow_instance_id = ?
+         order by created_at asc`
+      )
+      .all(workspaceId, workflowInstanceId) as Array<{ id: string; kind: string; file_path: string }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      filePath: row.file_path
+    }));
+  }
 }
