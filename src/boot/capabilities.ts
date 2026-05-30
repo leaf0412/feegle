@@ -21,6 +21,7 @@ import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
 import type { InMemoryRepositoryRegistry } from "../repositories/repository-registry.js";
 import type { RepositoryStore } from "../repositories/repository-store.js";
 import type { EffectHandlerRegistry } from "../runtime/effect-handler-registry.js";
+import type { RuntimeEffectExecutor } from "../runtime/runtime-effect-executor.js";
 import type { RuntimeStore } from "../runtime/runtime-store.js";
 import type { WorkflowRegistry } from "../runtime/workflow-registry.js";
 import type { WorkflowRuntime } from "../runtime/workflow-runtime.js";
@@ -64,6 +65,7 @@ export interface Capabilities {
   intentResolvers: IntentResolverRegistry;
   workflowSelector: WorkflowSelector;
   effectHandlers: EffectHandlerRegistry;
+  effectExecutor: RuntimeEffectExecutor;
   artifactStore: ArtifactStore;
   artifactService: ArtifactService;
   memoryStore: MemoryStore;

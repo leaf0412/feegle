@@ -71,10 +71,18 @@ export interface WorkflowStep {
   run(ctx: WorkflowStepContext): Promise<StepResult> | StepResult;
 }
 
+export interface EffectInput {
+  pluginId: string;
+  effectType: string;
+  input: unknown;
+  idempotencyKey?: string;
+}
+
 export interface WorkflowStepContext {
   workflowInstanceId: string;
   runAttemptId: string;
   input: unknown;
+  executeEffect(effect: EffectInput): Promise<unknown>;
 }
 
 export interface WorkflowDefinition {

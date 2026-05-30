@@ -1,6 +1,7 @@
 import type { RuntimeStore } from "./runtime-store.js";
-import type { RuntimeError, WorkflowStep } from "./runtime-models.js";
+import type { EffectInput, RuntimeError, WorkflowStep, WorkflowStepContext } from "./runtime-models.js";
 import type { WorkflowRegistry } from "./workflow-registry.js";
+import type { RuntimeEffectExecutor } from "./runtime-effect-executor.js";
 
 interface WorkflowRuntimeStartInput {
   workflowInstanceId: string;
@@ -12,10 +13,13 @@ interface WorkflowRuntimeStartInput {
   now: string;
 }
 
+let effectCounter = 0;
+
 export class WorkflowRuntime {
   constructor(
     private readonly store: RuntimeStore,
-    private readonly registry: WorkflowRegistry
+    private readonly registry: WorkflowRegistry,
+    private readonly effectExecutor: RuntimeEffectExecutor
   ) {}
 
   async start(input: WorkflowRuntimeStartInput): Promise<{ status: "succeeded" | "failed" | "waiting" }> {
@@ -50,11 +54,8 @@ export class WorkflowRuntime {
 
     for (const step of definition.steps) {
       const stateId = this.startStep(input, step, eventId);
-      const result = await step.run({
-        workflowInstanceId: input.workflowInstanceId,
-        runAttemptId: input.runAttemptId,
-        input: input.input
-      });
+      const ctx = this.buildContext(input, stateId);
+      const result = await step.run(ctx);
 
       if (result.kind === "wait") {
         this.waitStep(input, step, stateId, result.output, result.waitFor, eventId);
@@ -77,6 +78,30 @@ export class WorkflowRuntime {
 
     this.finish(input, "succeeded", null, null, eventId);
     return { status: "succeeded" };
+  }
+
+  private buildContext(input: WorkflowRuntimeStartInput, stepStateId: string): WorkflowStepContext {
+    return {
+      workflowInstanceId: input.workflowInstanceId,
+      runAttemptId: input.runAttemptId,
+      input: input.input,
+      executeEffect: (effect: EffectInput) => {
+        effectCounter++;
+        const effectId = `${input.runAttemptId}:effect:${effectCounter}`;
+        return this.effectExecutor.execute({
+          effectId,
+          pluginId: effect.pluginId,
+          effectType: effect.effectType,
+          input: effect.input,
+          idempotencyKey: effect.idempotencyKey,
+          workspaceId: input.workspaceId,
+          workflowInstanceId: input.workflowInstanceId,
+          runAttemptId: input.runAttemptId,
+          stepStateId,
+          now: input.now
+        });
+      }
+    };
   }
 
   private startStep(input: WorkflowRuntimeStartInput, step: WorkflowStep, eventId: (suffix: string) => string): string {

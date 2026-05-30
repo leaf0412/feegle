@@ -18,6 +18,7 @@ import { AliasStore } from "../../platform/commands/alias-store.js";
 import { ChatBindingStore } from "../../repositories/chat-binding-store.js";
 import { RepositoryRecordSchema, RepositoryStore } from "../../repositories/repository-store.js";
 import { EffectHandlerRegistry } from "../../runtime/effect-handler-registry.js";
+import { RuntimeEffectExecutor } from "../../runtime/runtime-effect-executor.js";
 import { RuntimeStore } from "../../runtime/runtime-store.js";
 import { WorkflowRegistry } from "../../runtime/workflow-registry.js";
 import { WorkflowRuntime } from "../../runtime/workflow-runtime.js";
@@ -51,7 +52,9 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("intentResolvers", intentResolvers);
       ctx.provide("workflowSelector", workflowSelector);
       ctx.provide("effectHandlers", effectHandlers);
-      ctx.provide("workflowRuntime", new WorkflowRuntime(runtimeStore, workflowRegistry));
+      const effectExecutor = new RuntimeEffectExecutor(runtimeStore, effectHandlers);
+      ctx.provide("effectExecutor", effectExecutor);
+      ctx.provide("workflowRuntime", new WorkflowRuntime(runtimeStore, workflowRegistry, effectExecutor));
       ctx.provide("artifactStore", artifactStore);
       ctx.provide("artifactService", new ArtifactService(artifactStore, join(deps.feegleHome, "artifacts")));
       ctx.provide("memoryStore", new MemoryStore(runtimeDb));

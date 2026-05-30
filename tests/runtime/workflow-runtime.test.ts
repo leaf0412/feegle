@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
+import { EffectHandlerRegistry } from "../../src/runtime/effect-handler-registry.js";
+import { RuntimeEffectExecutor } from "../../src/runtime/runtime-effect-executor.js";
 import { RuntimeStore } from "../../src/runtime/runtime-store.js";
 import { WorkflowRegistry } from "../../src/runtime/workflow-registry.js";
 import { WorkflowRuntime } from "../../src/runtime/workflow-runtime.js";
@@ -34,7 +36,7 @@ describe("WorkflowRuntime", () => {
       steps: [{ stepId: "finish", run: () => ({ kind: "complete", output: { ok: true } }) }]
     });
 
-    const runtime = new WorkflowRuntime(new RuntimeStore(db), registry);
+    const runtime = new WorkflowRuntime(new RuntimeStore(db), registry, new RuntimeEffectExecutor(new RuntimeStore(db), new EffectHandlerRegistry()));
     const result = await runtime.start({
       workflowInstanceId: "wfi_1",
       runAttemptId: "run_1",
@@ -58,7 +60,7 @@ describe("WorkflowRuntime", () => {
     });
 
     const store = new RuntimeStore(db);
-    const runtime = new WorkflowRuntime(store, registry);
+    const runtime = new WorkflowRuntime(store, registry, new RuntimeEffectExecutor(store, new EffectHandlerRegistry()));
     const result = await runtime.start({
       workflowInstanceId: "wfi_2",
       runAttemptId: "run_2",
@@ -100,7 +102,7 @@ describe("WorkflowRuntime", () => {
       ]
     });
     const store = new RuntimeStore(db);
-    const runtime = new WorkflowRuntime(store, registry);
+    const runtime = new WorkflowRuntime(store, registry, new RuntimeEffectExecutor(store, new EffectHandlerRegistry()));
 
     const result = await runtime.start({
       workflowInstanceId: "wfi_wait",
@@ -142,7 +144,7 @@ describe("WorkflowRuntime", () => {
       ]
     });
     const store = new RuntimeStore(db);
-    const runtime = new WorkflowRuntime(store, registry);
+    const runtime = new WorkflowRuntime(store, registry, new RuntimeEffectExecutor(store, new EffectHandlerRegistry()));
 
     const result = await runtime.start({
       workflowInstanceId: "wfi_fail",

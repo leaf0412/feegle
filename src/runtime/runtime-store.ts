@@ -337,4 +337,15 @@ export class RuntimeStore {
       ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
       : undefined;
   }
+
+  getEffectExecutionByIdempotencyKey(key: string): EffectExecutionView | undefined {
+    const row = this.db
+      .prepare(
+        "select id, status, output_summary_json from effect_executions where idempotency_key = ?"
+      )
+      .get(key) as { id: string; status: EffectStatus; output_summary_json: string | null } | undefined;
+    return row
+      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
+      : undefined;
+  }
 }
