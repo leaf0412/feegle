@@ -317,6 +317,25 @@ export function migrate(db: RuntimeDb): void {
     );
     create index if not exists runtime_events_instance_idx on runtime_events(workflow_instance_id, created_at);
   `);
+
+  db.exec(`
+    create table if not exists artifacts (
+      id text primary key,
+      workspace_id text not null,
+      workflow_instance_id text,
+      run_attempt_id text,
+      kind text not null,
+      file_path text not null,
+      content_type text not null,
+      summary_json text not null,
+      retention_days integer not null,
+      pinned integer not null default 0,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+    create index if not exists artifacts_workspace_kind_idx on artifacts(workspace_id, kind);
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {
