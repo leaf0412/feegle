@@ -41,17 +41,10 @@ describe("runtime command module", () => {
       controlActionProcessor: {
         process: async () => ({ status: "completed" as const }),
       } as any,
-      workflowRuntime: {
-        resume: async () => ({ status: "resumed" }),
-      } as any,
       runtimeInspectionService: fakeInspectionService([
         { id: "wf_1", status: "waiting", currentStepId: "approve", definitionId: "demo.workflow" },
       ]) as any,
       controlActionStore: controlActionStore as any,
-      memoryService: {
-        approve: vi.fn(),
-        reject: vi.fn(),
-      } as any,
     }),
     defaults: false,
     modules: [runtimeCommandModule("ws_default")],
@@ -252,13 +245,53 @@ describe("runtime command module", () => {
   });
 
   describe("resume", () => {
-    it("registers handler", () => {
-      expect(registry.resolve("runtime_resume")).toBeDefined();
+    it("creates a control action and processes it", async () => {
+      const handler = registry.resolve("runtime_resume");
+      expect(handler).toBeDefined();
+      const reply = await handler!.execute(makeContext("runtime_resume", "/runtime resume wf_1", "wf_1"));
+      if (reply.kind !== "text") throw new Error("expected text");
+      expect(reply.text).toContain("已恢复");
+      expect(controlActionStore.create).toHaveBeenCalled();
+    });
+
+    it("shows usage when no id provided", async () => {
+      const handler = registry.resolve("runtime_resume");
+      const reply = await handler!.execute(makeContext("runtime_resume", "/runtime resume", ""));
+      if (reply.kind !== "text") throw new Error("expected text");
+      expect(reply.text).toContain("用法");
+    });
+
+    it("surfaces failure text when processor fails", async () => {
+      const store = fakeControlActionStore();
+      const failReg = buildSlashCommandRegistry({
+        ...stubSchedulerSlashDeps({
+          controlActionProcessor: {
+            process: async () => ({ status: "failed" as const, error: { message: "resume failed" } }),
+          } as any,
+          controlActionStore: store as any,
+        }),
+        defaults: false,
+        modules: [runtimeCommandModule("ws_default")],
+      });
+      const handler = failReg.resolve("runtime_resume");
+      const def = failReg.findById("runtime_resume")!;
+      const reply = await handler!.execute({
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_1",
+        sender: { platform: "feishu", userId: "ou_1" },
+        definition: def,
+        raw: "/runtime resume wf_1",
+        args: "wf_1",
+      });
+      if (reply.kind !== "text") throw new Error("expected text");
+      expect(reply.text).toContain("失败");
+      expect(reply.text).toContain("resume failed");
     });
   });
 
   describe("memory approve", () => {
-    it("approves a memory candidate", async () => {
+    it("creates a control action and approves a memory candidate", async () => {
       const handler = registry.resolve("runtime_memory_approve");
       expect(handler).toBeDefined();
       const reply = await handler!.execute(makeContext(
@@ -269,6 +302,7 @@ describe("runtime command module", () => {
       if (reply.kind !== "text") throw new Error("expected text");
       expect(reply.text).toContain("mem_1");
       expect(reply.text).toContain("已批准");
+      expect(controlActionStore.create).toHaveBeenCalled();
     });
 
     it("shows usage when no id provided", async () => {
@@ -281,10 +315,38 @@ describe("runtime command module", () => {
       if (reply.kind !== "text") throw new Error("expected text");
       expect(reply.text).toContain("用法");
     });
+
+    it("surfaces failure text when processor fails", async () => {
+      const store = fakeControlActionStore();
+      const failReg = buildSlashCommandRegistry({
+        ...stubSchedulerSlashDeps({
+          controlActionProcessor: {
+            process: async () => ({ status: "failed" as const, error: { message: "memory not found" } }),
+          } as any,
+          controlActionStore: store as any,
+        }),
+        defaults: false,
+        modules: [runtimeCommandModule("ws_default")],
+      });
+      const handler = failReg.resolve("runtime_memory_approve");
+      const def = failReg.findById("runtime_memory_approve")!;
+      const reply = await handler!.execute({
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_1",
+        sender: { platform: "feishu", userId: "ou_1" },
+        definition: def,
+        raw: "/runtime memory approve mem_1",
+        args: "mem_1",
+      });
+      if (reply.kind !== "text") throw new Error("expected text");
+      expect(reply.text).toContain("失败");
+      expect(reply.text).toContain("memory not found");
+    });
   });
 
   describe("memory reject", () => {
-    it("rejects a memory candidate", async () => {
+    it("creates a control action and rejects a memory candidate", async () => {
       const handler = registry.resolve("runtime_memory_reject");
       expect(handler).toBeDefined();
       const reply = await handler!.execute(makeContext(
@@ -295,6 +357,7 @@ describe("runtime command module", () => {
       if (reply.kind !== "text") throw new Error("expected text");
       expect(reply.text).toContain("mem_1");
       expect(reply.text).toContain("已拒绝");
+      expect(controlActionStore.create).toHaveBeenCalled();
     });
 
     it("shows usage when no id provided", async () => {
@@ -306,6 +369,34 @@ describe("runtime command module", () => {
       ));
       if (reply.kind !== "text") throw new Error("expected text");
       expect(reply.text).toContain("用法");
+    });
+
+    it("surfaces failure text when processor fails", async () => {
+      const store = fakeControlActionStore();
+      const failReg = buildSlashCommandRegistry({
+        ...stubSchedulerSlashDeps({
+          controlActionProcessor: {
+            process: async () => ({ status: "failed" as const, error: { message: "cannot reject" } }),
+          } as any,
+          controlActionStore: store as any,
+        }),
+        defaults: false,
+        modules: [runtimeCommandModule("ws_default")],
+      });
+      const handler = failReg.resolve("runtime_memory_reject");
+      const def = failReg.findById("runtime_memory_reject")!;
+      const reply = await handler!.execute({
+        source: "message",
+        chatId: "oc_1",
+        messageId: "om_1",
+        sender: { platform: "feishu", userId: "ou_1" },
+        definition: def,
+        raw: "/runtime memory reject mem_1",
+        args: "mem_1",
+      });
+      if (reply.kind !== "text") throw new Error("expected text");
+      expect(reply.text).toContain("失败");
+      expect(reply.text).toContain("cannot reject");
     });
   });
 

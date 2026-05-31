@@ -62,6 +62,10 @@ export interface ApproveRecoveryHandler {
   approveRecovery(payload: { recoveryId: string }): Promise<{ status: "completed" }>;
 }
 
+export interface RejectRecoveryHandler {
+  rejectRecovery(payload: { recoveryId: string }): Promise<{ status: "completed" }>;
+}
+
 export interface ControlActionHandlers {
   approveStep?: ApproveStepHandler;
   rejectStep?: RejectStepHandler;
@@ -78,6 +82,7 @@ export interface ControlActionHandlers {
   resumeSchedule?: ResumeScheduleHandler;
   revokeMemory?: RevokeMemoryHandler;
   approveRecovery?: ApproveRecoveryHandler;
+  rejectRecovery?: RejectRecoveryHandler;
 }
 
 export interface ControlEventSink {
@@ -220,6 +225,11 @@ export class ControlActionProcessor {
       case "approve_recovery": {
         if (!this.handlers.approveRecovery) throw new Error("approve_recovery handler not wired");
         await this.handlers.approveRecovery.approveRecovery(payload as { recoveryId: string });
+        return;
+      }
+      case "reject_recovery": {
+        if (!this.handlers.rejectRecovery) throw new Error("reject_recovery handler not wired");
+        await this.handlers.rejectRecovery.rejectRecovery(payload as { recoveryId: string });
         return;
       }
       default:

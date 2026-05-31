@@ -200,4 +200,57 @@ describe("ControlActionProcessor", () => {
       "delete_memory"
     ]);
   });
+
+  it("processes reject_recovery action to completion", async () => {
+    store.create({
+      id: "ctrl_reject_recovery",
+      workspaceId: "ws_1",
+      actorUserId: null,
+      actionType: "reject_recovery",
+      payload: { recoveryId: "rec_1" },
+      now: "2026-05-31T00:00:00.000Z"
+    });
+
+    let rejectedPayload: unknown;
+    const handlers: ControlActionHandlers = {
+      rejectRecovery: {
+        rejectRecovery: async (p) => {
+          rejectedPayload = p;
+          return { status: "completed" };
+        }
+      }
+    };
+
+    const processor = new ControlActionProcessor(store, handlers, createSink());
+    const result = await processor.process("ctrl_reject_recovery", "2026-05-31T00:01:00.000Z");
+
+    expect(result.status).toBe("completed");
+    expect(rejectedPayload).toEqual({ recoveryId: "rec_1" });
+
+    const action = store.getById("ctrl_reject_recovery");
+    expect(action?.status).toBe("completed");
+    expect(emitted.map((e) => e.type)).toContain("control_action.completed");
+  });
+
+  it("fails unknown action type explicitly", async () => {
+    store.create({
+      id: "ctrl_unknown",
+      workspaceId: "ws_1",
+      actorUserId: null,
+      actionType: "nonexistent_action_type",
+      payload: { foo: "bar" },
+      now: "2026-05-31T00:00:00.000Z"
+    });
+
+    const processor = new ControlActionProcessor(store, {}, createSink());
+    const result = await processor.process("ctrl_unknown", "2026-05-31T00:01:00.000Z");
+
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("CONTROL_ACTION_INVALID_PAYLOAD");
+    expect(result.error?.message).toContain("unknown action type");
+
+    const action = store.getById("ctrl_unknown");
+    expect(action?.status).toBe("failed");
+    expect(action?.errorMessage).toContain("unknown action type");
+  });
 });
