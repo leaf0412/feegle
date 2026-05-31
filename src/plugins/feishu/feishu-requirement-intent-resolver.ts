@@ -23,6 +23,7 @@ export function isRequirementMessage(text: string): boolean {
 export const feishuRequirementActionTypes = [
   "requirement_plan_approve",
   "requirement_plan_revise",
+  "requirement_plan_back",
   "requirement_verify",
   "requirement_accept",
   "requirement_cancel"

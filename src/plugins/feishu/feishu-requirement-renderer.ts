@@ -132,7 +132,8 @@ function buildPlanReviewLinkCard(
         "确认计划",
         "primary",
         "submit_requirement_plan_approve",
-        actionValue(requirementId, "act:/requirement plan approve", planVersion)
+        // carry doc_url forward so 确认→开发→回退 can re-link the cloud doc
+        { ...actionValue(requirementId, "act:/requirement plan approve", planVersion), doc_url: docUrl }
       ),
       formSubmitButton(
         "要求修改",
@@ -173,6 +174,8 @@ function readDevelopmentPhase(input: RequirementRenderInput): DevelopmentPhase {
 // (结束/取消) or "failed" (取消) when the synchronous run resolves.
 function buildDevelopmentCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
   const phase = readDevelopmentPhase(input);
+  const planVersion = typeof input.planVersion === "number" ? input.planVersion : 1;
+  const docUrl = typeof input.docUrl === "string" ? input.docUrl : undefined;
   const base = {
     schema: "2.0" as const,
     config: { wide_screen_mode: true as const, update_multi: true as const }
@@ -183,6 +186,12 @@ function buildDevelopmentCard(requirementId: string, input: RequirementRenderInp
     "submit_requirement_plan_cancel",
     actionValue(requirementId, "act:/requirement plan cancel")
   );
+  // 回退到计划: carries doc_url so the re-rendered plan-review card re-links the
+  // existing cloud doc instead of creating a new one.
+  const backButton = formSubmitButton("回退上一步", "default", "submit_requirement_plan_back", {
+    ...actionValue(requirementId, "act:/requirement plan back", planVersion),
+    ...(docUrl ? { doc_url: docUrl } : {})
+  });
 
   if (phase === "developing") {
     return {
@@ -202,7 +211,7 @@ function buildDevelopmentCard(requirementId: string, input: RequirementRenderInp
       body: {
         elements: [
           { tag: "markdown", content: [`**需求 ID**：${requirementId}`, "", `开发执行失败：${error}`].join("\n") },
-          { tag: "form", name: "requirement_dev_failed_actions", elements: [cancelButton] }
+          { tag: "form", name: "requirement_dev_failed_actions", elements: [backButton, cancelButton] }
         ]
       }
     };
@@ -223,9 +232,9 @@ function buildDevelopmentCard(requirementId: string, input: RequirementRenderInp
       elements: [
         {
           tag: "markdown",
-          content: [`**需求 ID**：${requirementId}`, `**状态**：${status}`, "", "开发已完成。点「结束」进入验证，或「取消」放弃本需求。"].join("\n")
+          content: [`**需求 ID**：${requirementId}`, `**状态**：${status}`, "", "开发已完成。点「结束」进入验证，「回退上一步」回到计划，或「取消」放弃本需求。"].join("\n")
         },
-        { tag: "form", name: "requirement_dev_actions", elements: [finishButton, cancelButton] }
+        { tag: "form", name: "requirement_dev_actions", elements: [finishButton, backButton, cancelButton] }
       ]
     }
   };
@@ -295,16 +304,25 @@ function registerPlanReviewEffect(
       const planVersion = typeof input.planVersion === "number" ? input.planVersion : 1;
       const markdown = String(input.markdown ?? "");
       const summary = typeof input.summary === "string" ? input.summary : undefined;
-      const docTitle = `需求计划 ${requirementId} v${planVersion}`;
+      const providedDocUrl = typeof input.docUrl === "string" && input.docUrl.length > 0 ? input.docUrl : undefined;
 
-      const { documentId } = await cloudDoc.createDoc({ title: docTitle });
-      await cloudDoc.writeMarkdown({ documentId, markdown });
-      const docUrl = cloudDoc.buildDocUrl(documentId);
+      // 回退 re-renders this card with the doc already published — reuse the
+      // carried docUrl instead of creating a duplicate cloud doc.
+      let documentId: string | undefined;
+      let docUrl: string;
+      if (providedDocUrl) {
+        docUrl = providedDocUrl;
+      } else {
+        const created = await cloudDoc.createDoc({ title: `需求计划 ${requirementId} v${planVersion}` });
+        documentId = created.documentId;
+        await cloudDoc.writeMarkdown({ documentId, markdown });
+        docUrl = cloudDoc.buildDocUrl(documentId);
+      }
 
       const card = buildPlanReviewLinkCard(requirementId, planVersion, summary, docUrl);
       const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
 
-      return { rendered: true, messageId, documentId, docUrl };
+      return { rendered: true, messageId, ...(documentId ? { documentId } : {}), docUrl };
     }
   });
 }

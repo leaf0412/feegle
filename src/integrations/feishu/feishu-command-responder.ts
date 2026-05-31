@@ -112,6 +112,7 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "workbench_plan_revise_execution_submit":
       case "requirement_plan_approve":
       case "requirement_plan_revise":
+      case "requirement_plan_back":
       case "requirement_cancel":
       case "requirement_verify":
       case "requirement_accept":

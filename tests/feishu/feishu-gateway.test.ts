@@ -327,6 +327,44 @@ describe("parseFeishuCommand", () => {
     ).toEqual({ type: "requirement_plan_approve", requirementId: "reqwf_1", planVersion: 1 });
   });
 
+  it("carries doc_url on approve so 回退 can re-link the cloud doc", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan approve",
+        requirement_id: "reqwf_1",
+        plan_version: "1",
+        doc_url: "https://feishu.cn/docx/doc_1"
+      })
+    ).toEqual({
+      type: "requirement_plan_approve",
+      requirementId: "reqwf_1",
+      planVersion: 1,
+      docUrl: "https://feishu.cn/docx/doc_1"
+    });
+  });
+
+  it("parses requirement plan back (回退到计划) with doc_url", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan back",
+        requirement_id: "reqwf_1",
+        plan_version: "2",
+        doc_url: "https://feishu.cn/docx/doc_1"
+      })
+    ).toEqual({
+      type: "requirement_plan_back",
+      requirementId: "reqwf_1",
+      planVersion: 2,
+      docUrl: "https://feishu.cn/docx/doc_1"
+    });
+  });
+
+  it("treats requirement plan back with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({ action: "act:/requirement plan back", plan_version: "1" })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
   it("treats requirement plan approve with missing requirement_id as unknown", () => {
     expect(
       parseFeishuCardActionValue({

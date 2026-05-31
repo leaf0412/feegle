@@ -187,6 +187,54 @@ describe("Feishu requirement render effects", () => {
     expect(cardJson).not.toContain("act:/requirement execute");
   });
 
+  it("development card (completed) offers 回退上一步 carrying doc_url for re-linking", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: {
+        chatId: "oc_1",
+        requirementId: "reqwf_1",
+        cardMessageId: "om_card",
+        phase: "completed",
+        planVersion: 2,
+        docUrl: "https://feishu.cn/docx/doc_1",
+        result: { status: "implementation_ready" }
+      }
+    });
+
+    const [, card] = (client.updateInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("回退上一步");
+    expect(cardJson).toContain("act:/requirement plan back");
+    expect(cardJson).toContain('"doc_url":"https://feishu.cn/docx/doc_1"');
+  });
+
+  it("plan_review reuses a provided docUrl (回退 re-render) instead of creating a new cloud doc", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    const out = await handlers["feishu:requirement.plan_review.render"].execute({
+      input: {
+        chatId: "oc_1",
+        requirementId: "reqwf_1",
+        cardMessageId: "om_card",
+        planVersion: 2,
+        summary: "S",
+        markdown: "# Plan",
+        docUrl: "https://feishu.cn/docx/doc_1"
+      }
+    });
+
+    expect(cloudDoc.createDoc).not.toHaveBeenCalled();
+    expect(cloudDoc.writeMarkdown).not.toHaveBeenCalled();
+    expect(client.updateInteractiveCard).toHaveBeenCalledWith("om_card", expect.anything());
+    expect(out).toEqual({ rendered: true, messageId: "om_card", docUrl: "https://feishu.cn/docx/doc_1" });
+  });
+
   it("development card (failed phase) shows the error and only a 取消 button", async () => {
     const { handlers, registry } = makeRegistry();
     const client = makeClient();

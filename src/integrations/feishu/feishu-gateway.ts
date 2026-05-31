@@ -38,8 +38,9 @@ export type FeishuCommand =
       version: number;
       note: string;
     }
-  | { type: "requirement_plan_approve"; requirementId: string; planVersion: number }
+  | { type: "requirement_plan_approve"; requirementId: string; planVersion: number; docUrl?: string }
   | { type: "requirement_plan_revise"; requirementId: string; planVersion: number; feedback: string }
+  | { type: "requirement_plan_back"; requirementId: string; planVersion: number; docUrl?: string }
   | { type: "requirement_cancel"; requirementId: string }
   | { type: "requirement_verify"; requirementId: string }
   | { type: "requirement_accept"; requirementId: string }
@@ -133,7 +134,19 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
     if (typeof requirementId !== "string" || requirementId === "" || planVersion === undefined) {
       return { type: "unknown", raw: stringifyUnknown(value) };
     }
-    return { type: "requirement_plan_approve", requirementId, planVersion };
+    // doc_url rides on the card so 回退 can re-link the cloud doc without persisting it
+    const docUrl = typeof value.doc_url === "string" && value.doc_url !== "" ? value.doc_url : undefined;
+    return { type: "requirement_plan_approve", requirementId, planVersion, ...(docUrl ? { docUrl } : {}) };
+  }
+
+  if (value.action === "act:/requirement plan back") {
+    const requirementId = value.requirement_id;
+    const planVersion = parsePositiveInteger(value.plan_version);
+    if (typeof requirementId !== "string" || requirementId === "" || planVersion === undefined) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    const docUrl = typeof value.doc_url === "string" && value.doc_url !== "" ? value.doc_url : undefined;
+    return { type: "requirement_plan_back", requirementId, planVersion, ...(docUrl ? { docUrl } : {}) };
   }
 
   if (value.action === "act:/requirement plan cancel") {

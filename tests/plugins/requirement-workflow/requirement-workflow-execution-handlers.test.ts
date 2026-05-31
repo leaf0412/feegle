@@ -137,16 +137,42 @@ describe("requirement-workflow execution/verification/acceptance handlers — ha
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("registers all 7 business effect handlers when getDeps is provided", () => {
+  it("registers all 8 business effect handlers when getDeps is provided", () => {
     const { effectHandlers } = buildTestContext(db);
 
     expect(effectHandlers.has("requirement-workflow", "plan.generate")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "plan.revise")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "execution.approve")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "execution.cancel")).toBe(true);
+    expect(effectHandlers.has("requirement-workflow", "execution.revert_to_plan")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "execution.run")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "verification.run")).toBe(true);
     expect(effectHandlers.has("requirement-workflow", "acceptance.run")).toBe(true);
+  });
+
+  it("execution.revert_to_plan sends a developed requirement back to plan_reviewing and returns the latest plan", async () => {
+    const { workflowStore, executionStore, effectHandlers } = buildTestContext(db);
+
+    const requirementId = await reachPlanApproved(effectHandlers, workflowStore, executionStore);
+    // develop it so the revert starts from a post-approve state, like the dev card 回退
+    await effectHandlers.execute({
+      effectId: "e-exec",
+      pluginId: "requirement-workflow",
+      effectType: "execution.run",
+      input: { requirementId, requesterUserId: "user_1" }
+    });
+    expect(workflowStore.get(requirementId)?.status).toBe("implementation_ready");
+
+    const reverted = await effectHandlers.execute({
+      effectId: "e-back",
+      pluginId: "requirement-workflow",
+      effectType: "execution.revert_to_plan",
+      input: { requirementId }
+    }) as { requirementId: string; planVersion: number; summary: string; markdown: string };
+
+    expect(workflowStore.get(requirementId)?.status).toBe("plan_reviewing");
+    expect(reverted).toMatchObject({ requirementId, planVersion: 1, summary: "Plan summary" });
+    expect(reverted.markdown).toContain("# Plan");
   });
 
   it("execution.run transitions plan_approved→executing→implementation_ready and drives executionStore", async () => {

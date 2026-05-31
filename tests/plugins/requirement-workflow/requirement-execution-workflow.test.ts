@@ -113,3 +113,45 @@ describe("requirement.plan.approve.workflow step (approve → develop on one car
     expect(executed).toEqual(["execution.approve", "execution.run"]);
   });
 });
+
+describe("requirement.plan.back.workflow step (回退到计划)", () => {
+  it("routes the back intent and reverts to plan, re-rendering plan_review with the carried docUrl", async () => {
+    const selector = new WorkflowSelector();
+    const workflows = new WorkflowRegistry();
+    requirementWorkflowRuntimeContribution().register(new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: selector,
+      effectHandlers: new EffectHandlerRegistry()
+    }));
+
+    expect(selector.select({
+      intentId: "intent_back",
+      kind: "requirement_plan_back",
+      workspaceId: "workspace-default",
+      projectId: null,
+      actor: { kind: "user", userId: "user_1" },
+      payload: { requirementId: "reqwf_1" }
+    }).definitionId).toBe("requirement.plan.back.workflow");
+
+    const reverted = { requirementId: "reqwf_1", planVersion: 2, summary: "S", markdown: "# Plan" };
+    const executed: Array<{ pluginId: string; effectType: string; input: Record<string, unknown> }> = [];
+    const stepCtx = {
+      input: { requirementId: "reqwf_1", planVersion: 2, sourcePlugin: "feishu", chatId: "oc_1", cardMessageId: "om_card", docUrl: "https://feishu.cn/docx/doc_1" },
+      executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
+        executed.push({ pluginId: e.pluginId, effectType: e.effectType, input: e.input as Record<string, unknown> });
+        if (e.effectType === "execution.revert_to_plan") return reverted;
+        return {};
+      }
+    };
+
+    await workflows.require("requirement.plan.back.workflow").steps[0].run(stepCtx as never);
+
+    expect(executed.map((e) => e.effectType)).toEqual(["execution.revert_to_plan", "requirement.plan_review.render"]);
+    // the re-render carries docUrl so the renderer reuses the existing cloud doc
+    expect(executed[1]).toMatchObject({
+      pluginId: "feishu",
+      input: { docUrl: "https://feishu.cn/docx/doc_1", summary: "S", planVersion: 2 }
+    });
+  });
+});

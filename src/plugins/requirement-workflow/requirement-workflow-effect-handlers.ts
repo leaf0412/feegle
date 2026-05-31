@@ -186,6 +186,41 @@ export function buildExecutionCancelHandler(deps: RequirementWorkflowHandlerDeps
   };
 }
 
+// 回退到计划: send the requirement back to plan_reviewing from wherever it is
+// (post-approve / post-development / failed) and return the latest plan so the
+// card can be re-rendered as the plan-review card.
+export function buildRevertToPlanHandler(deps: RequirementWorkflowHandlerDeps): EffectHandler {
+  return {
+    pluginId: "requirement-workflow",
+    effectType: "execution.revert_to_plan",
+    execute(effect) {
+      const input = effect.input as { requirementId: string };
+
+      const current = deps.workflowStore.get(input.requirementId);
+      if (!current) {
+        throw new Error(`Requirement workflow not found: ${input.requirementId}`);
+      }
+      const plan = deps.planStore.latest(input.requirementId);
+      if (!plan) {
+        throw new Error(`No plan to revert to for requirement: ${input.requirementId}`);
+      }
+
+      deps.workflowStore.setStatus({
+        requirementId: input.requirementId,
+        expected: current.status,
+        next: "plan_reviewing"
+      });
+
+      return {
+        requirementId: input.requirementId,
+        planVersion: plan.version,
+        summary: plan.summary,
+        markdown: plan.markdown
+      };
+    }
+  };
+}
+
 export function buildExecutionRunHandler(deps: RequirementWorkflowHandlerDeps): EffectHandler {
   return {
     pluginId: "requirement-workflow",

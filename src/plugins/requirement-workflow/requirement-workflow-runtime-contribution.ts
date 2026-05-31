@@ -5,6 +5,7 @@ import {
   buildPlanReviseHandler,
   buildExecutionApproveHandler,
   buildExecutionCancelHandler,
+  buildRevertToPlanHandler,
   buildExecutionRunHandler,
   buildVerificationRunHandler,
   buildAcceptanceRunHandler
@@ -176,9 +177,16 @@ export function requirementWorkflowRuntimeContribution(
         definitionId: "requirement.cancel.workflow"
       });
 
+      ctx.workflowSelector.register({
+        id: "requirement-plan-back",
+        matches: (intent) => intent.kind === "requirement_plan_back",
+        definitionId: "requirement.plan.back.workflow"
+      });
+
       ctx.workflows.register(buildVerifyWorkflow());
       ctx.workflows.register(buildAcceptWorkflow());
       ctx.workflows.register(buildCancelWorkflow());
+      ctx.workflows.register(buildBackWorkflow());
 
       if (getDeps) {
         const deps = getDeps();
@@ -186,6 +194,7 @@ export function requirementWorkflowRuntimeContribution(
         ctx.effectHandlers.register(buildPlanReviseHandler(deps));
         ctx.effectHandlers.register(buildExecutionApproveHandler(deps));
         ctx.effectHandlers.register(buildExecutionCancelHandler(deps));
+        ctx.effectHandlers.register(buildRevertToPlanHandler(deps));
         ctx.effectHandlers.register(buildExecutionRunHandler(deps));
         ctx.effectHandlers.register(buildVerificationRunHandler(deps));
         ctx.effectHandlers.register(buildAcceptanceRunHandler(deps));
@@ -210,6 +219,37 @@ function buildCancelWorkflow() {
             input
           });
           return { kind: "complete" as const, output };
+        }
+      }
+    ]
+  };
+}
+
+function buildBackWorkflow() {
+  return {
+    definitionId: "requirement.plan.back.workflow",
+    version: 1,
+    concurrencyPolicy: "reject_if_running" as const,
+    steps: [
+      {
+        stepId: "revert_to_plan",
+        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
+          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; docUrl?: string; [key: string]: unknown };
+          const reverted = await stepCtx.executeEffect({
+            pluginId: "requirement-workflow",
+            effectType: "execution.revert_to_plan",
+            input
+          });
+          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+            // re-render the plan-review card in place; docUrl rides the action so
+            // the cloud doc is re-linked without creating a new one.
+            await stepCtx.executeEffect({
+              pluginId: input.sourcePlugin,
+              effectType: "requirement.plan_review.render",
+              input: { ...input, ...(reverted as Record<string, unknown>), docUrl: input.docUrl }
+            });
+          }
+          return { kind: "complete" as const, output: reverted };
         }
       }
     ]
