@@ -1,4 +1,4 @@
-import type { Intent } from "@core/ingress/intent.js";
+import type { Intent, IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
 
@@ -18,6 +18,56 @@ export function isRequirementMessage(text: string): boolean {
     }
   }
   return false;
+}
+
+export const feishuRequirementActionTypes = [
+  "requirement_plan_approve",
+  "requirement_plan_revise",
+  "requirement_execute",
+  "requirement_verify",
+  "requirement_accept",
+  "requirement_cancel"
+] as const;
+
+export type FeishuRequirementActionType = (typeof feishuRequirementActionTypes)[number];
+
+export function isFeishuRequirementActionType(value: unknown): value is FeishuRequirementActionType {
+  return typeof value === "string" && (feishuRequirementActionTypes as readonly string[]).includes(value);
+}
+
+export interface ResolveFeishuRequirementCardActionIntentInput {
+  triggerEventId: string;
+  resolvedWorkspaceId: string;
+  resolvedProjectId: string | null;
+  resolvedUserId: string;
+  sourcePlugin: string;
+  actionType: string;
+  actionPayload: Record<string, unknown>;
+  chatId: string;
+  messageId: string;
+  conversationKey?: string;
+}
+
+export function resolveFeishuRequirementCardActionIntent(
+  input: ResolveFeishuRequirementCardActionIntentInput
+): Intent | undefined {
+  if (!isFeishuRequirementActionType(input.actionType)) {
+    return undefined;
+  }
+  return {
+    intentId: `intent:${input.triggerEventId}`,
+    kind: input.actionType as IntentKind,
+    workspaceId: input.resolvedWorkspaceId,
+    projectId: input.resolvedProjectId,
+    actor: { kind: "user", userId: input.resolvedUserId },
+    payload: {
+      sourcePlugin: input.sourcePlugin,
+      ...input.actionPayload,
+      chatId: input.chatId,
+      messageId: input.messageId,
+      conversationKey: input.conversationKey ?? `feishu:${input.chatId}`
+    }
+  };
 }
 
 export interface ResolveFeishuRequirementIntentInput {
@@ -124,6 +174,61 @@ export function registerFeishuRequirementIntentResolvers(registry: IntentResolve
         text: raw,
         requirementId
       });
+    }
+  });
+
+  registry.register({
+    id: "feishu-requirement-card-action",
+    canResolve(event: TriggerEvent): boolean {
+      return (
+        event.source.pluginId === "feishu" &&
+        event.source.triggerType === "card_action" &&
+        isFeishuRequirementActionType(event.external.actionType)
+      );
+    },
+    resolve(event: TriggerEvent): Intent {
+      const resolvedWorkspaceId = event.external.resolvedWorkspaceId;
+      if (typeof resolvedWorkspaceId !== "string" || resolvedWorkspaceId.length === 0) {
+        throw new Error("resolved workspaceId missing from trigger event");
+      }
+      const resolvedProjectId = typeof event.external.resolvedProjectId === "string"
+        ? event.external.resolvedProjectId
+        : null;
+      const resolvedUserId = event.external.resolvedUserId;
+      if (typeof resolvedUserId !== "string" || resolvedUserId.length === 0) {
+        throw new Error("resolved userId missing from trigger event");
+      }
+      const chatId = event.external.chatId;
+      if (typeof chatId !== "string" || chatId.length === 0) {
+        throw new Error("chatId missing from trigger event");
+      }
+      const messageId = event.external.messageId;
+      if (typeof messageId !== "string" || messageId.length === 0) {
+        throw new Error("messageId missing from trigger event");
+      }
+      const actionPayload = (event.external.actionPayload as Record<string, unknown>) ?? {};
+      const conversationKey = typeof event.conversationHint?.conversationKey === "string"
+        ? event.conversationHint.conversationKey
+        : undefined;
+
+      const intent = resolveFeishuRequirementCardActionIntent({
+        triggerEventId: event.triggerEventId,
+        resolvedWorkspaceId,
+        resolvedProjectId,
+        resolvedUserId,
+        sourcePlugin: "feishu",
+        actionType: event.external.actionType as string,
+        actionPayload,
+        chatId,
+        messageId,
+        conversationKey
+      });
+
+      if (!intent) {
+        throw new Error(`Unhandled feishu requirement card action: ${String(event.external.actionType)}`);
+      }
+
+      return intent;
     }
   });
 }

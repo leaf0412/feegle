@@ -11,7 +11,8 @@ export const intentKinds = [
   "requirement_execute",
   "requirement_verify",
   "requirement_accept",
-  "requirement_intake"
+  "requirement_intake",
+  "requirement_cancel"
 ] as const;
 
 export type IntentKind = (typeof intentKinds)[number];
