@@ -89,11 +89,27 @@ export interface EffectInput {
   idempotencyKey?: string;
 }
 
+export interface ActiveMemorySummary {
+  id: string;
+  kind: string;
+  scope: string;
+  content: string;
+}
+
+export interface MemorySearchParams {
+  scope?: string;
+  kind?: string;
+  query?: string;
+}
+
 export interface WorkflowStepContext {
   workflowInstanceId: string;
   runAttemptId: string;
   input: unknown;
   executeEffect(effect: EffectInput): Promise<unknown>;
+  memory?: {
+    searchActive(params: MemorySearchParams): ActiveMemorySummary[];
+  };
 }
 
 export interface WorkflowDefinition {

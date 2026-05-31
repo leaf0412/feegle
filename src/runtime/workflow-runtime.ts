@@ -1,5 +1,5 @@
 import type { RuntimeStore } from "./runtime-store.js";
-import type { EffectInput, RuntimeError, WorkflowSignal, WorkflowStep, WorkflowStepContext } from "./runtime-models.js";
+import type { EffectInput, MemorySearchParams, RuntimeError, WorkflowSignal, WorkflowStep, WorkflowStepContext } from "./runtime-models.js";
 import type { WorkflowRegistry } from "./workflow-registry.js";
 import type { RuntimeEffectExecutor } from "./runtime-effect-executor.js";
 
@@ -16,11 +16,16 @@ interface WorkflowRuntimeStartInput {
 let effectCounter = 0;
 
 export class WorkflowRuntime {
+  private readonly memoryService?: { searchActive(params: { scope?: string; kind?: string; query?: string }): Array<{ id: string; kind: string; scope: string; content: string }> };
+
   constructor(
     private readonly store: RuntimeStore,
     private readonly registry: WorkflowRegistry,
-    private readonly effectExecutor: RuntimeEffectExecutor
-  ) {}
+    private readonly effectExecutor: RuntimeEffectExecutor,
+    memoryService?: { searchActive(params: { scope?: string; kind?: string; query?: string }): Array<{ id: string; kind: string; scope: string; content: string }> }
+  ) {
+    this.memoryService = memoryService;
+  }
 
   async start(input: WorkflowRuntimeStartInput): Promise<{ status: "succeeded" | "failed" | "waiting" }> {
     const definition = this.registry.require(input.definitionId);
@@ -104,7 +109,13 @@ export class WorkflowRuntime {
           stepStateId,
           now: input.now
         });
-      }
+      },
+      memory: this.memoryService
+        ? {
+            searchActive: (params: MemorySearchParams) =>
+              this.memoryService!.searchActive(params)
+          }
+        : undefined
     };
   }
 
@@ -380,7 +391,13 @@ export class WorkflowRuntime {
           stepStateId,
           now: input.now
         });
-      }
+      },
+      memory: this.memoryService
+        ? {
+            searchActive: (params: MemorySearchParams) =>
+              this.memoryService!.searchActive(params)
+          }
+        : undefined
     };
   }
 
