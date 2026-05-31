@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRuntimeClosedLoopHarness } from "./runtime-closed-loop-harness.js";
-import { feishuMessageEnvelopeToTriggerEvent } from "@integrations/feishu/feishu-trigger-event-adapter.js";
+import { feishuMessageEnvelopeToTriggerEvent, feishuCardActionToTriggerEvent } from "@integrations/feishu/feishu-trigger-event-adapter.js";
 import { gitlabEventToTriggerEvent } from "@integrations/gitlab/gitlab-trigger-event-adapter.js";
 import { webhookPayloadToTriggerEvent } from "@integrations/webhook/webhook-trigger-event-adapter.js";
 import { taskToTriggerEvent } from "@features/scheduler/scheduler-trigger-event.js";
@@ -783,6 +783,360 @@ describe("runtime closed-loop e2e", () => {
       await harness.inspectionService.inspect("ws_e2e");
       const after = harness.runtimeStore.listWorkflowSummaries("ws_e2e").length;
       expect(before).toBe(after);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("workbench plan approve: card action trigger -> workflow waits -> control action resumes -> complete", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      // Register feishu card action effect handler for card.update
+      harness.effectHandlerRegistry.register({
+        pluginId: "workbench",
+        effectType: "card.update",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { updated: true };
+        }
+      });
+
+      // Register feishu card action effect handler for plan.validate_approve
+      harness.effectHandlerRegistry.register({
+        pluginId: "workbench",
+        effectType: "plan.validate_approve",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { valid: true, needsBaseBranch: true, planId: (effect.input as Record<string, unknown>).planId };
+        }
+      });
+
+      // Register feishu card action effect handler for plan.execute (after resume)
+      harness.effectHandlerRegistry.register({
+        pluginId: "workbench",
+        effectType: "plan.execute",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { executed: true };
+        }
+      });
+
+      // Intent resolver for feishu card actions
+      harness.intentResolvers.register({
+        id: "workbench-card-approve",
+        canResolve(event) {
+          return event.source.pluginId === "feishu" &&
+            event.source.triggerType === "card_action" &&
+            event.external.actionType === "workbench_plan_approve";
+        },
+        resolve(event) {
+          const actionPayload = (event.external.actionPayload as Record<string, unknown>) ?? {};
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "workflow_signal" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "user" as const, userId: "user_e2e" },
+            payload: {
+              actionType: event.external.actionType,
+              ...actionPayload,
+              chatId: event.external.chatId,
+              messageId: event.external.messageId
+            }
+          };
+        }
+      });
+
+      // Workflow selector for plan approve
+      harness.workflowSelector.register({
+        id: "workbench-approve-rule",
+        matches(intent) {
+          return intent.kind === "workflow_signal" &&
+            typeof intent.payload === "object" && intent.payload !== null &&
+            (intent.payload as Record<string, unknown>).actionType === "workbench_plan_approve";
+        },
+        definitionId: "workbench.plan.approve"
+      });
+
+      // Register the plan approve workflow (mirrors workbench-runtime-contribution.ts)
+      harness.workflowRegistry.register({
+        definitionId: "workbench.plan.approve",
+        version: 1,
+        concurrencyPolicy: "reject_if_running",
+        steps: [
+          {
+            stepId: "validate_and_request_base",
+            async run(stepCtx) {
+              const payload = stepCtx.input as { planId?: string };
+              const result = await stepCtx.executeEffect({
+                pluginId: "workbench",
+                effectType: "plan.validate_approve",
+                input: { planId: payload.planId }
+              });
+              const needsBaseBranch = (result as Record<string, unknown>)?.needsBaseBranch === true;
+              if (needsBaseBranch) {
+                return {
+                  kind: "wait" as const,
+                  reason: "needs base branch",
+                  waitFor: { kind: "control_action" as const, action: "base_branch_submit" },
+                  output: { planId: payload.planId }
+                };
+              }
+              return { kind: "continue" as const, output: { approved: true } };
+            }
+          },
+          {
+            stepId: "execute_or_complete",
+            async run(stepCtx) {
+              const input = stepCtx.input as { previousOutput?: { planId?: string }; signal?: Record<string, unknown> };
+              const planId = input.previousOutput?.planId ?? (input.signal?._planId as string | undefined);
+              await stepCtx.executeEffect({
+                pluginId: "workbench",
+                effectType: "plan.execute",
+                input: { planId }
+              });
+              await stepCtx.executeEffect({
+                pluginId: "workbench",
+                effectType: "card.update",
+                input: { planId, status: "executing" }
+              });
+              return { kind: "complete" as const, output: { approved: true } };
+            }
+          }
+        ]
+      });
+
+      // Create trigger event for plan approve card action
+      const trigger = feishuCardActionToTriggerEvent({
+        triggerEventId: "trg_approve_1",
+        receivedAt: "2026-05-31T00:00:00.000Z",
+        chatId: "oc_e2e",
+        messageId: "om_approve_1",
+        senderUserId: "ou_e2e",
+        actionType: "workbench_plan_approve",
+        actionPayload: { planId: "plan_approve_test", version: 1 }
+      });
+
+      // Dispatch → workflow should enter waiting
+      const result1 = await harness.dispatcher.dispatch(trigger);
+      expect(result1.status).toBe("waiting");
+
+      const wfiId = `wfi_e2e_${harness.wfiCounter}`;
+
+      // Verify the workflow is waiting for base branch
+      const waitingSteps = harness.runtimeStore.listWaitingStepStates(wfiId);
+      expect(waitingSteps).toHaveLength(1);
+      expect(waitingSteps[0].waitCondition).toEqual({ kind: "control_action", action: "base_branch_submit" });
+
+      // Verify validate effect was called
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "workbench", effectType: "plan.validate_approve" })
+      );
+
+      // Wire resume handler to the harness control handlers
+      harness.controlHandlers.resumeWorkflow = {
+        async resumeWorkflow(payload) {
+          await harness.workflowRuntime.resume({
+            workflowInstanceId: payload.workflowInstanceId,
+            runAttemptId: harness.nextRunAttemptId(),
+            signal: {
+              signalId: "sig_base_branch_1",
+              kind: "control_action",
+              payload: { action: "base_branch_submit", baseBranch: "main" }
+            },
+            workspaceId: "ws_e2e",
+            now: "2026-05-31T00:00:00.000Z"
+          });
+          return { status: "completed" };
+        }
+      };
+
+      // Create a control action to resume the workflow
+      const actionId = "ca_base_branch_1";
+      harness.controlActionStore.create({
+        id: actionId,
+        workspaceId: "ws_e2e",
+        actorUserId: "user_e2e",
+        actionType: "resume_workflow",
+        payload: { workflowInstanceId: wfiId },
+        now: "2026-05-31T00:00:00.000Z"
+      });
+
+      // Process the control action → workflow should resume and complete
+      const procResult = await harness.controlActionProcessor.process(actionId, "2026-05-31T00:00:00.000Z");
+      expect(procResult.status).toBe("completed");
+
+      // Verify the workflow resumed and completed
+      const events = harness.runtimeEvents(wfiId);
+      expect(events).toContain("step.waiting");
+      expect(events).toContain("workflow.signal_received");
+      expect(events).toContain("step.resumed");
+      expect(events).toContain("attempt.completed");
+
+      // Verify execute and card update effects were called after resume
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "workbench", effectType: "plan.execute" })
+      );
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "workbench", effectType: "card.update", input: { planId: "plan_approve_test", status: "executing" } })
+      );
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("workbench plan reject: card action trigger -> workflow produces rejected control action and card update effect", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      // Register effect handler for plan.reject that creates a control action
+      harness.effectHandlerRegistry.register({
+        pluginId: "workbench",
+        effectType: "plan.reject",
+        execute(effect) {
+          const input = effect.input as { planId: string };
+          // Create a control action record (simulates a "rejected" control action being produced)
+          harness.controlActionStore.create({
+            id: `ca_reject_${input.planId}`,
+            workspaceId: "ws_e2e",
+            actorUserId: "user_e2e",
+            actionType: "reject_plan",
+            payload: { planId: input.planId, reason: "User rejected" },
+            now: "2026-05-31T00:00:00.000Z"
+          });
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { rejected: true };
+        }
+      });
+
+      // Register effect handler for card.update
+      harness.effectHandlerRegistry.register({
+        pluginId: "workbench",
+        effectType: "card.update",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { updated: true };
+        }
+      });
+
+      // Intent resolver for feishu card action (reject)
+      harness.intentResolvers.register({
+        id: "workbench-card-reject",
+        canResolve(event) {
+          return event.source.pluginId === "feishu" &&
+            event.source.triggerType === "card_action" &&
+            event.external.actionType === "workbench_plan_reject";
+        },
+        resolve(event) {
+          const actionPayload = (event.external.actionPayload as Record<string, unknown>) ?? {};
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "workflow_signal" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "user" as const, userId: "user_e2e" },
+            payload: {
+              actionType: event.external.actionType,
+              ...actionPayload,
+              chatId: event.external.chatId,
+              messageId: event.external.messageId
+            }
+          };
+        }
+      });
+
+      // Workflow selector for plan reject
+      harness.workflowSelector.register({
+        id: "workbench-reject-rule",
+        matches(intent) {
+          return intent.kind === "workflow_signal" &&
+            typeof intent.payload === "object" && intent.payload !== null &&
+            (intent.payload as Record<string, unknown>).actionType === "workbench_plan_reject";
+        },
+        definitionId: "workbench.plan.reject"
+      });
+
+      // Register the plan reject workflow (mirrors workbench-runtime-contribution.ts)
+      harness.workflowRegistry.register({
+        definitionId: "workbench.plan.reject",
+        version: 1,
+        concurrencyPolicy: "reject_if_running",
+        steps: [
+          {
+            stepId: "process_rejection",
+            async run(stepCtx) {
+              const payload = stepCtx.input as { planId?: string };
+              // First effect: plan.reject (which produces a rejected control action)
+              await stepCtx.executeEffect({
+                pluginId: "workbench",
+                effectType: "plan.reject",
+                input: { planId: payload.planId }
+              });
+              // Second effect: card.update (shows rejected status)
+              await stepCtx.executeEffect({
+                pluginId: "workbench",
+                effectType: "card.update",
+                input: { planId: payload.planId, status: "rejected" }
+              });
+              return { kind: "complete" as const, output: { rejected: true } };
+            }
+          }
+        ]
+      });
+
+      // Create trigger event for plan reject card action
+      const trigger = feishuCardActionToTriggerEvent({
+        triggerEventId: "trg_reject_1",
+        receivedAt: "2026-05-31T00:00:00.000Z",
+        chatId: "oc_e2e",
+        messageId: "om_reject_1",
+        senderUserId: "ou_e2e",
+        actionType: "workbench_plan_reject",
+        actionPayload: { planId: "plan_reject_test", version: 1 }
+      });
+
+      // Dispatch → workflow should complete
+      const result = await harness.dispatcher.dispatch(trigger);
+      expect(result.status).toBe("succeeded");
+
+      const wfiId = `wfi_e2e_${harness.wfiCounter}`;
+
+      // Verify workflow completed
+      const events = harness.runtimeEvents(wfiId);
+      expect(events).toContain("attempt.completed");
+
+      // Verify effects were called
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "workbench", effectType: "plan.reject" })
+      );
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "workbench", effectType: "card.update", input: { planId: "plan_reject_test", status: "rejected" } })
+      );
+
+      // Verify a rejected control action was created
+      const rejectedCa = harness.controlActionStore.getById("ca_reject_plan_reject_test");
+      expect(rejectedCa).toBeDefined();
+      expect(rejectedCa!.actionType).toBe("reject_plan");
+      expect(rejectedCa!.payload).toMatchObject({ planId: "plan_reject_test" });
     } finally {
       await harness.close();
     }
