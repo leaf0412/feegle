@@ -45,6 +45,7 @@ import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
 import type { StockStore } from "@integrations/stock/stock-store.js";
 import type { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
 import type { IngressDispatcher } from "@core/ingress/ingress-dispatcher.js";
+import type { RequirementWorkflowStore } from "@plugins/requirement-workflow/requirement-workflow-store.js";
 
 /**
  * The catalog of every capability the host can provide during boot. Grows only
@@ -92,6 +93,7 @@ export interface Capabilities {
   controlActionStore: ControlActionStore;
   controlActionProcessor: ControlActionProcessor;
   runtimeIngress: IngressDispatcher;
+  requirementWorkflowStore: RequirementWorkflowStore;
   // providers
   agents: AgentProviderRegistry;
   gitlab: GitLabClient;
