@@ -21,6 +21,42 @@ export function feishuRuntimeContribution(): RuntimeContributionModule {
         })
       });
 
+      // Resolve card action events (approve, reject, cancel, revise, etc.)
+      // as control_action intents, routing them through the runtime pipeline.
+      ctx.intentResolvers.register({
+        id: "feishu-card-action",
+        canResolve: (event) => event.source.pluginId === "feishu" && event.source.triggerType === "card_action",
+        resolve: (event) => ({
+          intentId: `intent:${event.triggerEventId}`,
+          kind: "control_action",
+          workspaceId: workspaceIdFromEvent(event),
+          projectId: projectIdFromEvent(event),
+          actor:
+            event.actorHint && typeof event.actorHint.externalUserId === "string"
+              ? { kind: "user", userId: event.actorHint.externalUserId }
+              : { kind: "system" },
+          payload: event.external
+        })
+      });
+
+      // Resolve bot menu events (text commands from the bot menu) as chat
+      // intents so they flow through the same pipeline as text messages.
+      ctx.intentResolvers.register({
+        id: "feishu-bot-menu",
+        canResolve: (event) => event.source.pluginId === "feishu" && event.source.triggerType === "bot_menu",
+        resolve: (event) => ({
+          intentId: `intent:${event.triggerEventId}`,
+          kind: "chat",
+          workspaceId: workspaceIdFromEvent(event),
+          projectId: projectIdFromEvent(event),
+          actor:
+            event.actorHint && typeof event.actorHint.externalUserId === "string"
+              ? { kind: "user", userId: event.actorHint.externalUserId }
+              : { kind: "system" },
+          payload: event.external
+        })
+      });
+
       ctx.workflowSelector.register({
         id: "feishu-chat",
         matches: (intent) => intent.kind === "chat",
@@ -44,6 +80,63 @@ export function feishuRuntimeContribution(): RuntimeContributionModule {
                 });
               }
               return { kind: "complete", output: { replied: true } };
+            }
+          }
+        ]
+      });
+
+      // Control action workflow: handles card_action-triggered intents.
+      // Recognized actions are acknowledged; unknown actions produce a
+      // runtime failure event.
+      ctx.workflowSelector.register({
+        id: "feishu-control-action",
+        matches: (intent) => intent.kind === "control_action",
+        definitionId: "feishu.control_action.workflow"
+      });
+
+      ctx.workflows.register({
+        definitionId: "feishu.control_action.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "process_action",
+            run: async (stepCtx) => {
+              const payload = stepCtx.input as Record<string, unknown>;
+              const actionType = payload.actionType as string;
+
+              const knownActions = [
+                "workbench_plan_approve",
+                "workbench_plan_cancel",
+                "workbench_plan_reject",
+                "workbench_plan_push",
+                "workbench_plan_cleanup",
+                "workbench_plan_revise",
+                "workbench_plan_revision_submit",
+                "workbench_plan_base_branch_submit",
+                "workbench_plan_revise_execution",
+                "workbench_plan_revise_execution_submit",
+                "bind_repo_submit",
+                "bind_repo_cancel",
+                "platform_action",
+                "push_repository"
+              ];
+
+              if (knownActions.includes(actionType)) {
+                return { kind: "complete", output: { actionProcessed: true, actionType } };
+              }
+
+              return {
+                kind: "fail",
+                error: {
+                  code: "UNKNOWN_CARD_ACTION",
+                  category: "validation",
+                  message: `Unknown card action type: ${actionType}`,
+                  retryable: false,
+                  recoverable: false
+                },
+                recoverable: false
+              };
             }
           }
         ]
