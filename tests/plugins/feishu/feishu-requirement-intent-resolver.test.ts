@@ -139,3 +139,106 @@ describe("feishu requirement resolver registration", () => {
     await expect(reg.resolve(evt("今天天气不错") as never)).rejects.toThrow();
   });
 });
+
+describe("intent payload completeness (workspaceId / projectId / requesterUserId)", () => {
+  it("requirement_intake payload includes workspaceId, projectId, requesterUserId", () => {
+    const intent = resolveFeishuRequirementIntent({
+      triggerEventId: "evt_ws",
+      resolvedWorkspaceId: "ws_abc",
+      resolvedProjectId: "proj_xyz",
+      resolvedUserId: "user_abc",
+      sourcePlugin: "feishu",
+      commandType: "chat",
+      chatId: "oc_ws",
+      messageId: "om_ws",
+      conversationKey: "feishu:oc_ws",
+      text: "\u9700\u6c42\u6587\u6863\uff1a\u505a\u4e2a\u767b\u5f55\u9875"
+    });
+    expect(intent.kind).toBe("requirement_intake");
+    expect(intent.payload).toMatchObject({
+      workspaceId: "ws_abc",
+      projectId: "proj_xyz",
+      requesterUserId: "user_abc"
+    });
+  });
+
+  it("requirement_plan_revise payload includes workspaceId, projectId, requesterUserId", () => {
+    const intent = resolveFeishuRequirementIntent({
+      triggerEventId: "evt_revise_ws",
+      resolvedWorkspaceId: "ws_abc",
+      resolvedProjectId: "proj_xyz",
+      resolvedUserId: "user_abc",
+      sourcePlugin: "feishu",
+      commandType: "chat",
+      chatId: "oc_ws",
+      messageId: "om_ws",
+      conversationKey: "feishu:oc_ws",
+      text: "\u52a0\u4e0a\u6d4b\u8bd5\u8ba1\u5212",
+      requirementId: "reqwf_1"
+    });
+    expect(intent.kind).toBe("requirement_plan_revise");
+    expect(intent.payload).toMatchObject({
+      workspaceId: "ws_abc",
+      projectId: "proj_xyz",
+      requesterUserId: "user_abc"
+    });
+  });
+
+  it("requirement_intake payload includes null projectId when not provided", () => {
+    const intent = resolveFeishuRequirementIntent({
+      triggerEventId: "evt_null_proj",
+      resolvedWorkspaceId: "ws_abc",
+      resolvedProjectId: null,
+      resolvedUserId: "user_abc",
+      sourcePlugin: "feishu",
+      commandType: "chat",
+      chatId: "oc_ws",
+      messageId: "om_ws",
+      conversationKey: "feishu:oc_ws",
+      text: "\u9700\u6c42\u6587\u6863\uff1a\u6d4b\u8bd5"
+    });
+    expect(intent.payload).toMatchObject({
+      workspaceId: "ws_abc",
+      projectId: null,
+      requesterUserId: "user_abc"
+    });
+  });
+
+  it("card-action intent payload includes workspaceId, projectId, requesterUserId", () => {
+    const intent = resolveFeishuRequirementCardActionIntent({
+      triggerEventId: "evt_card_ws",
+      resolvedWorkspaceId: "ws_abc",
+      resolvedProjectId: "proj_xyz",
+      resolvedUserId: "user_abc",
+      sourcePlugin: "feishu",
+      actionType: "requirement_plan_approve",
+      actionPayload: { requirementId: "reqwf_1", planVersion: 1 },
+      chatId: "oc_ws",
+      messageId: "om_ws"
+    });
+    expect(intent?.payload).toMatchObject({
+      workspaceId: "ws_abc",
+      projectId: "proj_xyz",
+      requesterUserId: "user_abc"
+    });
+  });
+
+  it("card-action intent payload with null projectId", () => {
+    const intent = resolveFeishuRequirementCardActionIntent({
+      triggerEventId: "evt_card_null_proj",
+      resolvedWorkspaceId: "ws_abc",
+      resolvedProjectId: null,
+      resolvedUserId: "user_abc",
+      sourcePlugin: "feishu",
+      actionType: "requirement_execute",
+      actionPayload: { requirementId: "reqwf_2" },
+      chatId: "oc_ws",
+      messageId: "om_ws"
+    });
+    expect(intent?.payload).toMatchObject({
+      workspaceId: "ws_abc",
+      projectId: null,
+      requesterUserId: "user_abc"
+    });
+  });
+});

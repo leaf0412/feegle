@@ -62,6 +62,9 @@ export function resolveFeishuRequirementCardActionIntent(
     actor: { kind: "user", userId: input.resolvedUserId },
     payload: {
       sourcePlugin: input.sourcePlugin,
+      workspaceId: input.resolvedWorkspaceId,
+      projectId: input.resolvedProjectId,
+      requesterUserId: input.resolvedUserId,
       ...input.actionPayload,
       chatId: input.chatId,
       messageId: input.messageId,
@@ -96,6 +99,9 @@ export function resolveFeishuRequirementIntent(input: ResolveFeishuRequirementIn
       actor: { kind: "user", userId: input.resolvedUserId },
       payload: {
         sourcePlugin: input.sourcePlugin,
+        workspaceId: input.resolvedWorkspaceId,
+        projectId: input.resolvedProjectId,
+        requesterUserId: input.resolvedUserId,
         requirementId: input.requirementId,
         feedback: input.text,
         chatId: input.chatId,
@@ -114,6 +120,9 @@ export function resolveFeishuRequirementIntent(input: ResolveFeishuRequirementIn
     actor: { kind: "user", userId: input.resolvedUserId },
     payload: {
       sourcePlugin: input.sourcePlugin,
+      workspaceId: input.resolvedWorkspaceId,
+      projectId: input.resolvedProjectId,
+      requesterUserId: input.resolvedUserId,
       requirementText: input.text,
       chatId: input.chatId,
       messageId: input.messageId,
