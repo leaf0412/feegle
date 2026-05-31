@@ -109,6 +109,37 @@ describe("HttpFeishuCloudDocClient", () => {
     expect(writeCalls[0]?.index).toBe(0);
   });
 
+  it("writeMarkdown strips table.property.merge_info, which the descendant API rejects (code 1770001)", async () => {
+    const blocks = [
+      {
+        block_id: "table",
+        block_type: 31,
+        parent_id: "",
+        children: ["cell"],
+        table: { cells: ["cell"], property: { row_size: 1, column_size: 1, column_width: [183], merge_info: [{ col_span: 1, row_span: 1 }] } }
+      },
+      { block_id: "cell", block_type: 32, parent_id: "table", children: ["t"], table_cell: {} },
+      { block_id: "t", block_type: 2, parent_id: "cell", text: {} }
+    ];
+    let writtenTable: Record<string, unknown> | undefined;
+    const requester = fakeRequester((req) => {
+      if (req.url.endsWith("/blocks/convert")) {
+        return { code: 0, data: { blocks, first_level_block_ids: ["table"] } };
+      }
+      const descendants = (req.data as { descendants: Array<Record<string, unknown>> }).descendants;
+      writtenTable = descendants.find((b) => b.block_type === 31);
+      return { code: 0, data: {} };
+    });
+    const client = new HttpFeishuCloudDocClient(requester);
+
+    await client.writeMarkdown({ documentId: "doc_123", markdown: "table" });
+
+    const property = (writtenTable?.table as Record<string, unknown>).property as Record<string, unknown>;
+    expect("merge_info" in property).toBe(false);
+    // the rest of the table property is preserved
+    expect(property).toMatchObject({ row_size: 1, column_size: 1, column_width: [183] });
+  });
+
   it("writeMarkdown fails loud when the tree exceeds the 1000-block descendant limit", async () => {
     const ids = Array.from({ length: 1001 }, (_, i) => `tmp_${i}`);
     const blocks = ids.map((id) => ({ block_id: id, block_type: 2, text: {}, parent_id: "" }));

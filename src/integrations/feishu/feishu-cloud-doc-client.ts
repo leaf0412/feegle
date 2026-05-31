@@ -88,7 +88,7 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
       method: "POST",
       data: {
         children_id: firstLevel,
-        descendants: blocks,
+        descendants: blocks.map(stripDescendantIncompatibleFields),
         index: 0
       }
     });
@@ -107,6 +107,25 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   buildDocUrl(documentId: string): string {
     return `${this.docBaseUrl}/docx/${documentId}`;
   }
+}
+
+// Feishu's markdown `convert` emits table blocks carrying property.merge_info,
+// but the `descendant` create API rejects that field (code 1770001 "invalid
+// param") — confirmed by probing every field variation. Strip it; convert
+// represents real merged cells via cell spans, not this top-level array.
+function stripDescendantIncompatibleFields(
+  block: Record<string, unknown> & { block_id: string }
+): Record<string, unknown> & { block_id: string } {
+  if (block.block_type !== 31 || !block.table || typeof block.table !== "object") {
+    return block;
+  }
+  const table = block.table as Record<string, unknown>;
+  const property = table.property;
+  if (!property || typeof property !== "object" || !("merge_info" in property)) {
+    return block;
+  }
+  const { merge_info: _dropped, ...propertyRest } = property as Record<string, unknown>;
+  return { ...block, table: { ...table, property: propertyRest } };
 }
 
 function expectSuccess(operation: string, response: unknown): Record<string, unknown> {
