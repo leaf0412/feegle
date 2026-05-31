@@ -8,7 +8,7 @@ import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "@tests/fixtures/fake-feishu-client.js";
 
 const rootDir = resolve(join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
-const plansDir = join(rootDir, "_docs", "_docs", "plans");
+const plansDir = join(rootDir, "_docs", "plans");
 const statusDocPath = join(rootDir, "_docs", "plans", "2026-05-31-runtime-platform-status.md");
 const verifyScriptPath = join(rootDir, "scripts", "verify-platform-readiness.mjs");
 const packageJsonPath = join(rootDir, "package.json");
@@ -16,10 +16,11 @@ const packageJsonPath = join(rootDir, "package.json");
 // All 50 plans (01-50)
 const ALL_PLAN_IDS = Array.from({ length: 50 }, (_, i) => String(i + 1).padStart(2, "0"));
 
-// Plans listed as "complete" in status doc as of wave completion
 const COMPLETED_PLANS = new Set([
   "09", "10", "11", "12", "13", "14", "15", "16", "17", "19",
-  "22", "23", "25", "26", "27", "28", "29", "31", "33", "34", "35"
+  "22", "23", "25", "26", "27", "28", "29", "31", "32", "33", "34", "35",
+  "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47",
+  "48", "49", "50"
 ]);
 
 // Plans listed as "partial" in status doc
@@ -32,19 +33,11 @@ const REOPENED_THEN_COMPLETED = new Set([
   "18", "20", "21", "24"
 ]);
 
-// Plans that are "pending" (32, 50 are being completed now; 36-49 are in the status doc)
-const PENDING_OR_IN_PROGRESS = new Set([
-  "32", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50"
-]);
-
 // Plans that have plan files and are tracked, with status per the status doc
-function expectedStatus(planId: string): "complete" | "partial" | "reopened-complete" | "pending" | "documented" {
+function expectedStatus(planId: string): "complete" | "partial" | "reopened-complete" | "documented" {
   if (COMPLETED_PLANS.has(planId)) return "complete";
   if (PARTIAL_PLANS.has(planId)) return "partial";
   if (REOPENED_THEN_COMPLETED.has(planId)) return "reopened-complete";
-  if (PENDING_OR_IN_PROGRESS.has(planId)) return "pending";
-  // Plans 01-08 exist in _docs/_docs/plans/ but are not in the status doc table yet
-  // acceptance-allow-gap: plans 01-08 are earlier waves completed before status doc was created
   return "documented";
 }
 
@@ -74,26 +67,17 @@ describe("platform acceptance matrix", () => {
     expect(existsSync(statusDocPath)).toBe(true);
     const statusContent = readFileSync(statusDocPath, "utf8");
 
-    // Plans 09-35 are tracked in the status doc table (zero-padded)
-    for (let i = 9; i <= 35; i++) {
+    for (let i = 9; i <= 50; i++) {
       const planId = String(i).padStart(2, "0");
       const hasReference =
         statusContent.includes(`Plan ${i}`) ||
         statusContent.includes(`| ${planId} |`);
       expect(hasReference, `Plan ${i} (${planId}) not found in status doc`).toBe(true);
-    }
-
-    // Plans 36-50 should also be referenced
-    for (let i = 36; i <= 50; i++) {
-      const planId = String(i).padStart(2, "0");
-      const hasReference =
-        statusContent.includes(`Plan ${i}`) ||
-        statusContent.includes(`| ${planId} |`) ||
-        statusContent.includes(`plan ${i}`) ||
-        statusContent.includes(`plans ${i}`);
-      // At minimum, the status doc should mention these plans
-      // acceptance-allow-gap: plans 36-50 may not have individual rows yet;
-      // they are covered by the spec closure follow-ups section
+      if (expectedStatus(planId) === "complete") {
+        expect(statusContent, `Plan ${i} should be marked complete`).toMatch(
+          new RegExp(`\\|\\s*${planId}\\s*\\|[^\\n]*\\|\\s*complete\\s*\\|`)
+        );
+      }
     }
   });
 
@@ -102,20 +86,18 @@ describe("platform acceptance matrix", () => {
     // For each "complete" plan, check there's a test file or evidence mention
     // The status doc itself is the evidence — this test validates the doc exists
     // and contains evidence columns
-    const completeRows = statusContent.split("\n").filter(
-      (line) => line.includes("|") && line.includes("complete")
-    );
+    const completeRows = statusContent.split("\n").filter((line) => {
+      if (!line.includes("|")) return false;
+      const cells = line.split("|").map((c) => c.trim());
+      return cells.includes("complete");
+    });
     expect(completeRows.length).toBeGreaterThan(0);
 
-    // Each complete row should have something in the "Evidence" column
     for (const row of completeRows) {
       const cells = row.split("|").map((c) => c.trim());
-      // Evidence is column 4 (0-indexed from the split)
-      if (cells.length >= 5 && cells[4] && cells[4] !== "none" && cells[4] !== "") {
-        // Has evidence — good
-      } else if (cells.length >= 4 && cells[3] && cells[3] !== "none" && cells[3] !== "") {
-        // Has evidence in different column position — good
-      }
+      const statusIndex = cells.findIndex((cell) => cell === "complete");
+      const evidence = statusIndex >= 0 ? cells[statusIndex + 1] ?? "" : "";
+      expect(evidence, `complete row has no evidence: ${row}`).not.toMatch(/^$|^none$/i);
     }
   });
 

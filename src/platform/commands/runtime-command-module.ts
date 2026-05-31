@@ -277,12 +277,13 @@ class RecoverCommandHandler implements SlashCommandHandler {
   }
 }
 
-export function runtimeCommandModule(operatorWorkspaceId: string): SlashCommandModule {
+export function runtimeCommandModule(operatorWorkspaceId?: string): SlashCommandModule {
   return {
     id: "runtime",
     register: (registry, deps) => {
       const workspaceId = deps.operatorWorkspaceId ?? operatorWorkspaceId;
-      if (deps.runtimeInspectionService) {
+
+      if (deps.runtimeInspectionService && workspaceId) {
         registry.registerCommand(listDefinition, new ListCommandHandler(deps.runtimeInspectionService, workspaceId));
         registry.registerCommand(showDefinition, new ShowCommandHandler(deps.runtimeInspectionService, workspaceId));
       } else {
@@ -293,7 +294,7 @@ export function runtimeCommandModule(operatorWorkspaceId: string): SlashCommandM
       if (deps.controlActionProcessor) {
         registry.registerCommand(approveDefinition, new ApproveCommandHandler(deps.controlActionProcessor));
         registry.registerCommand(rejectDefinition, new RejectCommandHandler(deps.controlActionProcessor));
-        if (deps.controlActionStore) {
+        if (deps.controlActionStore && workspaceId) {
           registry.registerCommand(cancelDefinition, new CancelCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
         } else {
           registry.declarePlanned(cancelDefinition);
@@ -304,7 +305,7 @@ export function runtimeCommandModule(operatorWorkspaceId: string): SlashCommandM
         registry.declarePlanned(cancelDefinition);
       }
 
-      if (deps.workflowRuntime) {
+      if (deps.workflowRuntime && workspaceId) {
         registry.registerCommand(resumeDefinition, new ResumeCommandHandler(deps.workflowRuntime, workspaceId));
       } else {
         registry.declarePlanned(resumeDefinition);
@@ -318,7 +319,7 @@ export function runtimeCommandModule(operatorWorkspaceId: string): SlashCommandM
         registry.declarePlanned(memoryRejectDefinition);
       }
 
-      if (deps.controlActionProcessor && deps.controlActionStore) {
+      if (deps.controlActionProcessor && deps.controlActionStore && workspaceId) {
         registry.registerCommand(recoverDefinition, new RecoverCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
       } else {
         registry.declarePlanned(recoverDefinition);

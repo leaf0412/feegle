@@ -26,6 +26,7 @@ export function gitlabEventToTriggerEvent(input: {
       resourceIid: input.resourceIid,
       action: input.action
     },
+    actorHint: { kind: "system" },
     conversationHint: {
       conversationKey: `gitlab:${input.host}:${input.projectId}:${input.resourceType}:${input.resourceIid}`
     },

@@ -3,6 +3,7 @@ import { buildSlashCommandRegistry } from "@platform/build-slash-command-registr
 import type { SlashCommandDefinition } from "@platform/slash-command-catalog.js";
 import type { SlashCommandHandler, SlashCommandReply } from "@platform/slash-command-handler.js";
 import type { SlashCommandRegistryDeps } from "@platform/slash-command-module.js";
+import { runtimeCommandModule } from "@platform/commands/runtime-command-module.js";
 import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("buildSlashCommandRegistry", () => {
@@ -64,6 +65,7 @@ describe("buildSlashCommandRegistry", () => {
       updatedAt: new Date()
     };
     const registry = buildSlashCommandRegistry({
+      operatorWorkspaceId: "ws_test",
       ...stubSchedulerSlashDeps({
         repositories: { list: () => [] }, // legacy empty source
         repositoryStore: { list: () => [record] } as unknown as SlashCommandRegistryDeps["repositoryStore"]
@@ -98,6 +100,19 @@ describe("buildSlashCommandRegistry", () => {
         }
       })
     ).toThrow(/frozen/);
+  });
+
+  it("does not implement runtime workspace commands without an explicit operator workspace", () => {
+    const registry = buildSlashCommandRegistry({
+        repositories: { list: () => [] },
+        defaults: false,
+        modules: [runtimeCommandModule()],
+        runtimeInspectionService: {} as never
+      });
+
+    expect(registry.findById("runtime_list")).toBeDefined();
+    expect(registry.isImplemented("runtime_list")).toBe(false);
+    expect(registry.resolve("runtime_list")).toBeUndefined();
   });
 
   it("surfaces planned-only definitions through listCommands and findByInput so help can show 规划中", () => {
@@ -202,6 +217,7 @@ describe("buildSlashCommandRegistry", () => {
 
     expect(() =>
       buildSlashCommandRegistry({
+        operatorWorkspaceId: "ws_test",
         ...stubSchedulerSlashDeps(),
         modules: [
           { id: "shadow", register: (target) => target.declarePlanned(collidingDef) }

@@ -377,14 +377,11 @@ describe("failure injection", () => {
         }]
       });
 
-      // The dispatcher skips permission check when identity is "unknown" and
-      // proceeds to intent resolution. This is a known gap — unknown actors
-      // should fail at identity resolution rather than proceeding unauthenticated.
-      // acceptance-allow-gap: unknown actor proceeds without permission check;
-      // identity resolution should fail dispatcher when status is "unknown"
+      // Unknown actors must fail at identity resolution rather than proceeding
+      // unauthenticated into intent resolution.
       const result = await unknownDispatcher.dispatch(trigger);
-      // Current behavior: succeeds because no permission check blocks it
-      // Future: should return { status: "failed" }
+      expect(result.status).toBe("failed");
+      expect(result.reason).toMatch(/identity/i);
     } finally {
       await harness.close();
     }

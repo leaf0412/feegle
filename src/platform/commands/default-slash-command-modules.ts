@@ -10,7 +10,6 @@ import { setupCommandModule } from "./setup-command-module.js";
 import { systemCommandModule } from "./system-command-module.js";
 
 export function defaultSlashCommandModules(operatorWorkspaceId?: string): SlashCommandModule[] {
-  const resolvedWorkspaceId = operatorWorkspaceId ?? "ws_default";
   return [
     systemCommandModule(),
     setupCommandModule(),
@@ -20,6 +19,6 @@ export function defaultSlashCommandModules(operatorWorkspaceId?: string): SlashC
     schedulerCommandModule(),
     providerCommandModule(),
     glsumCommandModule(),
-    runtimeCommandModule(resolvedWorkspaceId)
+    runtimeCommandModule(operatorWorkspaceId)
   ];
 }

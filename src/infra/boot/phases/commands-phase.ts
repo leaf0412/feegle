@@ -39,7 +39,7 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         "runtimeInspectionService",
         "recoveryService"
       );
-      const operatorWsId = cap.configStore?.get().defaultWorkspace ?? "ws_default";
+      const operatorWsId = cap.configStore?.get().defaultWorkspace;
       const registry = buildSlashCommandRegistry({
         feegleHome: deps.feegleHome,
         userDirectory: cap.userDirectory,

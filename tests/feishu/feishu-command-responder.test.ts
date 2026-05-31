@@ -749,7 +749,10 @@ function fakeBindingStore(
 
 function testRegistry(repositories: RepositoryRecord[] = []): SlashCommandRegistry {
   return buildSlashCommandRegistry(
-    stubSchedulerSlashDeps({ repositories: { list: () => repositories.map((record) => ({ ...record })) } })
+    stubSchedulerSlashDeps({
+      operatorWorkspaceId: "ws_test",
+      repositories: { list: () => repositories.map((record) => ({ ...record })) }
+    })
   );
 }
 

@@ -34,6 +34,7 @@ export function webhookPayloadToTriggerEvent(input: {
       sourceId: input.sourceId,
       headers: input.headers
     },
+    actorHint: { kind: "system" },
     payloadSummary: summarizePayload(input.payload)
   };
 }

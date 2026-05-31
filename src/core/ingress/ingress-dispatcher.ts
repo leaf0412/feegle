@@ -69,8 +69,25 @@ export class IngressDispatcher {
   async dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; reason?: string }> {
     const now = this.deps.clock.nowIso();
 
-    const identity = this.deps.identityResolver.resolve(event.actorHint ?? undefined);
+    const resolvedIdentity = this.deps.identityResolver.resolve(event.actorHint ?? undefined);
+    const systemActorKind = getTrustedSystemActorKind(event.actorHint);
+    const identity = resolvedIdentity.status === "unknown" && systemActorKind
+      ? {
+          status: "resolved" as const,
+          userId: `system:${systemActorKind}`,
+          displayName: systemActorKind,
+          externalIdentity: { provider: "system", externalId: systemActorKind }
+        }
+      : resolvedIdentity;
     this.emitDiagnostic(event, "ingress.identity_resolved", { status: identity.status }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
+    if (identity.status !== "resolved") {
+      const reason = identity.status === "unknown" ? identity.reason : "identity resolution failed";
+      this.emitDiagnostic(event, "ingress.identity_unresolved", {
+        pluginId: event.source.pluginId,
+        reason
+      }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
+      return { status: "failed", reason: `identity unresolved: ${reason}` };
+    }
 
     const workspace = this.deps.workspaceResolver.resolve(event.conversationHint ?? undefined);
     const resolvedWorkspaceId =
@@ -97,33 +114,31 @@ export class IngressDispatcher {
 
     let permission = null;
     let policy = null;
-    if (identity.status === "resolved") {
-      permission = this.deps.permissionPolicy.checkPermission(
-        resolvedWorkspaceId,
-        identity.userId
-      );
-      this.emitDiagnostic(
-        event,
-        "ingress.permission_checked",
-        { allowed: permission.allowed, role: permission.role },
-        resolvedWorkspaceId,
-        now
-      );
+    permission = this.deps.permissionPolicy.checkPermission(
+      resolvedWorkspaceId,
+      identity.userId
+    );
+    this.emitDiagnostic(
+      event,
+      "ingress.permission_checked",
+      { allowed: permission.allowed, role: permission.role },
+      resolvedWorkspaceId,
+      now
+    );
 
-      // Determine intent kind for policy. The intent resolver hasn't run yet,
-      // so default to "chat". The policy layer can refine this later.
-      policy = this.deps.permissionPolicy.decide(permission, "chat");
-      this.emitDiagnostic(
-        event,
-        "ingress.policy_decided",
-        { kind: policy.kind, reason: "reason" in policy ? policy.reason : undefined },
-        resolvedWorkspaceId,
-        now
-      );
+    // Determine intent kind for policy. The intent resolver hasn't run yet,
+    // so default to "chat". The policy layer can refine this later.
+    policy = this.deps.permissionPolicy.decide(permission, "chat");
+    this.emitDiagnostic(
+      event,
+      "ingress.policy_decided",
+      { kind: policy.kind, reason: "reason" in policy ? policy.reason : undefined },
+      resolvedWorkspaceId,
+      now
+    );
 
-      if (policy.kind === "deny") {
-        return { status: "failed", reason: "reason" in policy ? policy.reason : undefined };
-      }
+    if (policy.kind === "deny") {
+      return { status: "failed", reason: "reason" in policy ? policy.reason : undefined };
     }
 
     // Build enriched context for intent resolvers
@@ -139,11 +154,8 @@ export class IngressDispatcher {
     const resolvedContext: ResolvedInteractionContext = {
       workspaceId: resolvedWorkspaceId,
       projectId: workspace.status === "resolved" ? workspace.projectId : null,
-      userId: identity.status === "resolved" ? identity.userId : "system",
-      externalIdentity:
-        identity.status === "resolved"
-          ? identity.externalIdentity
-          : undefined,
+      userId: identity.userId,
+      externalIdentity: identity.externalIdentity,
       sourcePlugin: event.source.pluginId,
       sourceId: event.triggerEventId
     };
@@ -177,4 +189,10 @@ export class IngressDispatcher {
       now
     });
   }
+}
+
+function getTrustedSystemActorKind(actorHint: Record<string, unknown> | undefined): string | null {
+  if (!actorHint) return null;
+  const kind = actorHint.kind;
+  return kind === "system" || kind === "scheduler" ? kind : null;
 }
