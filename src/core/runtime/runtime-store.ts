@@ -24,6 +24,7 @@ export interface EffectExecutionView {
   id: string;
   status: EffectStatus;
   outputSummary: unknown;
+  inputSummary?: unknown;
 }
 
 export interface WorkflowSummaryRow {
@@ -467,21 +468,21 @@ export class RuntimeStore {
 
   getEffectExecution(id: string): EffectExecutionView | undefined {
     const row = this.db
-      .prepare("select id, status, output_summary_json from effect_executions where id = ?")
-      .get(id) as { id: string; status: EffectStatus; output_summary_json: string | null } | undefined;
+      .prepare("select id, status, output_summary_json, input_summary_json from effect_executions where id = ?")
+      .get(id) as { id: string; status: EffectStatus; output_summary_json: string | null; input_summary_json: string | null } | undefined;
     return row
-      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
+      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json), inputSummary: decodeJson(row.input_summary_json) ?? undefined }
       : undefined;
   }
 
   getEffectExecutionByIdempotencyKey(key: string): EffectExecutionView | undefined {
     const row = this.db
       .prepare(
-        "select id, status, output_summary_json from effect_executions where idempotency_key = ?"
+        "select id, status, output_summary_json, input_summary_json from effect_executions where idempotency_key = ?"
       )
-      .get(key) as { id: string; status: EffectStatus; output_summary_json: string | null } | undefined;
+      .get(key) as { id: string; status: EffectStatus; output_summary_json: string | null; input_summary_json: string | null } | undefined;
     return row
-      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
+      ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json), inputSummary: decodeJson(row.input_summary_json) ?? undefined }
       : undefined;
   }
 

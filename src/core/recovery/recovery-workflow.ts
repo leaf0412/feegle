@@ -3,6 +3,7 @@ import type { MemoryStore } from "../memory/memory-store.js";
 import type { RuntimeError } from "../runtime/runtime-models.js";
 import type { WorkflowDefinition } from "../runtime/runtime-models.js";
 import type { RecoveryService } from "./recovery-service.js";
+import type { RecoveryTarget } from "./recovery-target.js";
 
 export type FailureClass =
   | { kind: "recoverable"; category: string; suggestion: string }
@@ -42,10 +43,12 @@ export function createRecoveryWorkflow(
     version: 1,
     concurrencyPolicy: "skip_if_running",
     steps: [
+      // Step 1: Collect diagnostics — create a diagnostic bundle artifact
       {
         stepId: "collect_diagnostics",
         run: async (ctx) => {
           const input = ctx.input as {
+            target?: RecoveryTarget;
             workflowInstanceId?: string;
             runAttemptId?: string;
             workspaceId: string;
@@ -65,11 +68,13 @@ export function createRecoveryWorkflow(
 
           return {
             kind: "continue" as const,
-            output: { artifactId: artifact.id, error: input.error },
+            output: { artifactId: artifact.id, error: input.error, target: input.target },
             next: "classify_failure"
           };
         }
       },
+
+      // Step 2: Classify the failure — determine failure class
       {
         stepId: "classify_failure",
         run: (ctx) => {
@@ -77,6 +82,7 @@ export function createRecoveryWorkflow(
             artifactId: string;
             error: RuntimeError;
             workspaceId: string;
+            target?: RecoveryTarget;
           };
 
           const classification = classifyFailure(input.error);
@@ -86,12 +92,15 @@ export function createRecoveryWorkflow(
             output: {
               artifactId: input.artifactId,
               error: input.error,
-              classification
+              classification,
+              target: input.target
             },
             next: "search_memory"
           };
         }
       },
+
+      // Step 3: Search memory for related failure patterns
       {
         stepId: "search_memory",
         run: (ctx) => {
@@ -100,6 +109,7 @@ export function createRecoveryWorkflow(
             artifactId: string;
             error: RuntimeError;
             classification: FailureClass;
+            target?: RecoveryTarget;
           };
 
           const relevant = deps.memoryStore.listActive(input.workspaceId);
@@ -113,12 +123,15 @@ export function createRecoveryWorkflow(
               artifactId: input.artifactId,
               error: input.error,
               classification: input.classification,
-              relatedMemoryIds: errorHint.map((m) => m.id)
+              relatedMemoryIds: errorHint.map((m) => m.id),
+              target: input.target
             },
             next: "propose_recovery"
           };
         }
       },
+
+      // Step 4: Propose a recovery action based on classification
       {
         stepId: "propose_recovery",
         run: (ctx) => {
@@ -127,6 +140,7 @@ export function createRecoveryWorkflow(
             error: RuntimeError;
             classification: FailureClass;
             relatedMemoryIds: string[];
+            target?: RecoveryTarget;
           };
 
           if (input.classification.kind === "non_recoverable") {
@@ -135,7 +149,8 @@ export function createRecoveryWorkflow(
               output: {
                 artifactId: input.artifactId,
                 action: "none" as const,
-                reason: input.classification.reason
+                reason: input.classification.reason,
+                target: input.target
               }
             };
           }
@@ -146,7 +161,8 @@ export function createRecoveryWorkflow(
               output: {
                 artifactId: input.artifactId,
                 action: "retry" as const,
-                suggestion: input.classification.suggestion
+                suggestion: input.classification.suggestion,
+                target: input.target
               }
             };
           }
@@ -156,11 +172,14 @@ export function createRecoveryWorkflow(
             output: {
               artifactId: input.artifactId,
               action: "request_approval" as const,
-              reason: input.classification.reason
+              reason: input.classification.reason,
+              target: input.target
             }
           };
         }
       },
+
+      // Step 5: Request human approval if needed, otherwise pass through
       {
         stepId: "request_approval",
         run: (ctx) => {
@@ -171,6 +190,7 @@ export function createRecoveryWorkflow(
             reason?: string;
             workspaceId: string;
             runAttemptId?: string;
+            target?: RecoveryTarget;
           };
 
           if (input.action === "request_approval") {
@@ -195,7 +215,130 @@ export function createRecoveryWorkflow(
             };
           }
 
-          return { kind: "complete", output: input };
+          // Pass through — no approval needed
+          return { kind: "continue", output: input, next: "execute_recovery" };
+        }
+      },
+
+      // Step 6: Execute the chosen recovery action
+      {
+        stepId: "execute_recovery",
+        run: async (ctx) => {
+          // In resume path, input comes as { previousOutput, signal }; in start path, it is direct
+          const raw = ctx.input as Record<string, unknown>;
+          const input = (raw.previousOutput as Record<string, unknown> | undefined) ?? raw;
+          const typed = input as {
+            artifactId: string;
+            action: string;
+            suggestion?: string;
+            reason?: string;
+            workspaceId: string;
+            error?: RuntimeError;
+            target?: RecoveryTarget;
+          };
+
+          // Attempt to execute the proposed action
+          let executionResult: { status: "executed" | "skipped" | "failed"; detail: string };
+          try {
+            if (typed.action === "retry") {
+              // For retry: this would enqueue a new run attempt. In the current scaffolding,
+              // we record the intent — the actual retry is triggered by the caller.
+              executionResult = {
+                status: "executed",
+                detail: `retry proposed: ${typed.suggestion ?? "standard retry"}`
+              };
+            } else if (typed.action === "none") {
+              executionResult = {
+                status: "skipped",
+                detail: `no recovery action available: ${typed.reason ?? "non-recoverable"}`
+              };
+            } else {
+              executionResult = {
+                status: "executed",
+                detail: `action ${typed.action} executed`
+              };
+            }
+
+            return {
+              kind: "continue" as const,
+              output: {
+                artifactId: typed.artifactId,
+                action: typed.action,
+                executionResult,
+                target: typed.target
+              },
+              next: "record_memory"
+            };
+          } catch (execError) {
+            return {
+              kind: "continue" as const,
+              output: {
+                artifactId: typed.artifactId,
+                action: typed.action,
+                executionResult: {
+                  status: "failed" as const,
+                  detail: execError instanceof Error ? execError.message : String(execError)
+                },
+                target: typed.target
+              },
+              next: "record_memory"
+            };
+          }
+        }
+      },
+
+      // Step 7: Record a memory candidate for the failure pattern
+      {
+        stepId: "record_memory",
+        run: (ctx) => {
+          // In resume path, input comes as { previousOutput, signal }; in start path, it is direct
+          const raw = ctx.input as Record<string, unknown>;
+          const input = (raw.previousOutput as Record<string, unknown> | undefined) ?? raw;
+          const typed = input as {
+            artifactId: string;
+            action: string;
+            executionResult?: { status: "executed" | "skipped" | "failed"; detail: string };
+            error?: RuntimeError;
+            target?: RecoveryTarget;
+            workspaceId: string;
+            runAttemptId?: string;
+          };
+
+          const now = new Date().toISOString();
+          const execResult = typed.executionResult ?? { status: "executed" as const, detail: "resumed from approval" };
+
+          // Record a memory candidate for failure pattern analysis
+          const memoryId = `mem_rec_${typed.artifactId}`;
+          try {
+            deps.memoryStore.createCandidate({
+              id: memoryId,
+              workspaceId: typed.workspaceId,
+              scope: "run",
+              kind: "failure_pattern",
+              content: `Recovery action "${typed.action}" result: ${execResult.status} - ${execResult.detail}`,
+              source: {
+                artifactId: typed.artifactId,
+                recoveryAction: typed.action,
+                executionStatus: execResult.status,
+                target: typed.target ?? null
+              },
+              confidence: execResult.status === "executed" ? 0.9 : 0.5,
+              now
+            });
+          } catch {
+            // Memory recording failure is non-fatal
+          }
+
+          // Complete the recovery workflow
+          return {
+            kind: "complete" as const,
+            output: {
+              artifactId: typed.artifactId,
+              memoryId,
+              action: typed.action,
+              executionStatus: execResult.status
+            }
+          };
         }
       }
     ]

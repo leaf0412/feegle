@@ -18,13 +18,28 @@ export interface EffectExecutionInput {
 }
 
 function normalizeError(cause: unknown): RuntimeError {
+  // If the error already has code/category, pass through with safe defaults for missing flags
+  if (cause && typeof cause === "object" && "code" in cause && "category" in cause) {
+    const err = cause as Record<string, unknown>;
+    return {
+      code: String(err.code),
+      category: (err.category as RuntimeError["category"]) ?? "unknown",
+      message: String(err.message ?? String(cause)),
+      retryable: Boolean(err.retryable),
+      recoverable: Boolean(err.recoverable),
+      stack: typeof err.stack === "string" ? err.stack : undefined,
+      cause: err.cause as RuntimeError | undefined,
+      evidence: err.evidence as Record<string, unknown> | undefined
+    };
+  }
+  // Unknown errors are non-retryable, non-recoverable by default
   if (cause instanceof Error) {
     return {
       code: "EFFECT_FAILED",
       category: "capability",
       message: cause.message,
       retryable: false,
-      recoverable: true,
+      recoverable: false,
       stack: cause.stack
     };
   }
@@ -33,7 +48,7 @@ function normalizeError(cause: unknown): RuntimeError {
     category: "capability",
     message: String(cause),
     retryable: false,
-    recoverable: true
+    recoverable: false
   };
 }
 
@@ -52,6 +67,26 @@ export class RuntimeEffectExecutor {
     if (input.idempotencyKey) {
       const existing = this.store.getEffectExecutionByIdempotencyKey(input.idempotencyKey);
       if (existing?.status === "succeeded") {
+        // Idempotency conflict: same key, different input
+        if (existing.inputSummary !== undefined) {
+          const existingInput = JSON.stringify(existing.inputSummary);
+          const incomingInput = JSON.stringify(input.input);
+          if (existingInput !== incomingInput) {
+            const conflictError: RuntimeError = {
+              code: "IDEMPOTENCY_CONFLICT",
+              category: "validation",
+              message: "same key, different input",
+              retryable: false,
+              recoverable: false,
+              evidence: {
+                existingEffectId: existing.id,
+                idempotencyKey: input.idempotencyKey
+              }
+            };
+            throw conflictError;
+          }
+        }
+        // Same key, same input — reuse result
         return existing.outputSummary;
       }
     }
@@ -159,10 +194,7 @@ export class RuntimeEffectExecutor {
 
       return result;
     } catch (error) {
-      const normalized: RuntimeError =
-        error && typeof error === "object" && "code" in error && "category" in error
-          ? (error as RuntimeError)
-          : normalizeError(error);
+      const normalized: RuntimeError = normalizeError(error);
 
       this.store.updateEffectExecution({
         id: input.effectId,

@@ -12,6 +12,10 @@ import {
   classifyFailure,
   createRecoveryWorkflow
 } from "@core/recovery/recovery-workflow.js";
+import {
+  normalizeTarget,
+  type RecoveryTarget
+} from "@core/recovery/recovery-target.js";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { RuntimeEffectExecutor } from "@core/runtime/runtime-effect-executor.js";
 import type { RuntimeError } from "@core/runtime/runtime-models.js";
@@ -195,6 +199,242 @@ describe("Recovery Workflow", () => {
 
     // Verify a control action was created
     const pendingActions = controlActionStore.listPending("ws_1");
-    expect(pendingActions.length).toBeGreaterThanOrEqual(0); // may or may not create based on classification
+    expect(pendingActions.length).toBeGreaterThan(0);
+  });
+
+  it("retry action completes full path through execute and record_memory", async () => {
+    const runtime = makeRuntime();
+    const recoverableError: RuntimeError = {
+      code: "AGENT_FAILED",
+      category: "agent_process",
+      message: "agent died",
+      retryable: false,
+      recoverable: true
+    };
+
+    const result = await runtime.start({
+      workflowInstanceId: "wfi_full",
+      runAttemptId: "run_full",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "core.recovery.workflow",
+      input: {
+        workspaceId: "ws_1",
+        runAttemptId: "run_failed",
+        error: recoverableError,
+        now: "2026-05-31T00:10:00.000Z"
+      },
+      now: "2026-05-31T00:10:00.000Z"
+    });
+
+    expect(result.status).toBe("succeeded");
+
+    const events = store.listRuntimeEvents("wfi_full");
+    const stepEventTypes = events
+      .filter((e) => e.type.startsWith("step."))
+      .map((e) => e.type);
+    expect(stepEventTypes).toContain("step.started");
+    expect(stepEventTypes).toContain("step.succeeded");
+  });
+
+  it("recovery workflow creates memory candidate on completion", async () => {
+    const runtime = makeRuntime();
+    const recoverableError: RuntimeError = {
+      code: "EFFECT_FAILED",
+      category: "capability",
+      message: "handler unavailable",
+      retryable: false,
+      recoverable: true
+    };
+
+    const result = await runtime.start({
+      workflowInstanceId: "wfi_memory",
+      runAttemptId: "run_memory",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "core.recovery.workflow",
+      input: {
+        workspaceId: "ws_1",
+        runAttemptId: "run_orig",
+        error: recoverableError,
+        now: "2026-05-31T00:11:00.000Z"
+      },
+      now: "2026-05-31T00:11:00.000Z"
+    });
+
+    expect(result.status).toBe("succeeded");
+
+    const activeMemories = memoryStore.listActive("ws_1");
+    const failurePatterns = activeMemories.filter((m) => m.kind === "failure_pattern");
+    expect(failurePatterns.length).toBeGreaterThan(0);
+    expect(failurePatterns[0].content).toContain("Recovery action");
+  });
+
+  it("control action for trigger_recovery is created when approval needed", async () => {
+    const runtime = makeRuntime();
+    const unknownError: RuntimeError = {
+      code: "MYSTERY",
+      category: "unknown",
+      message: "something went wrong",
+      retryable: false,
+      recoverable: false
+    };
+
+    const result = await runtime.start({
+      workflowInstanceId: "wfi_ctrl",
+      runAttemptId: "run_ctrl",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "core.recovery.workflow",
+      input: {
+        workspaceId: "ws_1",
+        runAttemptId: "run_bad",
+        error: unknownError,
+        now: "2026-05-31T00:12:00.000Z"
+      },
+      now: "2026-05-31T00:12:00.000Z"
+    });
+
+    expect(result.status).toBe("waiting");
+
+    const pendingActions = controlActionStore.listPending("ws_1");
+    const recoveryAction = pendingActions.find((a) => a.actionType === "trigger_recovery");
+    expect(recoveryAction).toBeDefined();
+    expect(recoveryAction!.payload).toHaveProperty("artifactId");
+    expect(recoveryAction!.status).toBe("pending");
+  });
+
+  it("recovery workflow resumes from approval signal and completes", async () => {
+    const runtime = makeRuntime();
+    const unknownError: RuntimeError = {
+      code: "MYSTERY",
+      category: "unknown",
+      message: "something went wrong",
+      retryable: false,
+      recoverable: false
+    };
+
+    const result1 = await runtime.start({
+      workflowInstanceId: "wfi_resume",
+      runAttemptId: "run_resume_1",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "core.recovery.workflow",
+      input: {
+        workspaceId: "ws_1",
+        runAttemptId: "run_orig_bad",
+        error: unknownError,
+        now: "2026-05-31T00:13:00.000Z"
+      },
+      now: "2026-05-31T00:13:00.000Z"
+    });
+
+    expect(result1.status).toBe("waiting");
+
+    const pendingActions = controlActionStore.listPending("ws_1");
+    const recoveryAction = pendingActions.find((a) => a.actionType === "trigger_recovery");
+    expect(recoveryAction).toBeDefined();
+
+    const result2 = await runtime.resume({
+      workflowInstanceId: "wfi_resume",
+      runAttemptId: "run_resume_2",
+      signal: {
+        signalId: "sig_approve_recovery",
+        kind: "control_action",
+        payload: { action: "trigger_recovery" },
+        actor: { kind: "user", userId: "user_1" }
+      },
+      workspaceId: "ws_1",
+      now: "2026-05-31T00:14:00.000Z"
+    });
+
+    expect(result2.status).toBe("succeeded");
+
+    const events = store.listRuntimeEvents("wfi_resume");
+    const eventTypes = events.map((e) => e.type);
+    expect(eventTypes).toContain("step.waiting");
+    expect(eventTypes).toContain("workflow.signal_received");
+    expect(eventTypes).toContain("attempt.completed");
+    expect(eventTypes).toContain("workflow_instance.state_changed");
+  });
+});
+
+describe("Recovery Target", () => {
+  it("normalizes failed_attempt target", () => {
+    const target: RecoveryTarget = {
+      kind: "failed_attempt",
+      workflowInstanceId: "wfi_1",
+      runAttemptId: "run_1",
+      error: {
+        code: "AGENT_FAILED",
+        category: "agent_process",
+        message: "agent died",
+        retryable: false,
+        recoverable: true
+      }
+    };
+
+    const normalized = normalizeTarget(target);
+    expect(normalized.workflowInstanceId).toBe("wfi_1");
+    expect(normalized.runAttemptId).toBe("run_1");
+    expect(normalized.error).toBeDefined();
+    expect(normalized.error!.code).toBe("AGENT_FAILED");
+  });
+
+  it("normalizes failed_step target", () => {
+    const target: RecoveryTarget = {
+      kind: "failed_step",
+      workflowInstanceId: "wfi_2",
+      runAttemptId: "run_2",
+      stepStateId: "step_1",
+      error: {
+        code: "STEP_FAILED",
+        category: "unknown",
+        message: "step error",
+        retryable: false,
+        recoverable: false
+      }
+    };
+
+    const normalized = normalizeTarget(target);
+    expect(normalized.workflowInstanceId).toBe("wfi_2");
+    expect(normalized.runAttemptId).toBe("run_2");
+    expect(normalized.error!.code).toBe("STEP_FAILED");
+  });
+
+  it("normalizes stuck_workflow target (no error)", () => {
+    const target: RecoveryTarget = {
+      kind: "stuck_workflow",
+      workflowInstanceId: "wfi_3",
+      runAttemptId: "run_3",
+      stuckSince: "2026-05-31T00:00:00.000Z"
+    };
+
+    const normalized = normalizeTarget(target);
+    expect(normalized.workflowInstanceId).toBe("wfi_3");
+    expect(normalized.runAttemptId).toBe("run_3");
+    expect(normalized.error).toBeUndefined();
+    expect(normalized.stuckSince).toBe("2026-05-31T00:00:00.000Z");
+  });
+
+  it("normalizes failed_effect target", () => {
+    const target: RecoveryTarget = {
+      kind: "failed_effect",
+      workflowInstanceId: "wfi_4",
+      runAttemptId: "run_4",
+      effectExecutionId: "eff_1",
+      error: {
+        code: "EFFECT_FAILED",
+        category: "capability",
+        message: "effect failed",
+        retryable: true,
+        recoverable: true
+      }
+    };
+
+    const normalized = normalizeTarget(target);
+    expect(normalized.workflowInstanceId).toBe("wfi_4");
+    expect(normalized.runAttemptId).toBe("run_4");
+    expect(normalized.error!.code).toBe("EFFECT_FAILED");
   });
 });

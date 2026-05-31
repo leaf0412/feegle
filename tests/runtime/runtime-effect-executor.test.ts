@@ -206,6 +206,82 @@ describe("RuntimeEffectExecutor", () => {
     expect(effectRecord?.status).toBe("succeeded");
   });
 
+  it("throws IDEMPOTENCY_CONFLICT when same key used with different input", async () => {
+    handlers.register({
+      pluginId: "test",
+      effectType: "idem_conflict",
+      execute: async (effect) => ({ result: (effect.input as { value: string }).value })
+    });
+
+    seedRun("run_conflict", "wfi_conflict", "step_conflict", "2026-05-31T00:05:00.000Z");
+
+    const executor = new RuntimeEffectExecutor(store, handlers);
+
+    // First execution succeeds
+    await executor.execute({
+      effectId: "eff_conflict_1",
+      pluginId: "test",
+      effectType: "idem_conflict",
+      input: { value: "original" },
+      idempotencyKey: "key_conflict",
+      workspaceId: "ws_1",
+      workflowInstanceId: "wfi_conflict",
+      runAttemptId: "run_conflict",
+      stepStateId: "step_conflict",
+      now: "2026-05-31T00:05:00.000Z"
+    });
+
+    // Second execution with same key but different input should throw conflict
+    await expect(
+      executor.execute({
+        effectId: "eff_conflict_2",
+        pluginId: "test",
+        effectType: "idem_conflict",
+        input: { value: "different" },
+        idempotencyKey: "key_conflict",
+        workspaceId: "ws_1",
+        workflowInstanceId: "wfi_conflict",
+        runAttemptId: "run_conflict",
+        stepStateId: "step_conflict",
+        now: "2026-05-31T00:06:00.000Z"
+      })
+    ).rejects.toMatchObject({
+      code: "IDEMPOTENCY_CONFLICT",
+      category: "validation",
+      message: "same key, different input"
+    });
+  });
+
+  it("normalizes unknown errors with retryable: false, recoverable: false", async () => {
+    handlers.register({
+      pluginId: "test",
+      effectType: "strange_fail",
+      execute: async () => { throw "raw string error"; }
+    });
+
+    seedRun("run_raw", "wfi_raw", "step_raw", "2026-05-31T00:06:00.000Z");
+
+    const executor = new RuntimeEffectExecutor(store, handlers);
+    await expect(
+      executor.execute({
+        effectId: "eff_raw",
+        pluginId: "test",
+        effectType: "strange_fail",
+        input: {},
+        workspaceId: "ws_1",
+        workflowInstanceId: "wfi_raw",
+        runAttemptId: "run_raw",
+        stepStateId: "step_raw",
+        now: "2026-05-31T00:06:00.000Z"
+      })
+    ).rejects.toMatchObject({
+      code: "EFFECT_FAILED",
+      category: "capability",
+      retryable: false,
+      recoverable: false
+    });
+  });
+
   it("emits events in correct order: started before succeeded", async () => {
     const seen: string[] = [];
     handlers.register({
