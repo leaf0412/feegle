@@ -5,3 +5,4 @@ _docs
 docs/
 .worktrees/
 .env
+.claude/worktrees/

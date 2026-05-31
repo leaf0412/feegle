@@ -2,7 +2,6 @@ import type { FeeglePlugin } from "@infra/boot/feegle-plugin.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 import { gitlabFollowKindModule } from "@features/scheduler/default-handler-kind-modules.js";
 import { gitlabRuntimeContribution } from "./gitlab-runtime-contribution.js";
-
 // Module-level holder for the GitLab client, populated during providers phase.
 let _gitlabClient: GitLabClient | undefined;
 
