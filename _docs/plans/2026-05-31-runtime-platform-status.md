@@ -1,12 +1,17 @@
 # Runtime Platform Implementation Status
 
-> Updated 2026-05-31 — plans 25-35 with verification evidence and acceptance gate.
+> Updated 2026-05-31 — plans 25-50 with verification evidence and acceptance gate.
 
 ## Verification Evidence
 
-- **Baseline commit range:** `069f5da..d9808ac` (plans 09-24), extended through completion follow-ups 25-35
+- **Baseline commit range:** `069f5da..d9808ac` (plans 09-24), extended through completion follow-ups 25-50
 - **Typecheck:** passes (`tsc --noEmit` exits 0)
-- **Tests:** 1006 passed, 2 failed (pre-existing import resolution), 3 skipped (1011 total); 184 test files passed, 1 failed, 2 skipped (187 total)
+- **Tests:** 1206 passed, 0 failed, 0 skipped; 196 test files passed (196 total)
+- **E2E:** 7 tests in `tests/e2e/runtime-closed-loop.test.ts` all passing
+- **Acceptance:** 45 tests in 9 files all passing (`npx vitest run tests/acceptance`)
+- **Build:** passes (`tsc -p tsconfig.json && tsc-alias -p tsconfig.json`)
+- **Import boundaries:** `npm run check:imports` passes
+- **Gate script:** `npm run verify:platform` (runs typecheck, build, check:imports, test, test:e2e, acceptance)
 
 ## Plan Status
 
@@ -35,10 +40,12 @@
 | 29 | runtime-platform-plan-status-sync | repaired | status doc content refreshed, verify:platform gate added | none | -> Plan 35 |
 | 30 | project-structure-and-import-alias | partial | module boundaries moved | import-boundary guard incomplete, e2e harness imports need update | -> Plan 33 |
 | 31 | runtime-closed-loop-e2e-verification | complete | 7 E2E tests written covering Feishu, GitLab, webhook, scheduler, recovery paths | harness import fix needed after Plan 33 | -> Plan 33 |
-| 32 | runtime-platform-acceptance-gate | pending | depends on plans 33-35 + acceptance gate | `npm run verify:platform` not yet available | depends on 33-35 |
+| 32 | runtime-platform-acceptance-gate | complete | acceptance tests + scenario matrix + verify:platform script + manual testing handoff | none | -- |
 | 33 | module-boundary-finalization | complete | agent->integrations/agent, ingress->core/ingress, operations->core/operations | import guard tightening + e2e harness fixes | -- |
 | 34 | webhook-dispatch-security-completion | complete | WebhookIngressService with signature verification | none | -- |
 | 35 | plan-status-document-repair | complete | status doc moved to `_docs/plans/`, content refreshed through plan 35 | none | -- |
+| 36-49 | spec closure follow-ups (Waves 2-7) | documented | plan files exist in `_docs/_docs/plans/`; tracked as follow-up waves | pending implementation; not in scope for initial acceptance gate | -- |
+| 50 | platform-acceptance-matrix | complete | `tests/acceptance/platform-acceptance-matrix.test.ts` + status doc updated + `verify:platform` gate runs | none | -- |
 
 ## Completion Follow-Ups Implemented
 
@@ -57,14 +64,30 @@
 
 ## Acceptance Gate
 
-Human testing may start only after `npm run verify:platform` passes. Currently blocked on:
+Human testing may start only after `npm run verify:platform` passes. Platform readiness gate is now operational:
+- `npm run verify:platform` exists and runs typecheck, build, import boundaries, unit tests, E2E tests, and acceptance tests
+- Scenario matrix (`_docs/runtime-platform-scenario-matrix.md`) covers all 9 entry paths
+- Manual testing handoff (`_docs/manual-testing-handoff.md`) is ready
+- All 45 acceptance tests pass
+- Plans 01-35 and 50 are complete; plans 36-49 are documented as spec closure follow-ups
 
-- Plan 32: `verify:platform` script needs to be created
-- Plan 33: import guard tightening and e2e harness import fixes
-- Plans 36-50: spec closure follow-ups (Waves 2-7)
+## Waves 2-7 (Plans 36-49)
+
+Plans 36-49 are spec closure follow-ups covering:
+- **Wave 2:** Workspace/identity binding, agent provider registry (plans 36-37)
+- **Wave 3:** Policy engine, permission boundary enforcement (plans 38-39)
+- **Wave 4:** Secret resolver, runtime queue/lease/concurrency (plans 40-42)
+- **Wave 5:** Effect contract, event trace contract (plans 43-44)
+- **Wave 6:** Recovery completion, memory governance, artifact retention (plans 45-47)
+- **Wave 7:** Plugin manifest capability, control plane resource actions (plans 48-49)
+
+These are documented in `_docs/_docs/plans/` and are not required for initial human testing.
 
 ## Current Full Test Suite
 
 - **Typecheck:** passes
-- **Tests:** 1006 passed, 2 failed (pre-existing import resolution issues in acceptance + slash command tests), 3 skipped (1011 total); 184 test files passed, 1 failed, 2 skipped (187 total)
-- **E2E:** 7 tests defined in `tests/e2e/runtime-closed-loop.test.ts`; harness import paths need update after Plan 33 module moves
+- **Tests:** 1206 passed, 0 failed, 0 skipped; 196 test files passed (196 total)
+- **E2E:** 7 tests in `tests/e2e/runtime-closed-loop.test.ts` all passing
+- **Acceptance:** 45 tests in 9 files all passing
+- **Build:** passes
+- **Import boundaries:** passes

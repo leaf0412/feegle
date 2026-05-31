@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "start:feishu": "npm run build && node dist/src/integrations/feishu/feishu-long-connection-entry.js",
     "check:imports": "node scripts/check-import-boundaries.mjs",
-    "check": "npm run typecheck && npm run check:imports && npm test"
+    "check": "npm run typecheck && npm run check:imports && npm test",
+    "verify:platform": "node scripts/verify-platform-readiness.mjs"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.64.0",

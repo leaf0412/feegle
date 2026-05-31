@@ -29,4 +29,15 @@ describe("runtime platform scenario matrix", () => {
       }
     }
   });
+
+  it("manual testing handoff document references the verify:platform gate and required IDs", () => {
+    const handoffPath = join(rootDir, "_docs", "manual-testing-handoff.md");
+    const handoff = readFileSync(handoffPath, "utf8");
+
+    expect(handoff).toContain("npm run verify:platform");
+    expect(handoff).toContain("workflowInstanceId");
+    expect(handoff).toContain("runAttemptId");
+    expect(handoff).toContain("diagnostic artifact");
+    expect(handoff).toContain("failed trace stage");
+  });
 });
