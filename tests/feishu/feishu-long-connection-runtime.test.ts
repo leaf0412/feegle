@@ -71,6 +71,8 @@ describe("FeishuLongConnectionRuntime", () => {
 
     try {
       await runtime.start();
+      // Message event: no ingress configured, so it's dropped with a warning.
+      // Card event: still routes through handler.handleCommand.
       await registered["im.message.receive_v1"]?.({
         message: {
           message_id: "om_1",
@@ -99,16 +101,8 @@ describe("FeishuLongConnectionRuntime", () => {
         "im.message.recalled_v1",
         "im.message.receive_v1"
       ]);
+      // Message no longer calls handleCommand — only card action does
       expect(handled).toEqual([
-        {
-          source: "message",
-          chatId: "oc_1",
-          messageId: "om_1",
-          sessionKey: expect.any(String),
-          chatType: "group",
-          command: { type: "repo_select", repositoryIds: ["repo_1"] },
-          shouldRespond: true
-        },
         {
           source: "card",
           chatId: "oc_1",
@@ -118,13 +112,12 @@ describe("FeishuLongConnectionRuntime", () => {
         }
       ]);
       expect(consoleInfo).toHaveBeenCalledWith("Feishu message event received", expect.any(Object));
-      expect(consoleInfo).toHaveBeenCalledWith("Feishu message routed", expect.any(Object));
     } finally {
       expect(consoleInfo).toHaveBeenCalled();
     }
   });
 
-  it("dispatches accepted message events to runtime ingress when configured", async () => {
+  it("dispatches accepted message events to runtime ingress when configured and never calls handler.handleCommand", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
@@ -178,12 +171,71 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(dispatched[0]).toMatchObject({
       triggerEventId: "feishu:om_1",
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
-      external: { chatId: "oc_1", messageId: "om_1" },
+      external: { chatId: "oc_1", messageId: "om_1", commandType: "chat", shouldRespond: true },
       actorHint: { provider: "feishu", externalUserId: "ou_1" },
       conversationHint: { conversationKey: "feishu:oc_1" },
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
-    expect(handled).toHaveLength(1);
+    // handler.handleCommand must NOT be called for message events
+    expect(handled).toHaveLength(0);
+  });
+
+  it("logs an explicit error when ingress dispatch fails and never calls handler.handleCommand", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig(),
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      },
+      {
+        dispatch: async (_event) => {
+          return { status: "failed", reason: "intent unresolved: no matching workflow" };
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["im.message.receive_v1"]?.({
+      sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+      message: {
+        message_id: "om_fail",
+        chat_id: "oc_1",
+        chat_type: "p2p",
+        message_type: "text",
+        content: JSON.stringify({ text: "hello" })
+      }
+    });
+
+    // Ingress failure should be logged as an error
+    expect(consoleError).toHaveBeenCalledWith(
+      "Feishu ingress dispatch failed",
+      expect.objectContaining({ status: "failed", reason: "intent unresolved: no matching workflow" })
+    );
+    // handler.handleCommand must NOT be called
+    expect(handled).toHaveLength(0);
   });
 
   it("routes bot menu clicks through the command handler as slash commands", async () => {
@@ -261,12 +313,13 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(runtime.recallTracker.isRecalled("om_recalled")).toBe(true);
   });
 
-  it("does not handle the same source and message id twice", async () => {
+  it("does not handle the same message id twice", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
       "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
+    const dispatchCalls: unknown[] = [];
     const handled: unknown[] = [];
 
     class FakeEventDispatcher {
@@ -293,6 +346,12 @@ describe("FeishuLongConnectionRuntime", () => {
         handleCommand: async (input) => {
           handled.push(input);
         }
+      },
+      {
+        dispatch: async (event) => {
+          dispatchCalls.push(event);
+          return { status: "succeeded" };
+        }
       }
     );
 
@@ -307,8 +366,11 @@ describe("FeishuLongConnectionRuntime", () => {
         mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
       }
     };
+    // First dispatch of the same message id
     await registered["im.message.receive_v1"]?.(event);
+    // Second dispatch of the same message id — should be deduped
     await registered["im.message.receive_v1"]?.(event);
+    // Card action with same message id — not deduped (different source prefix)
     await registered["card.action.trigger"]?.({
       action: {
         value: {
@@ -320,7 +382,10 @@ describe("FeishuLongConnectionRuntime", () => {
       context: { open_chat_id: "oc_1", open_message_id: "om_1" }
     });
 
-    expect(handled).toHaveLength(2);
+    // ingress.dispatch should only be called once (second message deduped)
+    expect(dispatchCalls).toHaveLength(1);
+    // Card action still calls handler
+    expect(handled).toHaveLength(1);
   });
 
   it("handles repeated card navigation actions from the same card message", async () => {
@@ -394,12 +459,13 @@ describe("FeishuLongConnectionRuntime", () => {
     ]);
   });
 
-  it("uses platform allow-list config before invoking handlers", async () => {
+  it("uses platform allow-list config before invoking dispatch", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
       "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
+    const dispatchCalls: unknown[] = [];
     const handled: unknown[] = [];
     const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -427,6 +493,12 @@ describe("FeishuLongConnectionRuntime", () => {
         handleCommand: async (input) => {
           handled.push(input);
         }
+      },
+      {
+        dispatch: async (event) => {
+          dispatchCalls.push(event);
+          return { status: "succeeded" };
+        }
       }
     );
 
@@ -443,6 +515,8 @@ describe("FeishuLongConnectionRuntime", () => {
         }
       });
 
+      // Blocked user: neither ingress.dispatch nor handleCommand called
+      expect(dispatchCalls).toEqual([]);
       expect(handled).toEqual([]);
       expect(consoleWarn).toHaveBeenCalledWith(
         "Feishu message event ignored",
@@ -453,12 +527,13 @@ describe("FeishuLongConnectionRuntime", () => {
     }
   });
 
-  it("forwards unmentioned group messages for recording without allowing responses", async () => {
+  it("forwards unmentioned group messages to ingress with shouldRespond: false", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
       "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
+    const dispatchCalls: unknown[] = [];
     const handled: unknown[] = [];
 
     class FakeEventDispatcher {
@@ -485,6 +560,12 @@ describe("FeishuLongConnectionRuntime", () => {
         handleCommand: async (input) => {
           handled.push(input);
         }
+      },
+      {
+        dispatch: async (event) => {
+          dispatchCalls.push(event);
+          return { status: "succeeded" };
+        }
       }
     );
 
@@ -501,21 +582,18 @@ describe("FeishuLongConnectionRuntime", () => {
       }
     });
 
-    expect(handled).toEqual([
-      {
-        source: "message",
-        chatId: "oc_1",
-        messageId: "om_record_only",
-        sender: { platform: "feishu", userId: "ou_1" },
-        sessionKey: expect.any(String),
-        chatType: "group",
-        command: { type: "chat", raw: "只记录，不回复" },
-        shouldRespond: false
-      }
-    ]);
+    // The message should go to ingress with shouldRespond: false
+    expect(dispatchCalls).toHaveLength(1);
+    expect(dispatchCalls[0]).toMatchObject({
+      triggerEventId: "feishu:om_record_only",
+      external: { chatId: "oc_1", messageId: "om_record_only", commandType: "chat", shouldRespond: false, chatType: "group" },
+      actorHint: { provider: "feishu", externalUserId: "ou_1" }
+    });
+    // handler.handleCommand must NOT be called
+    expect(handled).toHaveLength(0);
   });
 
-  it("catches handler failures without rejecting SDK callbacks", async () => {
+  it("catches ingress dispatch errors without rejecting SDK callbacks", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
@@ -545,7 +623,12 @@ describe("FeishuLongConnectionRuntime", () => {
       },
       {
         handleCommand: async () => {
-          throw new Error("handler failed");
+          throw new Error("handler should never be called for messages");
+        }
+      },
+      {
+        dispatch: async () => {
+          throw new Error("ingress dispatch failed");
         }
       }
     );
@@ -566,9 +649,66 @@ describe("FeishuLongConnectionRuntime", () => {
       ).resolves.toBeUndefined();
       await Promise.resolve();
 
-      expect(consoleError).toHaveBeenCalledWith("Feishu message handler failed", expect.any(Error));
+      expect(consoleError).toHaveBeenCalledWith("Feishu ingress dispatch threw", expect.any(Object));
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("drops message when ingress is not configured with a warning", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+    } = {};
+    const handled: unknown[] = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig({ botOpenId: "ou_bot" }),
+      {
+        EventDispatcher: FakeEventDispatcher,
+        WSClient: FakeWSClient
+      },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      }
+      // No ingress configured
+    );
+
+    await runtime.start();
+    await registered["im.message.receive_v1"]?.({
+      message: {
+        message_id: "om_dropped",
+        chat_id: "oc_1",
+        chat_type: "group",
+        message_type: "text",
+        content: JSON.stringify({ text: "@_user_1 hello" }),
+        mentions: [{ id: { open_id: "ou_bot" }, name: "bot", key: "@_user_1" }]
+      }
+    });
+
+    // No ingress configured: message dropped, warning logged, no handler call
+    expect(consoleWarn).toHaveBeenCalledWith(
+      "Feishu message dropped — no ingress configured",
+      expect.any(Object)
+    );
+    expect(handled).toHaveLength(0);
   });
 });

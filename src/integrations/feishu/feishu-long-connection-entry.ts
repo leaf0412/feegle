@@ -41,7 +41,7 @@ const app = new FeegleApp({
   feishuClient,
   cloudDoc,
   loadConfigStore: async () => configStore,
-  runtimeFactory: (handler) => new FeishuLongConnectionRuntime(resolvedConfig, lark, handler)
+  runtimeFactory: (handler, ingress) => new FeishuLongConnectionRuntime(resolvedConfig, lark, handler, ingress)
 });
 
 await app.start();

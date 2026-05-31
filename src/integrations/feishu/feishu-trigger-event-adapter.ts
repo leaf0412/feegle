@@ -8,6 +8,10 @@ export function feishuMessageEnvelopeToTriggerEvent(input: {
   senderUserId?: string;
   commandType: string;
   textLength: number;
+  raw?: string;
+  shouldRespond?: boolean;
+  chatType?: string;
+  sessionKey?: string;
 }): TriggerEvent {
   return {
     triggerEventId: input.triggerEventId,
@@ -19,7 +23,11 @@ export function feishuMessageEnvelopeToTriggerEvent(input: {
     receivedAt: input.receivedAt,
     external: {
       chatId: input.chatId,
-      messageId: input.messageId
+      messageId: input.messageId,
+      commandType: input.commandType,
+      raw: input.raw,
+      shouldRespond: input.shouldRespond,
+      chatType: input.chatType
     },
     actorHint: input.senderUserId
       ? { provider: "feishu", externalUserId: input.senderUserId }
@@ -27,7 +35,8 @@ export function feishuMessageEnvelopeToTriggerEvent(input: {
     conversationHint: { conversationKey: `feishu:${input.chatId}` },
     payloadSummary: {
       commandType: input.commandType,
-      textLength: input.textLength
+      textLength: input.textLength,
+      shouldRespond: input.shouldRespond
     }
   };
 }

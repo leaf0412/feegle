@@ -1,6 +1,15 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+
+function intentKindFromEvent(event: TriggerEvent): IntentKind {
+  const commandType = event.external.commandType;
+  if (typeof commandType === "string" && commandType === "chat") {
+    return "chat";
+  }
+  return "slash_command";
+}
 
 export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeContributionModule {
   return {
@@ -11,7 +20,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
         canResolve: (event) => event.source.pluginId === "feishu" && event.source.triggerType === "message",
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
-          kind: "chat",
+          kind: intentKindFromEvent(event),
           workspaceId: workspaceIdFromEvent(event),
           projectId: projectIdFromEvent(event),
           actor:
@@ -28,6 +37,12 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
         definitionId: "feishu.chat.workflow"
       });
 
+      ctx.workflowSelector.register({
+        id: "feishu-slash",
+        matches: (intent) => intent.kind === "slash_command",
+        definitionId: "feishu.slash.workflow"
+      });
+
       ctx.workflows.register({
         definitionId: "feishu.chat.workflow",
         version: 1,
@@ -36,12 +51,12 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
           {
             stepId: "reply",
             run: async (stepCtx) => {
-              const payload = stepCtx.input as { chatId?: string; messageId?: string; text?: string };
-              if (payload.chatId && payload.text) {
+              const payload = stepCtx.input as { chatId?: string; messageId?: string; text?: string; shouldRespond?: boolean };
+              if (payload.shouldRespond !== false && payload.messageId && payload.text) {
                 await stepCtx.executeEffect({
                   pluginId: "feishu",
                   effectType: "reply",
-                  input: { messageId: payload.messageId ?? payload.chatId, content: payload.text }
+                  input: { messageId: payload.messageId, content: payload.text }
                 });
               }
               return { kind: "complete", output: { replied: true } };
@@ -50,7 +65,32 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
         ]
       });
 
-      // Register Feishu effect handlers
+      ctx.workflows.register({
+        definitionId: "feishu.slash.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "acknowledge",
+            run: async (stepCtx) => {
+              const payload = stepCtx.input as Record<string, unknown>;
+              if (payload.shouldRespond !== false) {
+                await stepCtx.executeEffect({
+                  pluginId: "feishu",
+                  effectType: "reply",
+                  input: {
+                    messageId: (payload.messageId ?? payload.chatId) as string,
+                    content: `[slash command "${payload.commandType}" processed via runtime]`
+                  }
+                });
+              }
+              return { kind: "complete", output: { acknowledged: true } };
+            }
+          }
+        ]
+      });
+
+      // Register Feishu effect handlers (client-backed)
       ctx.effectHandlers.register({
         pluginId: "feishu",
         effectType: "reply",
