@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "start:feishu": "npm run build && node dist/src/integrations/feishu/feishu-long-connection-entry.js",
+    "bootstrap:feishu-identity": "npm run build && node dist/src/infra/app/bootstrap-feishu-identity-entry.js",
     "check:imports": "node scripts/check-import-boundaries.mjs",
     "check": "npm run typecheck && npm run check:imports && npm test",
     "verify:platform": "node scripts/verify-platform-readiness.mjs"

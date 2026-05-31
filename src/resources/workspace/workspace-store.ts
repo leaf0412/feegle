@@ -79,6 +79,73 @@ export class WorkspaceStore {
     };
   }
 
+  ensureWorkspace(input: {
+    workspaceId: string;
+    workspaceName: string;
+    now: string;
+  }): WorkspaceRecord {
+    this.db
+      .prepare(
+        `insert into workspaces (id, name, created_at, updated_at)
+         values (?, ?, ?, ?)
+         on conflict(id) do update set
+          name = excluded.name,
+          updated_at = excluded.updated_at`
+      )
+      .run(input.workspaceId, input.workspaceName, input.now, input.now);
+
+    const workspace = this.getWorkspace(input.workspaceId);
+    if (!workspace) {
+      throw new Error(`workspace bootstrap failed: ${input.workspaceId}`);
+    }
+    return workspace;
+  }
+
+  ensureUser(input: {
+    userId: string;
+    displayName: string;
+    now: string;
+  }): UserRecord {
+    this.db
+      .prepare(
+        `insert into users (id, display_name, created_at, updated_at)
+         values (?, ?, ?, ?)
+         on conflict(id) do update set
+          display_name = excluded.display_name,
+          updated_at = excluded.updated_at`
+      )
+      .run(input.userId, input.displayName, input.now, input.now);
+
+    const user = this.getUser(input.userId);
+    if (!user) {
+      throw new Error(`user bootstrap failed: ${input.userId}`);
+    }
+    return user;
+  }
+
+  upsertMembership(input: {
+    workspaceId: string;
+    userId: string;
+    role: MembershipRecord["role"];
+    now: string;
+  }): MembershipRecord {
+    this.db
+      .prepare(
+        `insert into memberships (workspace_id, user_id, role, created_at, updated_at)
+         values (?, ?, ?, ?, ?)
+         on conflict(workspace_id, user_id) do update set
+          role = excluded.role,
+          updated_at = excluded.updated_at`
+      )
+      .run(input.workspaceId, input.userId, input.role, input.now, input.now);
+
+    const membership = this.getMembership(input.workspaceId, input.userId);
+    if (!membership) {
+      throw new Error(`membership bootstrap failed: ${input.workspaceId}:${input.userId}`);
+    }
+    return membership;
+  }
+
   bindConversation(input: {
     conversationKey: string;
     workspaceId: string;
