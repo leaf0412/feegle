@@ -376,6 +376,18 @@ export function migrate(db: RuntimeDb): void {
   `);
 
   ensureColumn(db, "control_actions", "error_message", "text");
+
+  db.exec(`
+    create table if not exists webhook_sources (
+      id text primary key,
+      name text not null,
+      plugin_id text not null,
+      secret_ref text not null,
+      enabled integer not null default 1,
+      created_at text not null,
+      updated_at text not null
+    );
+  `);
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {

@@ -23,8 +23,8 @@ describe("feishuRuntimeContribution", () => {
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
       receivedAt: "2026-05-31T00:00:00.000Z",
       external: { chatId: "oc_1", messageId: "om_1" },
-      actorHint: { platform: "feishu", userId: "ou_1" },
-      conversationHint: { chatId: "oc_1" },
+      actorHint: { provider: "feishu", externalUserId: "ou_1" },
+      conversationHint: { conversationKey: "feishu:oc_1" },
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
 
