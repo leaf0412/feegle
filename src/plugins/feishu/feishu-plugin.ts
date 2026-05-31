@@ -34,6 +34,22 @@ export interface FeishuPluginDeps {
 export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
   return {
     id: "feishu",
+    manifest: {
+      id: "feishu",
+      version: "1.0.0",
+      displayName: "Feishu",
+      description: "Feishu long-connection runtime, chat intent resolution, message reply, and card control actions",
+      triggerTypes: ["message"],
+      effectTypes: [
+        { pluginId: "feishu", effectType: "reply" },
+        { pluginId: "feishu", effectType: "card.update" }
+      ],
+      intentKinds: ["chat"],
+      controlActionTypes: ["card.revise", "card.approve", "card.cancel", "card.push", "card.revision_submit"],
+      permissions: ["read_feishu_messages", "send_feishu_messages", "manage_feishu_cards"],
+      secretRefs: ["FEISHU_APP_ID", "FEISHU_APP_SECRET"],
+      resourceScopes: ["feishu:im:message", "feishu:im:chat"]
+    },
     provides: [
       {
         phase: "providers",

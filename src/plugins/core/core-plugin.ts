@@ -13,6 +13,16 @@ import { schedulerWorkflowContribution } from "@features/scheduler/scheduler-wor
 
 export const corePlugin: FeeglePlugin = {
   id: "core",
+  manifest: {
+    id: "core",
+    version: "1.0.0",
+    displayName: "Core",
+    description: "Heartbeat, agent prompts, recovery workflows, and system commands",
+    triggerTypes: ["heartbeat"],
+    effectTypes: [{ pluginId: "core", effectType: "agent_prompt" }],
+    controlActionTypes: ["system_commands"],
+    permissions: ["schedule_tasks", "run_agent_prompts"]
+  },
   handlerKinds: [heartbeatKindModule(), agentPromptKindModule()],
   slashCommands: defaultSlashCommandModules(),
   runtimeContributions: [schedulerWorkflowContribution()],

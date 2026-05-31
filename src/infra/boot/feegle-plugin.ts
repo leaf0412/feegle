@@ -4,6 +4,7 @@ import type { SlashCommandModule } from "@platform/slash-command-module.js";
 import type { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import type { HandlerKindModule } from "@features/scheduler/handler-kind-module.js";
 import type { QuoteClientModule } from "@integrations/stock/quote-client-module.js";
+import type { PluginManifest } from "@core/plugins/plugin-manifest.js";
 import type { BootContext, CapabilityContext } from "./boot-context.js";
 import type { BootPhaseName } from "./boot-phase.js";
 
@@ -29,6 +30,7 @@ export interface RuntimeContributionModule {
 export interface FeeglePlugin {
   readonly id: string;
   readonly dependsOn?: readonly string[];
+  readonly manifest?: PluginManifest;
   readonly handlerKinds?: readonly HandlerKindModule[];
   readonly slashCommands?: readonly SlashCommandModule[];
   readonly quoteClients?: readonly QuoteClientModule[];

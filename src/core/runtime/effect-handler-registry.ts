@@ -21,6 +21,10 @@ export class EffectHandlerRegistry {
     return this.handlers.has(effectKey(pluginId, effectType));
   }
 
+  list(): EffectHandler[] {
+    return [...this.handlers.values()];
+  }
+
   async execute(effect: Effect): Promise<unknown> {
     const key = effectKey(effect.pluginId, effect.effectType);
     const handler = this.handlers.get(key);

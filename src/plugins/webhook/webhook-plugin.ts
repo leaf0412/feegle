@@ -56,5 +56,15 @@ export function webhookRuntimeContribution(): RuntimeContributionModule {
 
 export const webhookPlugin: FeeglePlugin = {
   id: "webhook",
+  manifest: {
+    id: "webhook",
+    version: "1.0.0",
+    displayName: "Webhook Ingress",
+    description: "Receives external webhook triggers and records events",
+    triggerTypes: ["webhook"],
+    effectTypes: [{ pluginId: "webhook", effectType: "record_event" }],
+    intentKinds: ["workflow_signal"],
+    permissions: ["receive_webhooks"]
+  },
   runtimeContributions: [webhookRuntimeContribution()]
 };

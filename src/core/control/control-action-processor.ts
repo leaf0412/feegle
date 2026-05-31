@@ -30,6 +30,38 @@ export interface DeleteMemoryHandler {
   deleteMemory(payload: { memoryId: string }): Promise<{ status: "completed" }>;
 }
 
+export interface BindWorkspaceHandler {
+  bindWorkspace(payload: { workspaceId: string; conversationId: string }): Promise<{ status: "completed" }>;
+}
+
+export interface RegisterProviderHandler {
+  registerProvider(payload: { providerId: string; label: string; command: string; kind?: string }): Promise<{ status: "completed" }>;
+}
+
+export interface DisableProviderHandler {
+  disableProvider(payload: { providerId: string }): Promise<{ status: "completed" }>;
+}
+
+export interface UpdatePolicyHandler {
+  updatePolicy(payload: { workspaceId: string; policyId: string; rule: Record<string, unknown> }): Promise<{ status: "completed" }>;
+}
+
+export interface PauseScheduleHandler {
+  pauseSchedule(payload: { scheduleId: string }): Promise<{ status: "completed" }>;
+}
+
+export interface ResumeScheduleHandler {
+  resumeSchedule(payload: { scheduleId: string }): Promise<{ status: "completed" }>;
+}
+
+export interface RevokeMemoryHandler {
+  revokeMemory(payload: { memoryId: string }): Promise<{ status: "completed" }>;
+}
+
+export interface ApproveRecoveryHandler {
+  approveRecovery(payload: { recoveryId: string }): Promise<{ status: "completed" }>;
+}
+
 export interface ControlActionHandlers {
   approveStep?: ApproveStepHandler;
   rejectStep?: RejectStepHandler;
@@ -38,6 +70,14 @@ export interface ControlActionHandlers {
   triggerRecovery?: TriggerRecoveryHandler;
   confirmMemory?: ConfirmMemoryHandler;
   deleteMemory?: DeleteMemoryHandler;
+  bindWorkspace?: BindWorkspaceHandler;
+  registerProvider?: RegisterProviderHandler;
+  disableProvider?: DisableProviderHandler;
+  updatePolicy?: UpdatePolicyHandler;
+  pauseSchedule?: PauseScheduleHandler;
+  resumeSchedule?: ResumeScheduleHandler;
+  revokeMemory?: RevokeMemoryHandler;
+  approveRecovery?: ApproveRecoveryHandler;
 }
 
 export interface ControlEventSink {
@@ -140,6 +180,46 @@ export class ControlActionProcessor {
       case "delete_memory": {
         if (!this.handlers.deleteMemory) throw new Error("delete_memory handler not wired");
         await this.handlers.deleteMemory.deleteMemory(payload as { memoryId: string });
+        return;
+      }
+      case "bind_workspace": {
+        if (!this.handlers.bindWorkspace) throw new Error("bind_workspace handler not wired");
+        await this.handlers.bindWorkspace.bindWorkspace(payload as { workspaceId: string; conversationId: string });
+        return;
+      }
+      case "register_provider": {
+        if (!this.handlers.registerProvider) throw new Error("register_provider handler not wired");
+        await this.handlers.registerProvider.registerProvider(payload as { providerId: string; label: string; command: string; kind?: string });
+        return;
+      }
+      case "disable_provider": {
+        if (!this.handlers.disableProvider) throw new Error("disable_provider handler not wired");
+        await this.handlers.disableProvider.disableProvider(payload as { providerId: string });
+        return;
+      }
+      case "update_policy": {
+        if (!this.handlers.updatePolicy) throw new Error("update_policy handler not wired");
+        await this.handlers.updatePolicy.updatePolicy(payload as { workspaceId: string; policyId: string; rule: Record<string, unknown> });
+        return;
+      }
+      case "pause_schedule": {
+        if (!this.handlers.pauseSchedule) throw new Error("pause_schedule handler not wired");
+        await this.handlers.pauseSchedule.pauseSchedule(payload as { scheduleId: string });
+        return;
+      }
+      case "resume_schedule": {
+        if (!this.handlers.resumeSchedule) throw new Error("resume_schedule handler not wired");
+        await this.handlers.resumeSchedule.resumeSchedule(payload as { scheduleId: string });
+        return;
+      }
+      case "revoke_memory": {
+        if (!this.handlers.revokeMemory) throw new Error("revoke_memory handler not wired");
+        await this.handlers.revokeMemory.revokeMemory(payload as { memoryId: string });
+        return;
+      }
+      case "approve_recovery": {
+        if (!this.handlers.approveRecovery) throw new Error("approve_recovery handler not wired");
+        await this.handlers.approveRecovery.approveRecovery(payload as { recoveryId: string });
         return;
       }
       default:
