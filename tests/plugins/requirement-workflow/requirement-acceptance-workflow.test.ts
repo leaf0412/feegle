@@ -6,6 +6,21 @@ import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js"
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import { requirementWorkflowRuntimeContribution } from "@plugins/requirement-workflow/requirement-workflow-runtime-contribution.js";
 
+describe("requirement cancel workflow", () => {
+  it("routes requirement_cancel and registers the cancel workflow", () => {
+    const selector = new WorkflowSelector();
+    const workflows = new WorkflowRegistry();
+    requirementWorkflowRuntimeContribution().register(new RuntimeContributionContext({
+      workflows, intentResolvers: new IntentResolverRegistry(), workflowSelector: selector, effectHandlers: new EffectHandlerRegistry()
+    }));
+    expect(selector.select({
+      intentId: "i", kind: "requirement_cancel", workspaceId: "ws", projectId: null,
+      actor: { kind: "user", userId: "u" }, payload: { requirementId: "reqwf_1" }
+    }).definitionId).toBe("requirement.cancel.workflow");
+    expect(() => workflows.require("requirement.cancel.workflow")).not.toThrow();
+  });
+});
+
 describe("requirement verification workflow selectors", () => {
   it("routes verify and accept intents", () => {
     const selector = new WorkflowSelector();

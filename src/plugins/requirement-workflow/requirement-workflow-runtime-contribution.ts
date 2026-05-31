@@ -157,9 +157,38 @@ export function requirementWorkflowRuntimeContribution(): RuntimeContributionMod
         definitionId: "requirement.accept.workflow"
       });
 
+      ctx.workflowSelector.register({
+        id: "requirement-cancel",
+        matches: (intent) => intent.kind === "requirement_cancel",
+        definitionId: "requirement.cancel.workflow"
+      });
+
       ctx.workflows.register(buildVerifyWorkflow());
       ctx.workflows.register(buildAcceptWorkflow());
+      ctx.workflows.register(buildCancelWorkflow());
     }
+  };
+}
+
+function buildCancelWorkflow() {
+  return {
+    definitionId: "requirement.cancel.workflow",
+    version: 1,
+    concurrencyPolicy: "reject_if_running" as const,
+    steps: [
+      {
+        stepId: "cancel",
+        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
+          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
+          const output = await stepCtx.executeEffect({
+            pluginId: "requirement-workflow",
+            effectType: "execution.cancel",
+            input
+          });
+          return { kind: "complete" as const, output };
+        }
+      }
+    ]
   };
 }
 
