@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIterationPrompt, deriveSlug } from "../../src/features/workbench/plan-execution-helpers.js";
+import { buildIterationPrompt, deriveSlug } from "@features/workbench/plan-execution-helpers.js";
 
 describe("deriveSlug", () => {
   it("normalises English title to snake_case", () => {

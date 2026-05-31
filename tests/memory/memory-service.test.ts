@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { MemoryService } from "../../src/core/memory/memory-service.js";
-import { MemoryStore } from "../../src/core/memory/memory-store.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { MemoryService } from "@core/memory/memory-service.js";
+import { MemoryStore } from "@core/memory/memory-store.js";
 
 describe("MemoryService", () => {
   let tempDir: string;

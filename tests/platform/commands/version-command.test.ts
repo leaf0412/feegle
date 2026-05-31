@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VersionCommandHandler } from "../../../src/platform/commands/system/version-command.js";
+import { VersionCommandHandler } from "@platform/commands/system/version-command.js";
 
 describe("VersionCommandHandler", () => {
   it("reports feegle version from package.json so /version surfaces what's actually deployed", async () => {

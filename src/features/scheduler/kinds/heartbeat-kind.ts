@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createPlatformCard } from "../../../platform/platform-card.js";
+import { createPlatformCard } from "@platform/platform-card.js";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";
 import type { TaskContext } from "../task-context.js";
 import type { Task } from "../task.js";

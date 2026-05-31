@@ -1,4 +1,4 @@
-import type { PlatformProgressEntry, PlatformProgressSnapshot } from "../../platform/progress.js";
+import type { PlatformProgressEntry, PlatformProgressSnapshot } from "@platform/progress.js";
 
 export function renderFeishuProgressCard(snapshot: PlatformProgressSnapshot): Record<string, unknown> {
   const state = progressState(snapshot.state, snapshot.title);

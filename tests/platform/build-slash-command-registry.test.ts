@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
-import type { SlashCommandDefinition } from "../../src/platform/slash-command-catalog.js";
-import type { SlashCommandHandler, SlashCommandReply } from "../../src/platform/slash-command-handler.js";
-import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-module.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
+import type { SlashCommandDefinition } from "@platform/slash-command-catalog.js";
+import type { SlashCommandHandler, SlashCommandReply } from "@platform/slash-command-handler.js";
+import type { SlashCommandRegistryDeps } from "@platform/slash-command-module.js";
 import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("buildSlashCommandRegistry", () => {

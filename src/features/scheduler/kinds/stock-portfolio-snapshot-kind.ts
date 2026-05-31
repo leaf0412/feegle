@@ -1,10 +1,10 @@
 import { z } from "zod";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";
 import type { TaskContext } from "../task-context.js";
-import type { QuoteClient } from "../../../integrations/stock/stock-quote-port.js";
-import type { PortfolioEntry, PortfolioPosition, Snapshot } from "../../../integrations/stock/stock-store-types.js";
-import type { StockCode } from "../../../integrations/stock/stock-code.js";
-import { pnlForEntry } from "../../../integrations/stock/stock-domain.js";
+import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
+import type { PortfolioEntry, PortfolioPosition, Snapshot } from "@integrations/stock/stock-store-types.js";
+import type { StockCode } from "@integrations/stock/stock-code.js";
+import { pnlForEntry } from "@integrations/stock/stock-domain.js";
 import { buildSnapshotCard } from "./build-snapshot-card.js";
 
 const ParamsSchema = z.object({}).default({});

@@ -4,9 +4,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { migrate, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { migrateLegacyRepositoriesJson } from "../../src/infra/boot/phases/stores-phase.js";
-import { RepositoryStore } from "../../src/resources/repositories/repository-store.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { migrateLegacyRepositoriesJson } from "@infra/boot/phases/stores-phase.js";
+import { RepositoryStore } from "@resources/repositories/repository-store.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

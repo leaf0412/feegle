@@ -4,7 +4,7 @@ import {
   extractCardActionCommand,
   extractTextMessageCommand,
   explainTextMessageCommand
-} from "../../src/integrations/feishu/feishu-event-adapter.js";
+} from "@integrations/feishu/feishu-event-adapter.js";
 
 describe("feishu event adapter", () => {
   it("extracts text message commands from im.message.receive_v1 events", () => {

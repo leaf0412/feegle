@@ -3,7 +3,7 @@ import {
   createProgressEvent,
   type PlatformProgressEntry,
   type PlatformProgressSnapshot
-} from "../../src/platform/progress.js";
+} from "@platform/progress.js";
 
 describe("createProgressEvent", () => {
   it("normalizes long running work into card-renderable progress state", () => {

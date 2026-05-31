@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { WorkspaceManager } from "../../src/resources/workspace/workspace-manager.js";
+import { WorkspaceManager } from "@resources/workspace/workspace-manager.js";
 
 describe("WorkspaceManager", () => {
   it("creates deterministic paths by chat, requirement, and repository", () => {

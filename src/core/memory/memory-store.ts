@@ -1,4 +1,4 @@
-import type { RuntimeDb } from "../../infra/app/runtime-db.js";
+import type { RuntimeDb } from "@infra/app/runtime-db.js";
 import type { MemoryKind, MemoryRecord, MemoryScope, MemoryStatus } from "./memory-models.js";
 
 export class MemoryStore {

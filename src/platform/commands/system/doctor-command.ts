@@ -6,7 +6,7 @@ import {
   type DoctorChecker,
   type DoctorStatus
 } from "../../../agent/agent-capabilities.js";
-import type { ConfigStorePort } from "../../../infra/app/config-store.js";
+import type { ConfigStorePort } from "@infra/app/config-store.js";
 import type {
   SlashCommandHandler,
   SlashCommandReply

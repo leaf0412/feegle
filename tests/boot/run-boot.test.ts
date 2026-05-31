@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { BootContext } from "../../src/infra/boot/boot-context.js";
-import type { BootPhase } from "../../src/infra/boot/boot-phase.js";
-import { BootAbortError } from "../../src/infra/boot/boot-phase.js";
-import { runBoot } from "../../src/infra/boot/run-boot.js";
+import { BootContext } from "@infra/boot/boot-context.js";
+import type { BootPhase } from "@infra/boot/boot-phase.js";
+import { BootAbortError } from "@infra/boot/boot-phase.js";
+import { runBoot } from "@infra/boot/run-boot.js";
 
 function phase(name: BootPhase["name"], run: () => Promise<void>): BootPhase {
   return { name, run };

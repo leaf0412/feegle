@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOwnerEmails } from "../../src/infra/app/owner-emails.js";
+import { parseOwnerEmails } from "@infra/app/owner-emails.js";
 
 describe("parseOwnerEmails", () => {
   it("normalizes comma-separated owner emails: trim + lowercase", () => {

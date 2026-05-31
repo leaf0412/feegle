@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGitLabIssueUrl } from "../../src/integrations/gitlab/gitlab-url-parser.js";
+import { parseGitLabIssueUrl } from "@integrations/gitlab/gitlab-url-parser.js";
 
 describe("parseGitLabIssueUrl", () => {
   it("parses a standard GitLab issue URL with nested namespace", () => {

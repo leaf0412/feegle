@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createPlatformCommandHandler } from "../../src/platform/platform-command-handler.js";
-import type { PlatformIncomingMessage } from "../../src/platform/platform-message.js";
+import { createPlatformCommandHandler } from "@platform/platform-command-handler.js";
+import type { PlatformIncomingMessage } from "@platform/platform-message.js";
 
 describe("createPlatformCommandHandler", () => {
   it("adapts platform messages to legacy command responder input", async () => {

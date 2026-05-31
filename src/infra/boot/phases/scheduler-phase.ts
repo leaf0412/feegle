@@ -5,9 +5,9 @@ import type { ConfigStorePort } from "../../app/config-store.js";
 import type { Startable } from "../../app/feegle-app.js";
 import type { HookManager } from "../../app/hooks.js";
 import type { NotificationBroker } from "../../app/notification-broker.js";
-import { ConsoleJsonLogger } from "../../../features/scheduler/logger.js";
-import { TaskScheduler } from "../../../features/scheduler/task-scheduler.js";
-import { RuntimeHostInfoProvider } from "../../../features/scheduler/util/host-info.js";
+import { ConsoleJsonLogger } from "@features/scheduler/logger.js";
+import { TaskScheduler } from "@features/scheduler/task-scheduler.js";
+import { RuntimeHostInfoProvider } from "@features/scheduler/util/host-info.js";
 
 export interface SchedulerPhaseDeps {
   ownerEmails: ReadonlySet<string>;

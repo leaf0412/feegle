@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextRunDescription } from "../../../src/platform/commands/cron/cron-command-handlers.js";
+import { nextRunDescription } from "@platform/commands/cron/cron-command-handlers.js";
 
 describe("nextRunDescription", () => {
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import type { CapabilityContext } from "../../infra/boot/boot-context.js";
+import type { CapabilityContext } from "@infra/boot/boot-context.js";
 import type { HandlerKindRegistry } from "./handler-kind-registry.js";
 
 export interface HandlerKindModule {

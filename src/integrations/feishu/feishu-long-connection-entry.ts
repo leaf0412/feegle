@@ -3,11 +3,11 @@ import { FeishuClientPort, LarkFeishuClient } from "./feishu-client.js";
 import { HttpFeishuCloudDocClient } from "./feishu-cloud-doc-client.js";
 import { FeishuLongConnectionRuntime } from "./feishu-long-connection-runtime.js";
 import { buildFeishuEntryConfig, resolveFeishuEntryConfig } from "./feishu-entry-config.js";
-import { FeegleApp } from "../../infra/app/feegle-app.js";
-import { ConfigStore } from "../../infra/app/config-store.js";
-import { resolveFeegleHome } from "../../infra/app/feegle-home.js";
-import { normalizeOwnerEmails } from "../../infra/app/owner-emails.js";
-import { installConsoleTimestamps } from "../../infra/app/console-timestamps.js";
+import { FeegleApp } from "@infra/app/feegle-app.js";
+import { ConfigStore } from "@infra/app/config-store.js";
+import { resolveFeegleHome } from "@infra/app/feegle-home.js";
+import { normalizeOwnerEmails } from "@infra/app/owner-emails.js";
+import { installConsoleTimestamps } from "@infra/app/console-timestamps.js";
 
 installConsoleTimestamps();
 

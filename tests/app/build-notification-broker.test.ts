@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildNotificationBroker } from "../../src/infra/app/build-notification-broker.js";
-import type { NotificationPort } from "../../src/infra/app/notification-port.js";
-import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
+import { buildNotificationBroker } from "@infra/app/build-notification-broker.js";
+import type { NotificationPort } from "@infra/app/notification-port.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 
 describe("buildNotificationBroker", () => {
   it("lets external modules register notification adapters without editing the app entry", async () => {

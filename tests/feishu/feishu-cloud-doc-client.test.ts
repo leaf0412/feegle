@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HttpFeishuCloudDocClient, type FeishuRawRequester } from "../../src/integrations/feishu/feishu-cloud-doc-client.js";
+import { HttpFeishuCloudDocClient, type FeishuRawRequester } from "@integrations/feishu/feishu-cloud-doc-client.js";
 
 function fakeRequester(
   handler: (req: {

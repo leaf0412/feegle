@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeishuFetchedMessage } from "../../src/integrations/feishu/feishu-client.js";
+import type { FeishuFetchedMessage } from "@integrations/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import {
   fetchQuotedMessage,
   fetchReplyChain,
   formatReplyChain
-} from "../../src/integrations/feishu/feishu-reply-chain.js";
-import { FeishuUserDirectory } from "../../src/integrations/feishu/feishu-user-directory.js";
+} from "@integrations/feishu/feishu-reply-chain.js";
+import { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
 
 describe("formatReplyChain", () => {
   it("renders a single-quote prefix when chain has one message", () => {

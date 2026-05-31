@@ -1,5 +1,5 @@
 import type { ConfigStorePort } from "../app/config-store.js";
-import type { TaskRegistry } from "../../features/scheduler/task-registry.js";
+import type { TaskRegistry } from "@features/scheduler/task-registry.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
 
 export interface AgentReadiness {

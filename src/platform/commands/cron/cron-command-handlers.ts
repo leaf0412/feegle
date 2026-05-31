@@ -1,7 +1,7 @@
 import { Cron } from "croner";
 import { ulid } from "ulid";
-import type { NotificationTarget } from "../../../infra/app/notification-port.js";
-import type { Task } from "../../../features/scheduler/task.js";
+import type { NotificationTarget } from "@infra/app/notification-port.js";
+import type { Task } from "@features/scheduler/task.js";
 import type { SlashCommandContext, SlashCommandHandler, SlashCommandReply } from "../../slash-command-handler.js";
 import { isOwner } from "../../owner-access.js";
 import type { SchedulerCommandDeps } from "../scheduler-command-deps.js";

@@ -1,9 +1,9 @@
 import Database from "better-sqlite3";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { migrate, type RuntimeDb } from "../../../../src/infra/app/runtime-db.js";
-import { RepositoryStore } from "../../../../src/resources/repositories/repository-store.js";
-import { ChatBindingStore } from "../../../../src/resources/repositories/chat-binding-store.js";
-import { bindRepositoryToScope, formatBoundRepoLines } from "../../../../src/platform/commands/repo/repo-binding.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { RepositoryStore } from "@resources/repositories/repository-store.js";
+import { ChatBindingStore } from "@resources/repositories/chat-binding-store.js";
+import { bindRepositoryToScope, formatBoundRepoLines } from "@platform/commands/repo/repo-binding.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

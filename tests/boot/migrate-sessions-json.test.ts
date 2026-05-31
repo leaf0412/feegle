@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionStore } from "../../src/agent/session-store.js";
-import { migrate, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { migrateLegacySessionsJson } from "../../src/infra/boot/phases/stores-phase.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { migrateLegacySessionsJson } from "@infra/boot/phases/stores-phase.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

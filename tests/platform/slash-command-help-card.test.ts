@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildSlashCommandDetailCard, buildSlashCommandHelpCard } from "../../src/platform/slash-command-help-card.js";
-import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
+import { buildSlashCommandDetailCard, buildSlashCommandHelpCard } from "@platform/slash-command-help-card.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
 import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("slash command help cards", () => {

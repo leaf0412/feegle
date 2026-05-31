@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { PlanArtifactStore } from "../../src/features/workbench/plan-artifact-store.js";
-import { PlanExecutionService } from "../../src/features/workbench/plan-execution-service.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
+import { PlanExecutionService } from "@features/workbench/plan-execution-service.js";
 
 describe("PlanExecutionService.approve — no base branch", () => {
   let home: string;

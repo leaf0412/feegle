@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BootContext } from "../../src/infra/boot/boot-context.js";
+import { BootContext } from "@infra/boot/boot-context.js";
 
 describe("BootContext", () => {
   it("returns the provided value as a typed capability", () => {

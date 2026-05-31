@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FeishuMergeForwardItem } from "../../src/integrations/feishu/feishu-client.js";
-import { parseMergeForward } from "../../src/integrations/feishu/feishu-merge-forward.js";
-import { FeishuUserDirectory } from "../../src/integrations/feishu/feishu-user-directory.js";
+import type { FeishuMergeForwardItem } from "@integrations/feishu/feishu-client.js";
+import { parseMergeForward } from "@integrations/feishu/feishu-merge-forward.js";
+import { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("parseMergeForward", () => {

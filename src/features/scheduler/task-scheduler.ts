@@ -1,9 +1,9 @@
 import { Cron } from "croner";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import type { FeegleConfig } from "../../infra/app/config-store.js";
-import type { HookManager } from "../../infra/app/hooks.js";
-import type { NotificationPort } from "../../infra/app/notification-port.js";
-import type { RuntimeError } from "../../core/runtime/runtime-models.js";
+import type { FeegleConfig } from "@infra/app/config-store.js";
+import type { HookManager } from "@infra/app/hooks.js";
+import type { NotificationPort } from "@infra/app/notification-port.js";
+import type { RuntimeError } from "@core/runtime/runtime-models.js";
 import { buildFailureCard } from "./build-failure-card.js";
 import { buildRecoveryCard } from "./build-recovery-card.js";
 import { decideShouldNotifyFailure } from "./failure-policy.js";

@@ -1,6 +1,6 @@
 import { preprocessFeishuMarkdown } from "./feishu-markdown.js";
 import { getToolIcon, pickThinkingVerb } from "./feishu-tool-icons.js";
-import type { PlatformProgressToolStep } from "../../platform/progress.js";
+import type { PlatformProgressToolStep } from "@platform/progress.js";
 
 export type FeishuRichCardStatus = "working" | "thinking" | "done" | "error";
 

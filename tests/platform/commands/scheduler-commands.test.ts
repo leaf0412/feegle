@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import type { ProviderStore } from "../../../src/agent/provider-store.js";
-import { ConfigStore } from "../../../src/infra/app/config-store.js";
-import { buildSlashCommandRegistry } from "../../../src/platform/build-slash-command-registry.js";
-import { FeishuCommandResponder } from "../../../src/integrations/feishu/feishu-command-responder.js";
-import { HandlerKindRegistry } from "../../../src/features/scheduler/handler-kind-registry.js";
-import { TaskRegistry } from "../../../src/features/scheduler/task-registry.js";
-import { TaskScheduler } from "../../../src/features/scheduler/task-scheduler.js";
-import type { HandlerKind } from "../../../src/features/scheduler/handler-kind.js";
-import type { Task } from "../../../src/features/scheduler/task.js";
-import type { FeishuClientPort } from "../../../src/integrations/feishu/feishu-client.js";
+import { ConfigStore } from "@infra/app/config-store.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
+import { FeishuCommandResponder } from "@integrations/feishu/feishu-command-responder.js";
+import { HandlerKindRegistry } from "@features/scheduler/handler-kind-registry.js";
+import { TaskRegistry } from "@features/scheduler/task-registry.js";
+import { TaskScheduler } from "@features/scheduler/task-scheduler.js";
+import type { HandlerKind } from "@features/scheduler/handler-kind.js";
+import type { Task } from "@features/scheduler/task.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../../fixtures/fake-feishu-client.js";
-import type { StockStore } from "../../../src/integrations/stock/stock-store.js";
+import type { StockStore } from "@integrations/stock/stock-store.js";
 
 describe("scheduler slash commands", () => {
   it("adds concrete cron, stock, portfolio, and error_target commands to the catalog", () => {

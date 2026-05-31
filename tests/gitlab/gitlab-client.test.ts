@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { GitLabClient } from "../../src/integrations/gitlab/gitlab-client.js";
-import type { GitLabIssueUrl } from "../../src/integrations/gitlab/gitlab-types.js";
+import { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
+import type { GitLabIssueUrl } from "@integrations/gitlab/gitlab-types.js";
 
 const issueUrl: GitLabIssueUrl = {
   host: "www.lejuhub.com",

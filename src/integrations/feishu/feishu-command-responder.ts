@@ -7,13 +7,13 @@ import {
   type SlashCommandHandler,
   type SlashCommandReply,
   type SlashCommandRegistry
-} from "../../platform/slash-command-handler.js";
+} from "@platform/slash-command-handler.js";
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
-import { dispatchPlatformCommandAction } from "../../platform/platform-action-dispatcher.js";
+import { dispatchPlatformCommandAction } from "@platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
-import type { ChatBindingStore } from "../../resources/repositories/chat-binding-store.js";
-import type { RepositoryStore } from "../../resources/repositories/repository-store.js";
-import { bindRepositoryToScope, formatBoundRepoLines } from "../../platform/commands/repo/repo-binding.js";
+import type { ChatBindingStore } from "@resources/repositories/chat-binding-store.js";
+import type { RepositoryStore } from "@resources/repositories/repository-store.js";
+import { bindRepositoryToScope, formatBoundRepoLines } from "@platform/commands/repo/repo-binding.js";
 import {
   buildBindPromptSupersededCard,
   buildBindRepoPromptCard,

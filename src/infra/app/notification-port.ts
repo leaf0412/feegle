@@ -1,4 +1,4 @@
-import type { PlatformCard } from "../../platform/platform-card.js";
+import type { PlatformCard } from "@platform/platform-card.js";
 
 export interface NotificationTarget {
   platform: string;

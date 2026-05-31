@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveRepositoryName } from "../../../../src/platform/commands/repo/repo-url.js";
+import { deriveRepositoryName } from "@platform/commands/repo/repo-url.js";
 
 describe("deriveRepositoryName", () => {
   it("takes the last path segment", () => {

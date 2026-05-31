@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveFeegleHome } from "../../src/infra/app/feegle-home.js";
+import { resolveFeegleHome } from "@infra/app/feegle-home.js";
 
 describe("resolveFeegleHome", () => {
   it("uses FEEGLE_HOME when set so tests and deployments can isolate state", () => {

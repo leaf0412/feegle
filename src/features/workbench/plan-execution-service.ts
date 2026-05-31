@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 import type { AgentCli } from "../../agent/agent-cli.js";
-import type { FeishuClientPort } from "../../integrations/feishu/feishu-client.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import {
   buildBaseBranchPromptCard,
   buildPlanCompletedCard,
   buildPlanProgressCard,
   buildPlanPushResultCard,
   type PlanProgressStage
-} from "../../integrations/feishu/feishu-workbench-cards.js";
-import type { GitService } from "../../infra/git/git-service.js";
+} from "@integrations/feishu/feishu-workbench-cards.js";
+import type { GitService } from "@infra/git/git-service.js";
 import type { PlanArtifact, PlanArtifactStatus, PlanArtifactStore } from "./plan-artifact-store.js";
 import { buildIterationPrompt, deriveSlug } from "./plan-execution-helpers.js";
 

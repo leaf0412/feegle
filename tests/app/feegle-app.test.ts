@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { FeegleApp } from "../../src/infra/app/feegle-app.js";
-import type { FeishuCloudDocClientPort } from "../../src/integrations/feishu/feishu-cloud-doc-client.js";
-import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
-import type { FeishuCommandHandler } from "../../src/integrations/feishu/feishu-long-connection-runtime.js";
+import { FeegleApp } from "@infra/app/feegle-app.js";
+import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import type { FeishuCommandHandler } from "@integrations/feishu/feishu-long-connection-runtime.js";
 import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 
 describe("FeegleApp", () => {

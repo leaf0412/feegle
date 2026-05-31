@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryRepositoryRegistry } from "../../src/resources/repositories/repository-registry.js";
+import { InMemoryRepositoryRegistry } from "@resources/repositories/repository-registry.js";
 
 describe("InMemoryRepositoryRegistry", () => {
   it("registers and lists repositories", () => {

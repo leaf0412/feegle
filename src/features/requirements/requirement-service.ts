@@ -1,7 +1,7 @@
-import type { RequirementContext, RequirementRepository } from "../../domain/models.js";
-import { assertTransition } from "../../domain/status.js";
-import type { InMemoryRepositoryRegistry } from "../../resources/repositories/repository-registry.js";
-import type { WorkspaceManager } from "../../resources/workspace/workspace-manager.js";
+import type { RequirementContext, RequirementRepository } from "@domain/models.js";
+import { assertTransition } from "@domain/status.js";
+import type { InMemoryRepositoryRegistry } from "@resources/repositories/repository-registry.js";
+import type { WorkspaceManager } from "@resources/workspace/workspace-manager.js";
 
 export class RequirementService {
   private readonly contexts: RequirementContext[] = [];

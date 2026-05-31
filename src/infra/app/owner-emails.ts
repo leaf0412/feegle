@@ -1,4 +1,4 @@
-import { normalizeOwnerEmail } from "../../platform/owner-access.js";
+import { normalizeOwnerEmail } from "@platform/owner-access.js";
 
 export function parseOwnerEmails(input: string | undefined): ReadonlySet<string> {
   if (!input) {

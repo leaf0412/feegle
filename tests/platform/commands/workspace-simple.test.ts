@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
-import { CommandsCommandHandler } from "../../../src/platform/commands/workspace/commands-command.js";
-import { CompressCommandHandler } from "../../../src/platform/commands/workspace/compress-command.js";
-import { ShowCommandHandler } from "../../../src/platform/commands/workspace/show-command.js";
-import { SkillsCommandHandler } from "../../../src/platform/commands/workspace/skills-command.js";
-import { StopCommandHandler } from "../../../src/platform/commands/workspace/stop-command.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
-import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
+import { CommandsCommandHandler } from "@platform/commands/workspace/commands-command.js";
+import { CompressCommandHandler } from "@platform/commands/workspace/compress-command.js";
+import { ShowCommandHandler } from "@platform/commands/workspace/show-command.js";
+import { SkillsCommandHandler } from "@platform/commands/workspace/skills-command.js";
+import { StopCommandHandler } from "@platform/commands/workspace/stop-command.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 const def = defineSlashCommand("ws", "/ws", "x", "agent", "cmd:/ws");
 

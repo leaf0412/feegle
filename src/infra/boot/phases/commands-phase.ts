@@ -1,9 +1,9 @@
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
-import { buildSlashCommandRegistry } from "../../../platform/build-slash-command-registry.js";
-import { InMemoryRepositoryRegistry } from "../../../resources/repositories/repository-registry.js";
-import type { TaskScheduler } from "../../../features/scheduler/task-scheduler.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
+import { InMemoryRepositoryRegistry } from "@resources/repositories/repository-registry.js";
+import type { TaskScheduler } from "@features/scheduler/task-scheduler.js";
 
 export interface CommandsPhaseDeps {
   feegleHome: string;

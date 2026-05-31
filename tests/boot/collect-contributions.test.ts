@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectContributions, type FeeglePlugin } from "../../src/infra/boot/feegle-plugin.js";
+import { collectContributions, type FeeglePlugin } from "@infra/boot/feegle-plugin.js";
 
 describe("collectContributions", () => {
   it("flattens each plugin's contributions by extension point, preserving order", () => {

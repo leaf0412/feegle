@@ -3,8 +3,8 @@ import {
   SlashCommandRegistry,
   type SlashCommandHandler,
   type SlashCommandReply
-} from "../../src/platform/slash-command-handler.js";
-import { defineSlashCommand } from "../../src/platform/slash-command-catalog.js";
+} from "@platform/slash-command-handler.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
 
 const stubHandler = (id: string, aliases?: string[]): SlashCommandHandler => ({
   id,

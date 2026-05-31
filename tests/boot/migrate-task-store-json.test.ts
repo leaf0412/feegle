@@ -4,9 +4,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { migrate, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { migrateLegacyTaskStoreJson } from "../../src/infra/boot/phases/stores-phase.js";
-import { TaskStore } from "../../src/features/scheduler/task-store.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { migrateLegacyTaskStoreJson } from "@infra/boot/phases/stores-phase.js";
+import { TaskStore } from "@features/scheduler/task-store.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

@@ -3,8 +3,8 @@ import {
   buildRequirementStatusCard,
   buildWorkflowProgressCard,
   type FeishuInteractiveCard
-} from "../../src/integrations/feishu/feishu-card-builder.js";
-import { parseFeishuCardActionValue } from "../../src/integrations/feishu/feishu-gateway.js";
+} from "@integrations/feishu/feishu-card-builder.js";
+import { parseFeishuCardActionValue } from "@integrations/feishu/feishu-gateway.js";
 
 describe("buildRequirementStatusCard", () => {
   it("renders a shared card with per-repository push actions", () => {

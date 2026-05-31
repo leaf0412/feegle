@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PolicyService } from "../../src/core/security/policy-service.js";
+import { PolicyService } from "@core/security/policy-service.js";
 
 describe("PolicyService", () => {
   const service = new PolicyService();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSensitive } from "../../src/core/security/redaction.js";
+import { redactSensitive } from "@core/security/redaction.js";
 
 describe("redactSensitive", () => {
   it("redacts bearer tokens", () => {

@@ -1,5 +1,5 @@
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import type { NotificationPort } from "../../infra/app/notification-port.js";
+import type { NotificationPort } from "@infra/app/notification-port.js";
 import type { Task } from "./task.js";
 
 export interface Clock {

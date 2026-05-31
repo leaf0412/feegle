@@ -1,5 +1,5 @@
-import { parsePlatformAction, type PlatformAction } from "../../platform/platform-action.js";
-import type { SlashCommandDefinition } from "../../platform/slash-command-catalog.js";
+import { parsePlatformAction, type PlatformAction } from "@platform/platform-action.js";
+import type { SlashCommandDefinition } from "@platform/slash-command-catalog.js";
 
 export type FeishuCommand =
   | { type: "help"; groupKey?: string }

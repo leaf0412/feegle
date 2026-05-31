@@ -1,4 +1,4 @@
-import { createPlatformCard, type PlatformCard } from "../../platform/platform-card.js";
+import { createPlatformCard, type PlatformCard } from "@platform/platform-card.js";
 import type { Task } from "./task.js";
 
 export function buildFailureCard(task: Task, error: unknown, consecutiveFailures: number): PlatformCard {

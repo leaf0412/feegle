@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import type { ReadStream } from "node:fs";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
-import type { PlatformProgressSnapshot } from "../../platform/progress.js";
+import type { PlatformProgressSnapshot } from "@platform/progress.js";
 import { detectMimeType } from "./feishu-mime.js";
 import type { FeishuFileType } from "./feishu-mime.js";
 import { renderFeishuProgressCard } from "./feishu-progress-card.js";

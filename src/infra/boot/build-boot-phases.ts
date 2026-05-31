@@ -10,7 +10,7 @@ import { commandsPhase } from "./phases/commands-phase.js";
 import { runtimeContributionsPhase } from "./phases/runtime-contributions-phase.js";
 import { runtimePhase } from "./phases/runtime-phase.js";
 import type { FeegleAppDeps, Startable } from "../app/feegle-app.js";
-import type { Task } from "../../features/scheduler/task.js";
+import type { Task } from "@features/scheduler/task.js";
 
 export interface BuildBootPhasesDeps {
   appDeps: FeegleAppDeps;

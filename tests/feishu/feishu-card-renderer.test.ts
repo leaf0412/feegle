@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { renderFeishuCard } from "../../src/integrations/feishu/feishu-card-renderer.js";
-import { createPlatformCard } from "../../src/platform/platform-card.js";
+import { renderFeishuCard } from "@integrations/feishu/feishu-card-renderer.js";
+import { createPlatformCard } from "@platform/platform-card.js";
 
 describe("renderFeishuCard", () => {
   it("renders equal-width action buttons as column_set", () => {

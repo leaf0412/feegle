@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { QuoteClient } from "../../../integrations/stock/stock-quote-port.js";
-import type { PortfolioPosition } from "../../../integrations/stock/stock-store-types.js";
-import { riskLevel } from "../../../integrations/stock/stock-domain.js";
+import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
+import type { PortfolioPosition } from "@integrations/stock/stock-store-types.js";
+import { riskLevel } from "@integrations/stock/stock-domain.js";
 import { AgentRunError, UnknownProviderError } from "../handler-errors.js";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";
 import type { TaskContext } from "../task-context.js";

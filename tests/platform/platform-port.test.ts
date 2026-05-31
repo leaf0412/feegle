@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PlatformPort } from "../../src/platform/platform-port.js";
+import type { PlatformPort } from "@platform/platform-port.js";
 
 describe("PlatformPort", () => {
   it("defines the boundary adapters need to send text and cards", async () => {

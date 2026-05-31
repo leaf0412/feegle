@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { NotificationTargetSchema } from "../../infra/app/config-store.js";
-import type { NotificationTarget } from "../../infra/app/notification-port.js";
+import { NotificationTargetSchema } from "@infra/app/config-store.js";
+import type { NotificationTarget } from "@infra/app/notification-port.js";
 
 export type ErrorPolicy = "always" | "on-change" | "silent";
 export type TaskSource = "seed" | "domain" | "user";

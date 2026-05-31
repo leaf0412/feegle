@@ -1,5 +1,5 @@
 import type { Statement } from "better-sqlite3";
-import type { RuntimeDb } from "../../infra/app/runtime-db.js";
+import type { RuntimeDb } from "@infra/app/runtime-db.js";
 import type { Task } from "./task.js";
 
 /**

@@ -1,5 +1,5 @@
 import type { AutomationDefinition } from "./automation-models.js";
-import type { WorkflowDefinition } from "../../core/runtime/runtime-models.js";
+import type { WorkflowDefinition } from "@core/runtime/runtime-models.js";
 
 export function compileAutomation(def: AutomationDefinition): WorkflowDefinition {
   return {

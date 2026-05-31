@@ -1,12 +1,12 @@
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
 import type { ProviderStore } from "../../src/agent/provider-store.js";
-import type { ConfigStorePort } from "../../src/infra/app/config-store.js";
-import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
-import type { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
-import type { TaskScheduler } from "../../src/features/scheduler/task-scheduler.js";
-import type { QuoteClient } from "../../src/integrations/stock/stock-quote-port.js";
-import type { StockStore } from "../../src/integrations/stock/stock-store.js";
-import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-module.js";
+import type { ConfigStorePort } from "@infra/app/config-store.js";
+import { HandlerKindRegistry } from "@features/scheduler/handler-kind-registry.js";
+import type { TaskRegistry } from "@features/scheduler/task-registry.js";
+import type { TaskScheduler } from "@features/scheduler/task-scheduler.js";
+import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
+import type { StockStore } from "@integrations/stock/stock-store.js";
+import type { SlashCommandRegistryDeps } from "@platform/slash-command-module.js";
 
 /**
  * Minimal scheduler deps that satisfy `requireSchedulerDeps` so tests focused on

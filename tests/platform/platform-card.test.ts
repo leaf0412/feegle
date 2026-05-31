@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPlatformCard } from "../../src/platform/platform-card.js";
+import { createPlatformCard } from "@platform/platform-card.js";
 
 describe("createPlatformCard", () => {
   it("builds a card without platform-specific fields", () => {

@@ -5,7 +5,7 @@ import {
   parseThreadRootID,
   reconstructPlatformReplyCtx,
   sessionKeyFromCardAction
-} from "../../src/platform/platform-session.js";
+} from "@platform/platform-session.js";
 
 describe("createPlatformSessionKey", () => {
   it("uses user scope for direct messages", () => {

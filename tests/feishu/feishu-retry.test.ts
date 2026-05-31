@@ -4,7 +4,7 @@ import {
   isTransientError,
   withTokenRefreshRetry,
   withTransientRetry
-} from "../../src/integrations/feishu/feishu-retry.js";
+} from "@integrations/feishu/feishu-retry.js";
 
 describe("isTenantAccessTokenInvalid", () => {
   it("recognises Feishu code 99991663", () => {

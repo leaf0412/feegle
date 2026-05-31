@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { HelpCommandHandler } from "../../../src/platform/commands/help-command.js";
+import { HelpCommandHandler } from "@platform/commands/help-command.js";
 import {
   SlashCommandRegistry,
   type SlashCommandContext,
   type SlashCommandHandler
-} from "../../../src/platform/slash-command-handler.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
+} from "@platform/slash-command-handler.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
 
 const ownerEmail = "alice@example.com";
 const ownerEmails = new Set([ownerEmail]);

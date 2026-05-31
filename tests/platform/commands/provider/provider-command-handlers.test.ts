@@ -4,14 +4,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../../src/agent/agent-provider-registry.js";
 import { ProviderStore } from "../../../../src/agent/provider-store.js";
-import { ConfigStore } from "../../../../src/infra/app/config-store.js";
+import { ConfigStore } from "@infra/app/config-store.js";
 import {
   ProviderListCommandHandler,
   ProviderRegisterCommandHandler,
   ProviderUnregisterCommandHandler,
   ProviderUseCommandHandler
-} from "../../../../src/platform/commands/provider/provider-command-handlers.js";
-import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
+} from "@platform/commands/provider/provider-command-handlers.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 const OWNER_EMAIL = "alice@example.com";
 const OWNER = new Set([OWNER_EMAIL]);

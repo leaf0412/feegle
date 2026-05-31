@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { FeegleApp, type FeegleAppDeps } from "../../src/infra/app/feegle-app.js";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { BootContext } from "../../src/infra/boot/boot-context.js";
-import { runtimePhase } from "../../src/infra/boot/phases/runtime-phase.js";
-import type { FeishuCloudDocClientPort } from "../../src/integrations/feishu/feishu-cloud-doc-client.js";
-import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
-import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
+import { FeegleApp, type FeegleAppDeps } from "@infra/app/feegle-app.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { BootContext } from "@infra/boot/boot-context.js";
+import { runtimePhase } from "@infra/boot/phases/runtime-phase.js";
+import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import { RuntimeStore } from "@core/runtime/runtime-store.js";
 import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 
 function fakeCloudDoc(): FeishuCloudDocClientPort {

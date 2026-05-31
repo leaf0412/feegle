@@ -1,5 +1,5 @@
-import type { NotificationPort, NotificationTarget } from "../../infra/app/notification-port.js";
-import type { PlatformCard } from "../../platform/platform-card.js";
+import type { NotificationPort, NotificationTarget } from "@infra/app/notification-port.js";
+import type { PlatformCard } from "@platform/platform-card.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 

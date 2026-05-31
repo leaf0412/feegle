@@ -1,5 +1,5 @@
-import type { RequirementStatus } from "../../domain/status.js";
-import { createPlatformCard, type PlatformCardButton } from "../../platform/platform-card.js";
+import type { RequirementStatus } from "@domain/status.js";
+import { createPlatformCard, type PlatformCardButton } from "@platform/platform-card.js";
 import { renderFeishuCard } from "./feishu-card-renderer.js";
 
 export interface FeishuInteractiveCard {

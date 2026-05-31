@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 
 describe("openRuntimeDb", () => {
   let home: string;

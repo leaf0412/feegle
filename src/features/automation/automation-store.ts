@@ -1,4 +1,4 @@
-import type { RuntimeDb } from "../../infra/app/runtime-db.js";
+import type { RuntimeDb } from "@infra/app/runtime-db.js";
 import type { AutomationDefinition, AutomationEffect, AutomationTrigger } from "./automation-models.js";
 
 export class AutomationStore {

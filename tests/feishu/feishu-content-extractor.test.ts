@@ -3,7 +3,7 @@ import {
   extractInteractiveCardText,
   extractPostPlainText,
   replaceMentions
-} from "../../src/integrations/feishu/feishu-content-extractor.js";
+} from "@integrations/feishu/feishu-content-extractor.js";
 
 describe("replaceMentions", () => {
   it("substitutes @_user_X placeholders with display names", () => {

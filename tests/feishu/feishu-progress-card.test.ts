@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderFeishuProgressCard } from "../../src/integrations/feishu/feishu-progress-card.js";
+import { renderFeishuProgressCard } from "@integrations/feishu/feishu-progress-card.js";
 
 describe("renderFeishuProgressCard", () => {
   it("renders running progress with blue header", () => {

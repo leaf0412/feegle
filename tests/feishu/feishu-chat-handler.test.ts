@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
 import type { AgentCli, AgentChatMessage, AgentRunOptions } from "../../src/agent/agent-cli.js";
 import { ChatHistoryStore } from "../../src/agent/chat-history-store.js";
-import { FeishuChatHandler } from "../../src/integrations/feishu/feishu-chat-handler.js";
-import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
+import { FeishuChatHandler } from "@integrations/feishu/feishu-chat-handler.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import Database from "better-sqlite3";
 import { AgentLoadBalancer } from "../../src/agent/agent-load-balancer.js";
 import { SessionStore } from "../../src/agent/session-store.js";
-import { migrate } from "../../src/infra/app/runtime-db.js";
+import { migrate } from "@infra/app/runtime-db.js";
 
 describe("FeishuChatHandler", () => {
   afterEach(() => {

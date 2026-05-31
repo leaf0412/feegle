@@ -4,7 +4,7 @@ import type { BootPhase } from "../boot-phase.js";
 import { ConfigStore, type ConfigStoreProviderWriter } from "../../app/config-store.js";
 import { acquireFeegleLock } from "../../app/feegle-lock.js";
 import { openRuntimeDb } from "../../app/runtime-db.js";
-import { PlanArtifactStore } from "../../../features/workbench/plan-artifact-store.js";
+import { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
 
 export interface InfraPhaseDeps {
   feegleHome: string;

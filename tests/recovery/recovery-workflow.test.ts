@@ -2,22 +2,22 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
-import { ArtifactService } from "../../src/core/artifacts/artifact-service.js";
-import { ArtifactStore } from "../../src/core/artifacts/artifact-store.js";
-import { ControlActionStore } from "../../src/core/control/control-action-store.js";
-import { MemoryStore } from "../../src/core/memory/memory-store.js";
-import { RecoveryService } from "../../src/core/recovery/recovery-service.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { ArtifactService } from "@core/artifacts/artifact-service.js";
+import { ArtifactStore } from "@core/artifacts/artifact-store.js";
+import { ControlActionStore } from "@core/control/control-action-store.js";
+import { MemoryStore } from "@core/memory/memory-store.js";
+import { RecoveryService } from "@core/recovery/recovery-service.js";
 import {
   classifyFailure,
   createRecoveryWorkflow
-} from "../../src/core/recovery/recovery-workflow.js";
-import { EffectHandlerRegistry } from "../../src/core/runtime/effect-handler-registry.js";
-import { RuntimeEffectExecutor } from "../../src/core/runtime/runtime-effect-executor.js";
-import type { RuntimeError } from "../../src/core/runtime/runtime-models.js";
-import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
-import { WorkflowRegistry } from "../../src/core/runtime/workflow-registry.js";
-import { WorkflowRuntime } from "../../src/core/runtime/workflow-runtime.js";
+} from "@core/recovery/recovery-workflow.js";
+import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
+import { RuntimeEffectExecutor } from "@core/runtime/runtime-effect-executor.js";
+import type { RuntimeError } from "@core/runtime/runtime-models.js";
+import { RuntimeStore } from "@core/runtime/runtime-store.js";
+import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
+import { WorkflowRuntime } from "@core/runtime/workflow-runtime.js";
 
 describe("classifyFailure", () => {
   it("classifies validation errors as non-recoverable", () => {

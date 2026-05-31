@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHmac } from "node:crypto";
-import { verifyWebhookSignature, webhookPayloadToTriggerEvent } from "../../src/integrations/webhook/webhook-trigger-event-adapter.js";
+import { verifyWebhookSignature, webhookPayloadToTriggerEvent } from "@integrations/webhook/webhook-trigger-event-adapter.js";
 
 describe("webhook trigger event adapter", () => {
   it("converts a webhook payload to a TriggerEvent", () => {

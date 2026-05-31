@@ -1,5 +1,5 @@
-import { createPlatformCard, type PlatformCard } from "../../../platform/platform-card.js";
-import type { Snapshot } from "../../../integrations/stock/stock-store-types.js";
+import { createPlatformCard, type PlatformCard } from "@platform/platform-card.js";
+import type { Snapshot } from "@integrations/stock/stock-store-types.js";
 
 export function buildSnapshotCard(snapshot: Snapshot): PlatformCard {
   const totalPnl = snapshot.rows.reduce((sum, row) => sum + row.pnl, 0);

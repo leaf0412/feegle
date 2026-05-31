@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideShouldNotifyFailure } from "../../src/features/scheduler/failure-policy.js";
+import { decideShouldNotifyFailure } from "@features/scheduler/failure-policy.js";
 
 describe("decideShouldNotifyFailure", () => {
   const now = new Date("2026-05-18T02:00:00.000Z");

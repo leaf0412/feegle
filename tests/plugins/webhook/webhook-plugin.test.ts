@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { EffectHandlerRegistry } from "../../../src/core/runtime/effect-handler-registry.js";
+import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { IntentResolverRegistry } from "../../../src/ingress/intent-resolver-registry.js";
-import { WorkflowRegistry } from "../../../src/core/runtime/workflow-registry.js";
+import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
 import { WorkflowSelector } from "../../../src/ingress/workflow-selector.js";
-import { webhookRuntimeContribution } from "../../../src/plugins/webhook/webhook-plugin.js";
+import { webhookRuntimeContribution } from "@plugins/webhook/webhook-plugin.js";
 
 describe("webhook runtime contribution", () => {
   it("registers intent resolver, workflow, and effect handlers", () => {

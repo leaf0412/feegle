@@ -1,4 +1,4 @@
-import type { GitLabIssue, GitLabNote, GitLabSummarySection } from "../../../integrations/gitlab/gitlab-types.js";
+import type { GitLabIssue, GitLabNote, GitLabSummarySection } from "@integrations/gitlab/gitlab-types.js";
 
 export function buildSummarySections(
   issue: GitLabIssue,

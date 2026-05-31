@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   feishuCardActionToTriggerEvent,
   feishuMessageEnvelopeToTriggerEvent
-} from "../../src/integrations/feishu/feishu-trigger-event-adapter.js";
+} from "@integrations/feishu/feishu-trigger-event-adapter.js";
 
 describe("feishu trigger event adapter", () => {
   it("converts a routed Feishu message envelope into an open TriggerEvent", () => {

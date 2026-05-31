@@ -17,7 +17,7 @@ import {
   buildRichCards,
   type FeishuRichCardStatus
 } from "./feishu-rich-card.js";
-import type { PlatformProgressToolStep } from "../../platform/progress.js";
+import type { PlatformProgressToolStep } from "@platform/progress.js";
 
 export interface FeishuChatHandlerDeps {
   client: FeishuClientPort;

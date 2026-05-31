@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "../../src/integrations/feishu/feishu-platform-config.js";
+import { parseFeishuPlatformConfig, type FeishuPlatformConfigInput } from "@integrations/feishu/feishu-platform-config.js";
 
 function input(overrides: Partial<FeishuPlatformConfigInput> = {}): FeishuPlatformConfigInput {
   return {

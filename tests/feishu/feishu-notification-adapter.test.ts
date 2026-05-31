@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createPlatformCard } from "../../src/platform/platform-card.js";
-import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
-import { FeishuNotificationAdapter } from "../../src/integrations/feishu/feishu-notification-adapter.js";
+import { createPlatformCard } from "@platform/platform-card.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import { FeishuNotificationAdapter } from "@integrations/feishu/feishu-notification-adapter.js";
 
 describe("FeishuNotificationAdapter", () => {
   it("sends text and rendered cards through the Feishu client without business logic", async () => {

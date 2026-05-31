@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigStore } from "../../src/infra/app/config-store.js";
-import { migrateLegacyProvidersJson } from "../../src/infra/boot/phases/stores-phase.js";
+import { ConfigStore } from "@infra/app/config-store.js";
+import { migrateLegacyProvidersJson } from "@infra/boot/phases/stores-phase.js";
 
 async function seedConfig(home: string, raw = `{
   "schemaVersion": 1,

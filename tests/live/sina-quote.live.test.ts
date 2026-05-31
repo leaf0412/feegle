@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SinaQuoteClient } from "../../src/integrations/stock/sina-quote-client.js";
+import { SinaQuoteClient } from "@integrations/stock/sina-quote-client.js";
 
 describe.skipIf(process.env.RUN_LIVE_QUOTE_TEST !== "1")("SinaQuoteClient live", () => {
   it("fetches a real quote from Sina", async () => {

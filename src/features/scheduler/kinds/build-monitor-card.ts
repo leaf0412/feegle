@@ -1,6 +1,6 @@
-import { createPlatformCard, type PlatformCard } from "../../../platform/platform-card.js";
-import type { MatchedCondition } from "../../../integrations/stock/stock-domain.js";
-import type { Quote } from "../../../integrations/stock/stock-quote-port.js";
+import { createPlatformCard, type PlatformCard } from "@platform/platform-card.js";
+import type { MatchedCondition } from "@integrations/stock/stock-domain.js";
+import type { Quote } from "@integrations/stock/stock-quote-port.js";
 
 export function buildMonitorCard(matches: MatchedCondition[], quotes: Quote[], taskId: string): PlatformCard {
   const quoteByCode = new Map(quotes.map((quote) => [quote.stockCode, quote]));

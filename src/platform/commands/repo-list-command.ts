@@ -1,4 +1,4 @@
-import type { RepositoryRecord } from "../../domain/models.js";
+import type { RepositoryRecord } from "@domain/models.js";
 import type { SlashCommandHandler, SlashCommandReply } from "../slash-command-handler.js";
 
 export interface RepositoryListSource {

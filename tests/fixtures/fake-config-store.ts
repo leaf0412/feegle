@@ -2,7 +2,7 @@ import {
   NotificationTargetSchema,
   type ConfigStoreProviderWriter,
   type FeegleConfig
-} from "../../src/infra/app/config-store.js";
+} from "@infra/app/config-store.js";
 
 /**
  * Test-only fake of ConfigStoreProviderWriter. Tracks `agent.providers` and `agent.default` in

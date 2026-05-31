@@ -1,4 +1,4 @@
-import type { RuntimeContributionModule } from "../../infra/boot/feegle-plugin.js";
+import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
 
 export function schedulerWorkflowContribution(): RuntimeContributionModule {
   return {

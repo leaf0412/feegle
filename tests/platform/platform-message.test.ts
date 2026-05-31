@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlatformIncomingMessage, PlatformReplyContext } from "../../src/platform/platform-message.js";
+import type { PlatformIncomingMessage, PlatformReplyContext } from "@platform/platform-message.js";
 
 describe("PlatformIncomingMessage", () => {
   it("keeps business routing independent from raw platform payloads", () => {

@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 import {
   workspaceRoles,
   type ConversationBindingRecord,
   type WorkspaceRecord
-} from "../../src/resources/workspace/workspace-models.js";
-import { WorkspaceStore } from "../../src/resources/workspace/workspace-store.js";
+} from "@resources/workspace/workspace-models.js";
+import { WorkspaceStore } from "@resources/workspace/workspace-store.js";
 
 describe("workspace models", () => {
   it("defines workspace roles so permission code has a stable enum source", () => {

@@ -1,4 +1,4 @@
-import type { RepositoryRecord } from "../../domain/models.js";
+import type { RepositoryRecord } from "@domain/models.js";
 
 export interface AddRepositoryInput {
   name: string;

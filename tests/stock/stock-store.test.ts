@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { StockStore } from "../../src/integrations/stock/stock-store.js";
+import { StockStore } from "@integrations/stock/stock-store.js";
 
 describe("StockStore", () => {
   it("deduplicates subscriptions and keeps portfolio patches narrow", async () => {

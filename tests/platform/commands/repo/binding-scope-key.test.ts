@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveBindingScopeKey, resolveBindingScopeNoun } from "../../../../src/platform/commands/repo/binding-scope-key.js";
-import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
+import { resolveBindingScopeKey, resolveBindingScopeNoun } from "@platform/commands/repo/binding-scope-key.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 function ctx(overrides: Partial<SlashCommandContext>): SlashCommandContext {
   return {

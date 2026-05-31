@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseProviderArgs } from "../../../../src/platform/commands/provider/parse-provider-args.js";
+import { parseProviderArgs } from "@platform/commands/provider/parse-provider-args.js";
 
 describe("parseProviderArgs", () => {
   it("splits kind and key=value pairs", () => {

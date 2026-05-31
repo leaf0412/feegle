@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Buffer } from "node:buffer";
 import iconv from "iconv-lite";
-import { parseSinaResponse, SinaQuoteClient } from "../../src/integrations/stock/sina-quote-client.js";
-import { QuoteFetchError, QuoteParseError } from "../../src/integrations/stock/stock-quote-port.js";
+import { parseSinaResponse, SinaQuoteClient } from "@integrations/stock/sina-quote-client.js";
+import { QuoteFetchError, QuoteParseError } from "@integrations/stock/stock-quote-port.js";
 
 const fixture =
   'var hq_str_sh600519="贵州茅台,1750.00,1798.00,1810.50,1815.00,1790.00,1810.00,1811.00,12345,22345678.90,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2026-05-17,15:00:00,00";';

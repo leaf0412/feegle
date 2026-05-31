@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EffectHandlerRegistry } from "../../src/core/runtime/effect-handler-registry.js";
+import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 
 describe("EffectHandlerRegistry", () => {
   it("dispatches effects by plugin id and effect type", async () => {

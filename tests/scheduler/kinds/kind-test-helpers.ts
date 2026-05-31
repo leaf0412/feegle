@@ -1,9 +1,9 @@
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import type { AgentCli } from "../../../src/agent/agent-cli.js";
-import type { NotificationPort } from "../../../src/infra/app/notification-port.js";
-import type { Quote } from "../../../src/integrations/stock/stock-quote-port.js";
-import type { Task } from "../../../src/features/scheduler/task.js";
-import type { TaskContext } from "../../../src/features/scheduler/task-context.js";
+import type { NotificationPort } from "@infra/app/notification-port.js";
+import type { Quote } from "@integrations/stock/stock-quote-port.js";
+import type { Task } from "@features/scheduler/task.js";
+import type { TaskContext } from "@features/scheduler/task-context.js";
 
 export function makeTask(patch: Partial<Task> = {}): Task {
   return {

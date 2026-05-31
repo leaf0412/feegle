@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GitLabClient } from "../../src/integrations/gitlab/gitlab-client.js";
-import { parseGitLabIssueUrl } from "../../src/integrations/gitlab/gitlab-url-parser.js";
+import { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
+import { parseGitLabIssueUrl } from "@integrations/gitlab/gitlab-url-parser.js";
 
 // Read-only smoke test against a real GitLab (lejuhub by default). Gated off by default.
 // Run with:

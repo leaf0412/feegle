@@ -5,7 +5,7 @@ import {
   pickThinkingVerb,
   THINKING_VERBS,
   TOOL_ICON_MAP
-} from "../../src/integrations/feishu/feishu-tool-icons.js";
+} from "@integrations/feishu/feishu-tool-icons.js";
 
 describe("getToolIcon", () => {
   it("returns the configured icon when the tool name is known", () => {

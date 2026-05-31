@@ -2,12 +2,12 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
-import { migrate, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
-import { HistoryCommandHandler } from "../../../src/platform/commands/session/history-command.js";
-import { NameCommandHandler } from "../../../src/platform/commands/session/name-command.js";
-import { SearchCommandHandler } from "../../../src/platform/commands/session/search-command.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
-import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { HistoryCommandHandler } from "@platform/commands/session/history-command.js";
+import { NameCommandHandler } from "@platform/commands/session/name-command.js";
+import { SearchCommandHandler } from "@platform/commands/session/search-command.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 const histDef = defineSlashCommand("history", "/history", "h", "session", "nav:/history");
 const searchDef = defineSlashCommand("search", "/search", "s", "session", "cmd:/search");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertTransition, canTransition } from "../../src/domain/status.js";
+import { assertTransition, canTransition } from "@domain/status.js";
 
 describe("requirement state machine", () => {
   it("allows the phase 1 happy path in order", () => {

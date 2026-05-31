@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { createDefaultJsonFile, writeJsonAtomically } from "../../infra/app/json-file.js";
+import { createDefaultJsonFile, writeJsonAtomically } from "@infra/app/json-file.js";
 
 const ALIAS_KEY_RE = /^[A-Za-z0-9_\-]+$/;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PlatformActionRouter } from "../../src/platform/action-router.js";
+import { PlatformActionRouter } from "@platform/action-router.js";
 
 describe("PlatformActionRouter", () => {
   it("routes nav actions to card renderers", async () => {

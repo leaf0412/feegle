@@ -10,7 +10,7 @@ import {
   preprocessFeishuMarkdown,
   sanitizeMarkdownURLs,
   splitMarkdownByTables
-} from "../../src/integrations/feishu/feishu-markdown.js";
+} from "@integrations/feishu/feishu-markdown.js";
 
 describe("containsMarkdown", () => {
   it("recognises common indicators", () => {

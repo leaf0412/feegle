@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UsageCommandHandler } from "../../../src/platform/commands/system/usage-command.js";
+import { UsageCommandHandler } from "@platform/commands/system/usage-command.js";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import type { UsageReport } from "../../../src/agent/agent-capabilities.js";
 

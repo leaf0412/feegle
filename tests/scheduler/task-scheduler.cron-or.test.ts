@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
-import { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
-import { TaskScheduler } from "../../src/features/scheduler/task-scheduler.js";
-import type { HandlerKind } from "../../src/features/scheduler/handler-kind.js";
-import type { TaskStorePort } from "../../src/features/scheduler/task-registry.js";
-import type { Task } from "../../src/features/scheduler/task.js";
+import { HandlerKindRegistry } from "@features/scheduler/handler-kind-registry.js";
+import { TaskRegistry } from "@features/scheduler/task-registry.js";
+import { TaskScheduler } from "@features/scheduler/task-scheduler.js";
+import type { HandlerKind } from "@features/scheduler/handler-kind.js";
+import type { TaskStorePort } from "@features/scheduler/task-registry.js";
+import type { Task } from "@features/scheduler/task.js";
 
 describe("TaskScheduler runtime cron semantics", () => {
   beforeEach(() => {

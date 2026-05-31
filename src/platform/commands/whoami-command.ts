@@ -4,7 +4,7 @@ import type {
   SlashCommandReply
 } from "../slash-command-handler.js";
 import { isOwner } from "../owner-access.js";
-import type { FeishuUserDirectory } from "../../integrations/feishu/feishu-user-directory.js";
+import type { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
 
 export interface WhoamiCommandHandlerDeps {
   ownerEmails?: ReadonlySet<string>;

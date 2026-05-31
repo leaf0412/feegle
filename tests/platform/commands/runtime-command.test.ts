@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildSlashCommandRegistry } from "../../../src/platform/build-slash-command-registry.js";
-import type { SlashCommandDefinition } from "../../../src/platform/slash-command-catalog.js";
-import type { SlashCommandHandler, SlashCommandReply } from "../../../src/platform/slash-command-handler.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
+import type { SlashCommandDefinition } from "@platform/slash-command-catalog.js";
+import type { SlashCommandHandler, SlashCommandReply } from "@platform/slash-command-handler.js";
 import { stubSchedulerSlashDeps } from "../../fixtures/scheduler-deps.js";
-import { runtimeCommandModule } from "../../../src/platform/commands/runtime-command-module.js";
+import { runtimeCommandModule } from "@platform/commands/runtime-command-module.js";
 
 function fakeInspectionService(workflows: Array<{
   id: string;

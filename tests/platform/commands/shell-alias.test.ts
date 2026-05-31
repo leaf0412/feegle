@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import { ProviderStore } from "../../../src/agent/provider-store.js";
-import { ConfigStore } from "../../../src/infra/app/config-store.js";
-import { AliasStore } from "../../../src/platform/commands/alias-store.js";
-import { AliasCommandHandler } from "../../../src/platform/commands/setup/alias-command.js";
-import { ShellCommandHandler } from "../../../src/platform/commands/workspace/shell-command.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
-import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
+import { ConfigStore } from "@infra/app/config-store.js";
+import { AliasStore } from "@platform/commands/alias-store.js";
+import { AliasCommandHandler } from "@platform/commands/setup/alias-command.js";
+import { ShellCommandHandler } from "@platform/commands/workspace/shell-command.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 const def = defineSlashCommand("x", "/x", "x", "agent", "cmd:/x");
 

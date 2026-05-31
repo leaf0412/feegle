@@ -3,15 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { migrate, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
-import { RepositoryStore } from "../../../src/resources/repositories/repository-store.js";
-import { ChatBindingStore } from "../../../src/resources/repositories/chat-binding-store.js";
-import { RepoRemoveCommandHandler } from "../../../src/platform/commands/repo/repo-remove-command.js";
-import { BindRepoCommandHandler } from "../../../src/platform/commands/repo/bind-repo-command.js";
-import { RepoShowCommandHandler } from "../../../src/platform/commands/repo/repo-show-command.js";
-import { RepoClearCommandHandler } from "../../../src/platform/commands/repo/repo-clear-command.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
-import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
+import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
+import { RepositoryStore } from "@resources/repositories/repository-store.js";
+import { ChatBindingStore } from "@resources/repositories/chat-binding-store.js";
+import { RepoRemoveCommandHandler } from "@platform/commands/repo/repo-remove-command.js";
+import { BindRepoCommandHandler } from "@platform/commands/repo/bind-repo-command.js";
+import { RepoShowCommandHandler } from "@platform/commands/repo/repo-show-command.js";
+import { RepoClearCommandHandler } from "@platform/commands/repo/repo-clear-command.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

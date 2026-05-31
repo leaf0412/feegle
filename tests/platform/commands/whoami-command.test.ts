@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { WhoamiCommandHandler } from "../../../src/platform/commands/whoami-command.js";
-import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";
-import { defineSlashCommand } from "../../../src/platform/slash-command-catalog.js";
+import { WhoamiCommandHandler } from "@platform/commands/whoami-command.js";
+import type { SlashCommandContext } from "@platform/slash-command-handler.js";
+import { defineSlashCommand } from "@platform/slash-command-catalog.js";
 
 const definition = defineSlashCommand("whoami", "/whoami", "查看身份", "system", "cmd:/whoami");
 

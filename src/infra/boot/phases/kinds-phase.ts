@@ -1,7 +1,7 @@
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
-import { buildHandlerKindRegistry } from "../../../features/scheduler/build-handler-kind-registry.js";
+import { buildHandlerKindRegistry } from "@features/scheduler/build-handler-kind-registry.js";
 
 export function kindsPhase(deps: { contributions: Contributions }): BootPhase {
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePlatformAction } from "../../src/platform/platform-action.js";
+import { parsePlatformAction } from "@platform/platform-action.js";
 
 describe("parsePlatformAction", () => {
   it("parses navigational actions", () => {

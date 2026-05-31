@@ -1,4 +1,4 @@
-import { createPlatformCard, type PlatformCard } from "../../platform/platform-card.js";
+import { createPlatformCard, type PlatformCard } from "@platform/platform-card.js";
 import type { Task } from "./task.js";
 
 export function buildRecoveryCard(task: Task, now: Date): PlatformCard {

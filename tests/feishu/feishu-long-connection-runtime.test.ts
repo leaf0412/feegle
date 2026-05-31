@@ -4,11 +4,11 @@ import {
   type FeishuCardActionTriggerEvent,
   type FeishuMessageReceiveEvent,
   type FeishuMessageRecalledEvent
-} from "../../src/integrations/feishu/feishu-event-adapter.js";
+} from "@integrations/feishu/feishu-event-adapter.js";
 import {
   FeishuLongConnectionRuntime
-} from "../../src/integrations/feishu/feishu-long-connection-runtime.js";
-import type { FeishuPlatformConfig } from "../../src/integrations/feishu/feishu-platform-config.js";
+} from "@integrations/feishu/feishu-long-connection-runtime.js";
+import type { FeishuPlatformConfig } from "@integrations/feishu/feishu-platform-config.js";
 
 function fullConfig(overrides: Partial<FeishuPlatformConfig> = {}): FeishuPlatformConfig {
   return {

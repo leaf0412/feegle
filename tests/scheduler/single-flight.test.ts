@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SingleFlight } from "../../src/features/scheduler/single-flight.js";
+import { SingleFlight } from "@features/scheduler/single-flight.js";
 
 describe("SingleFlight", () => {
   it("does not queue duplicate task runs", () => {

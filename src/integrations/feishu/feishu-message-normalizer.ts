@@ -1,5 +1,5 @@
-import type { PlatformIncomingMessage, PlatformKind } from "../../platform/platform-message.js";
-import { createPlatformSessionKey } from "../../platform/platform-session.js";
+import type { PlatformIncomingMessage, PlatformKind } from "@platform/platform-message.js";
+import { createPlatformSessionKey } from "@platform/platform-session.js";
 import { isAllowedByList, isOldMessage } from "./feishu-dedup.js";
 import type { FeishuMessageMention, FeishuMessageReceiveEvent } from "./feishu-event-adapter.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SchedulerRuntimeObserver } from "../../src/features/scheduler/scheduler-runtime-observer.js";
+import { SchedulerRuntimeObserver } from "@features/scheduler/scheduler-runtime-observer.js";
 
 describe("SchedulerRuntimeObserver", () => {
   it("dispatches scheduled trigger events without changing scheduler outcome", async () => {

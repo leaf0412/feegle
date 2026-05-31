@@ -1,8 +1,8 @@
-import { createPlatformCard } from "../../../platform/platform-card.js";
-import type { Task } from "../../../features/scheduler/task.js";
-import { normalizeStockCode, type StockCode } from "../../../integrations/stock/stock-code.js";
-import { pnlForEntry } from "../../../integrations/stock/stock-domain.js";
-import type { PortfolioPatch, Threshold } from "../../../integrations/stock/stock-store-types.js";
+import { createPlatformCard } from "@platform/platform-card.js";
+import type { Task } from "@features/scheduler/task.js";
+import { normalizeStockCode, type StockCode } from "@integrations/stock/stock-code.js";
+import { pnlForEntry } from "@integrations/stock/stock-domain.js";
+import type { PortfolioPatch, Threshold } from "@integrations/stock/stock-store-types.js";
 import type { SlashCommandContext, SlashCommandHandler, SlashCommandReply } from "../../slash-command-handler.js";
 import { isOwner } from "../../owner-access.js";
 import type { SchedulerCommandDeps } from "../scheduler-command-deps.js";

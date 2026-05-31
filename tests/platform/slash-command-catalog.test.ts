@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSlashCommandRegistry } from "../../src/platform/build-slash-command-registry.js";
+import { buildSlashCommandRegistry } from "@platform/build-slash-command-registry.js";
 import { stubSchedulerSlashDeps } from "../fixtures/scheduler-deps.js";
 
 describe("slash command catalog", () => {

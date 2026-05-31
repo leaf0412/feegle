@@ -4,7 +4,7 @@ import {
   sanitizeLogArgs,
   sanitizeLogString,
   shouldSuppressDebug
-} from "../../src/integrations/feishu/feishu-logger.js";
+} from "@integrations/feishu/feishu-logger.js";
 
 describe("sanitizeLogString", () => {
   it("masks sensitive query params while keeping the rest of the URL", () => {

@@ -1,7 +1,7 @@
 import type { AgentCli, AgentChatMessage } from "../../../agent/agent-cli.js";
-import type { GitLabClient } from "../../../integrations/gitlab/gitlab-client.js";
-import type { GitLabIssue, GitLabIssueUrl, GitLabNote } from "../../../integrations/gitlab/gitlab-types.js";
-import { parseGitLabIssueUrl } from "../../../integrations/gitlab/gitlab-url-parser.js";
+import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
+import type { GitLabIssue, GitLabIssueUrl, GitLabNote } from "@integrations/gitlab/gitlab-types.js";
+import { parseGitLabIssueUrl } from "@integrations/gitlab/gitlab-url-parser.js";
 import type { SlashCommandContext, SlashCommandHandler, SlashCommandReply } from "../../slash-command-handler.js";
 import type { PipelineHooks } from "../../pipeline-hooks.js";
 import { assembleSummary, buildSummarySections } from "./build-summary.js";
