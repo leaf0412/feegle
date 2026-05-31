@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { createHmac } from "node:crypto";
 import { createRuntimeClosedLoopHarness } from "./runtime-closed-loop-harness.js";
 import { feishuMessageEnvelopeToTriggerEvent } from "@integrations/feishu/feishu-trigger-event-adapter.js";
 import { gitlabEventToTriggerEvent } from "@integrations/gitlab/gitlab-trigger-event-adapter.js";
-import { webhookPayloadToTriggerEvent } from "@integrations/webhook/webhook-trigger-event-adapter.js";
+import { webhookPayloadToTriggerEvent, verifyWebhookSignature as verifySignature } from "@integrations/webhook/webhook-trigger-event-adapter.js";
+import { WebhookIngressService } from "@integrations/webhook/webhook-ingress-service.js";
 import { taskToTriggerEvent } from "@features/scheduler/scheduler-trigger-event.js";
 import { FakeGitLabClient } from "../fixtures/fake-gitlab-client.js";
 import { createRecoveryWorkflow } from "@core/recovery/recovery-workflow.js";
@@ -783,6 +785,323 @@ describe("runtime closed-loop e2e", () => {
       await harness.inspectionService.inspect("ws_e2e");
       const after = harness.runtimeStore.listWorkflowSummaries("ws_e2e").length;
       expect(before).toBe(after);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("GitLab trigger: external IDs resolve to workspace before intent resolution", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      // Register intent resolver that inspects the enriched event
+      let capturedWorkspaceId: string | undefined;
+      harness.intentResolvers.register({
+        id: "gitlab-resolve-test",
+        canResolve(event) {
+          return event.source.pluginId === "gitlab";
+        },
+        resolve(event) {
+          const external = event.external as Record<string, unknown>;
+          capturedWorkspaceId = external.resolvedWorkspaceId as string | undefined;
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "chat" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "system" as const },
+            payload: external
+          };
+        }
+      });
+
+      harness.workflowSelector.register({
+        id: "gitlab-resolve-rule",
+        matches(_intent) { return true; },
+        definitionId: "gitlab.resolve.test.workflow"
+      });
+
+      harness.workflowRegistry.register({
+        definitionId: "gitlab.resolve.test.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "done",
+            async run() {
+              return { kind: "complete" as const };
+            }
+          }
+        ]
+      });
+
+      // Trigger event with gitlab conversation hint
+      const trigger = gitlabEventToTriggerEvent({
+        triggerEventId: "trg_gl_resolve",
+        receivedAt: "2026-05-31T00:00:00.000Z",
+        host: "gitlab.example.com",
+        projectId: 42,
+        eventType: "issue",
+        resourceType: "issue",
+        resourceIid: 7,
+        action: "open",
+        payload: { title: "Test resolution" }
+      });
+
+      const result = await harness.dispatcher.dispatch(trigger);
+      expect(result.status).toBe("succeeded");
+      // Workspace was resolved from conversationHint before intent resolution
+      expect(capturedWorkspaceId).toBe("ws_e2e");
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("GitLab trigger event: payload summary redacted before runtime event", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      harness.intentResolvers.register({
+        id: "gitlab-redact-test",
+        canResolve(event) {
+          return event.source.pluginId === "gitlab";
+        },
+        resolve(event) {
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "chat" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "system" as const },
+            payload: event.payloadSummary
+          };
+        }
+      });
+
+      harness.workflowSelector.register({
+        id: "gitlab-redact-rule",
+        matches(_intent) { return true; },
+        definitionId: "gitlab.redact.test.workflow"
+      });
+
+      harness.workflowRegistry.register({
+        definitionId: "gitlab.redact.test.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "done",
+            async run() {
+              return { kind: "complete" as const };
+            }
+          }
+        ]
+      });
+
+      // Payload with sensitive fields
+      const trigger = gitlabEventToTriggerEvent({
+        triggerEventId: "trg_gl_redact",
+        receivedAt: "2026-05-31T00:00:00.000Z",
+        host: "gitlab.internal",
+        projectId: 1,
+        eventType: "issue",
+        resourceType: "issue",
+        resourceIid: 99,
+        action: "update",
+        payload: {
+          title: "Fix bug",
+          token: "glpat-secret",
+          description: "Need to fix login issue"
+        }
+      });
+
+      // Verify payload summary is redacted at the trigger event level
+      expect(trigger.payloadSummary.token).toBe("[REDACTED]");
+      expect(trigger.payloadSummary.title).toBe("Fix bug");
+
+      const result = await harness.dispatcher.dispatch(trigger);
+      expect(result.status).toBe("succeeded");
+
+      // Verify no sensitive values in runtime events (metadata only, no input leak)
+      const wfiId = `wfi_e2e_${harness.wfiCounter}`;
+      const payloadsJson = JSON.stringify(harness.runtimeEventsPayloads(wfiId));
+      expect(payloadsJson).not.toContain("glpat-secret");
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("Webhook ingress service: verified request reaches workflow runtime", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      // Register webhook runtime components
+      harness.intentResolvers.register({
+        id: "webhook-e2e",
+        canResolve(event) {
+          return event.source.pluginId === "webhook";
+        },
+        resolve(event) {
+          harness.effectCalls.push({
+            pluginId: "webhook",
+            effectType: "process",
+            input: event.payloadSummary
+          });
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "workflow_signal" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "system" as const },
+            payload: event.external
+          };
+        }
+      });
+
+      harness.workflowSelector.register({
+        id: "webhook-e2e-rule",
+        matches(_intent) { return true; },
+        definitionId: "webhook.e2e.test.workflow"
+      });
+
+      harness.workflowRegistry.register({
+        definitionId: "webhook.e2e.test.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "record",
+            async run(ctx) {
+              await ctx.executeEffect({
+                pluginId: "webhook",
+                effectType: "process",
+                input: ctx.input
+              });
+              return { kind: "complete" as const };
+            }
+          }
+        ]
+      });
+
+      harness.effectHandlerRegistry.register({
+        pluginId: "webhook",
+        effectType: "process",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { processed: true };
+        }
+      });
+
+      // Create WebhookIngressService connected to the harness dispatcher
+      const secret = "webhook-secret";
+      const rawBody = JSON.stringify({ action: "deploy", ref: "main" });
+      const signature = createHmac("sha256", secret).update(rawBody).digest("hex");
+
+      const service = new WebhookIngressService(
+        {
+          sourceStore: {
+            getById(id: string) {
+              if (id === "wh_e2e") {
+                return {
+                  id: "wh_e2e",
+                  name: "E2E Source",
+                  pluginId: "webhook",
+                  secretRef: "secret:webhook/e2e",
+                  enabled: true,
+                  createdAt: "2026-05-31T00:00:00.000Z",
+                  updatedAt: "2026-05-31T00:00:00.000Z"
+                };
+              }
+              return undefined;
+            }
+          },
+          verifySignature,
+          ingressDispatcher: harness.dispatcher,
+          idFactory: { triggerEventId: () => "trg_wh_e2e" },
+          clock: { nowIso: () => "2026-05-31T00:00:00.000Z" }
+        },
+        {
+          async resolve(ref: string) {
+            if (ref === "secret:webhook/e2e") {
+              return { status: "resolved" as const, value: secret };
+            }
+            return { status: "missing" as const, reason: "unknown secret ref" };
+          }
+        }
+      );
+
+      const result = await service.handleWebhook({
+        sourceId: "wh_e2e",
+        pluginId: "webhook",
+        headers: { "x-hub-signature-256": signature },
+        rawBody,
+        payload: { action: "deploy", ref: "main" },
+        receivedAt: "2026-05-31T00:00:00.000Z"
+      });
+
+      expect(result.status).toBe("succeeded");
+      expect(harness.effectCalls.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("Webhook ingress service: unverified request blocked before runtime dispatch", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      let dispatchCalled = false;
+
+      const service = new WebhookIngressService(
+        {
+          sourceStore: {
+            getById(id: string) {
+              if (id === "wh_bad") {
+                return {
+                  id: "wh_bad",
+                  name: "Bad Source",
+                  pluginId: "webhook",
+                  secretRef: "secret:webhook/bad",
+                  enabled: true,
+                  createdAt: "2026-05-31T00:00:00.000Z",
+                  updatedAt: "2026-05-31T00:00:00.000Z"
+                };
+              }
+              return undefined;
+            }
+          },
+          verifySignature,
+          ingressDispatcher: {
+            async dispatch() {
+              dispatchCalled = true;
+              return { status: "succeeded" };
+            }
+          },
+          idFactory: { triggerEventId: () => "trg_wh_bad" },
+          clock: { nowIso: () => "2026-05-31T00:00:00.000Z" }
+        },
+        {
+          async resolve(ref: string) {
+            if (ref === "secret:webhook/bad") {
+              return { status: "resolved" as const, value: "correct-secret" };
+            }
+            return { status: "missing" as const, reason: "unknown secret ref" };
+          }
+        }
+      );
+
+      const result = await service.handleWebhook({
+        sourceId: "wh_bad",
+        pluginId: "webhook",
+        headers: { "x-hub-signature-256": "invalid-signature" },
+        rawBody: JSON.stringify({ action: "deploy" }),
+        payload: { action: "deploy" },
+        receivedAt: "2026-05-31T00:00:00.000Z"
+      });
+
+      expect(result.status).toBe("failed");
+      expect(result.detail).toContain("invalid webhook signature");
+      expect(dispatchCalled).toBe(false);
     } finally {
       await harness.close();
     }
