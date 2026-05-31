@@ -9,6 +9,7 @@ import { RecoveryService } from "@core/recovery/recovery-service.js";
 import { createRecoveryWorkflow } from "@core/recovery/recovery-workflow.js";
 import { defaultSlashCommandModules } from "@platform/commands/default-slash-command-modules.js";
 import { agentPromptKindModule, heartbeatKindModule } from "@features/scheduler/default-handler-kind-modules.js";
+import { agentConversationRuntimeContribution } from "@core/agent-conversation/agent-conversation-runtime-contribution.js";
 import { schedulerWorkflowContribution } from "@features/scheduler/scheduler-workflow-contribution.js";
 
 export const corePlugin: FeeglePlugin = {
@@ -25,7 +26,7 @@ export const corePlugin: FeeglePlugin = {
   },
   handlerKinds: [heartbeatKindModule(), agentPromptKindModule()],
   slashCommands: defaultSlashCommandModules(),
-  runtimeContributions: [schedulerWorkflowContribution()],
+  runtimeContributions: [schedulerWorkflowContribution(), agentConversationRuntimeContribution()],
   provides: [
     {
       phase: "stores" as BootPhaseName,

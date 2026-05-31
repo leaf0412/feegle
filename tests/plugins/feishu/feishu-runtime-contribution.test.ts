@@ -36,7 +36,7 @@ function createMockClient(): FeishuClientPort {
 }
 
 describe("feishuRuntimeContribution", () => {
-  it("registers Feishu chat workflow, selector, resolver, and reply effect", async () => {
+  it("registers Feishu chat selector, resolver, and platform effects", async () => {
     const mockClient = createMockClient();
     const ctx = new RuntimeContributionContext({
       workflows: new WorkflowRegistry(),
@@ -47,7 +47,6 @@ describe("feishuRuntimeContribution", () => {
 
     await feishuRuntimeContribution(mockClient).register(ctx);
 
-    expect(ctx.workflows.require("feishu.chat.workflow").definitionId).toBe("feishu.chat.workflow");
     const intent = await ctx.intentResolvers.resolve({
       triggerEventId: "trg_1",
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
@@ -61,7 +60,7 @@ describe("feishuRuntimeContribution", () => {
     expect(intent.kind).toBe("chat");
     expect(intent.workspaceId).toBe("ws_test");
     expect(intent.projectId).toBe("project_test");
-    expect(ctx.workflowSelector.select(intent).definitionId).toBe("feishu.chat.workflow");
+    expect(ctx.workflowSelector.select(intent).definitionId).toBe("agent.conversation.workflow");
   });
 
   it("keeps Feishu chat selection isolated when GitLab runtime is also registered", async () => {
@@ -93,7 +92,7 @@ describe("feishuRuntimeContribution", () => {
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
 
-    expect(ctx.workflowSelector.select(intent).definitionId).toBe("feishu.chat.workflow");
+    expect(ctx.workflowSelector.select(intent).definitionId).toBe("agent.conversation.workflow");
   });
 
   it("feishu reply effect calls client.replyText with correct args", async () => {

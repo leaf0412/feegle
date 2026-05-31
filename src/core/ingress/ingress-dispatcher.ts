@@ -151,7 +151,8 @@ export class IngressDispatcher {
       external: {
         ...event.external,
         resolvedWorkspaceId,
-        resolvedProjectId: workspace.status === "resolved" ? workspace.projectId : null
+        resolvedProjectId: workspace.status === "resolved" ? workspace.projectId : null,
+        resolvedUserId: identity.userId
       }
     };
 

@@ -1,7 +1,9 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { AgentConversationResult } from "@core/agent-conversation/agent-conversation-models.js";
 import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 
 function intentKindFromEvent(event: TriggerEvent): IntentKind {
   const commandType = event.external.commandType;
@@ -23,6 +25,7 @@ function feishuPayloadFromEvent(event: TriggerEvent): Record<string, unknown> {
   return {
     ...event.external,
     sourcePlugin: "feishu",
+    conversationKey: event.conversationHint?.conversationKey,
     text: textFromEvent(event)
   };
 }
@@ -147,7 +150,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
       ctx.workflowSelector.register({
         id: "feishu-chat",
         matches: (intent) => intent.kind === "chat" && intentPayloadSource(intent.payload) === "feishu",
-        definitionId: "feishu.chat.workflow"
+        definitionId: "agent.conversation.workflow"
       });
 
       ctx.workflowSelector.register({
@@ -163,28 +166,6 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
       });
 
       // --- Workflow definitions ---
-
-      ctx.workflows.register({
-        definitionId: "feishu.chat.workflow",
-        version: 1,
-        concurrencyPolicy: "reject_if_running",
-        steps: [
-          {
-            stepId: "reply",
-            run: async (stepCtx) => {
-              const payload = stepCtx.input as { chatId?: string; messageId?: string; text?: string; shouldRespond?: boolean };
-              if (payload.shouldRespond !== false && payload.messageId && payload.text) {
-                await stepCtx.executeEffect({
-                  pluginId: "feishu",
-                  effectType: "reply",
-                  input: { messageId: payload.messageId, content: payload.text }
-                });
-              }
-              return { kind: "complete", output: { replied: true } };
-            }
-          }
-        ]
-      });
 
       ctx.workflows.register({
         definitionId: "feishu.slash.workflow",
@@ -282,6 +263,24 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
 
       ctx.effectHandlers.register({
         pluginId: "feishu",
+        effectType: "agent_conversation.render",
+        execute: async (effect) => {
+          const input = effect.input as {
+            chatId?: string;
+            messageId?: string;
+            result?: AgentConversationResult;
+          };
+          await renderFeishuAgentConversationResult(client, {
+            chatId: requiredString(input.chatId, "chatId"),
+            messageId: requiredString(input.messageId, "messageId"),
+            result: requiredAgentConversationResult(input.result)
+          });
+          return { rendered: true };
+        }
+      });
+
+      ctx.effectHandlers.register({
+        pluginId: "feishu",
         effectType: "card.update",
         execute: async (effect) => {
           const input = effect.input as { messageId?: string; card?: unknown };
@@ -310,4 +309,18 @@ function workspaceIdFromEvent(event: TriggerEvent): string {
 function projectIdFromEvent(event: TriggerEvent): string | null {
   const projectId = event.external.resolvedProjectId;
   return typeof projectId === "string" ? projectId : null;
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Missing required field: ${field}`);
+  }
+  return value;
+}
+
+function requiredAgentConversationResult(value: unknown): AgentConversationResult {
+  if (!value || typeof value !== "object" || !("status" in value)) {
+    throw new Error("Missing required field: result");
+  }
+  return value as AgentConversationResult;
 }
