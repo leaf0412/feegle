@@ -47,3 +47,62 @@ describe("requirement execution workflow selectors", () => {
     expect(() => workflows.require("requirement.execute.workflow")).not.toThrow();
   });
 });
+
+describe("requirement.plan.approve.workflow step", () => {
+  it("calls execution.approve effect then renders plan_approved via sourcePlugin when present", async () => {
+    const workflows = new WorkflowRegistry();
+    requirementWorkflowRuntimeContribution().register(new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers: new EffectHandlerRegistry()
+    }));
+
+    const approveOutput = { approved: true, planVersion: 3 };
+    const executedEffects: Array<{ pluginId: string; effectType: string; input: unknown }> = [];
+    const stepCtx = {
+      input: { requirementId: "reqwf_1", planVersion: 3, sourcePlugin: "feishu", chatId: "oc_1" },
+      executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
+        executedEffects.push(e);
+        if (e.effectType === "execution.approve") return approveOutput;
+        return {};
+      }
+    };
+
+    const definition = workflows.require("requirement.plan.approve.workflow");
+    const step = definition.steps[0];
+    const result = await step.run(stepCtx as never);
+
+    expect(result).toEqual({ kind: "complete", output: approveOutput });
+    expect(executedEffects[0]).toMatchObject({ pluginId: "requirement-workflow", effectType: "execution.approve" });
+    expect(executedEffects[1]).toMatchObject({
+      pluginId: "feishu",
+      effectType: "requirement.plan_approved.render"
+    });
+  });
+
+  it("skips plan_approved render when sourcePlugin is absent", async () => {
+    const workflows = new WorkflowRegistry();
+    requirementWorkflowRuntimeContribution().register(new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers: new EffectHandlerRegistry()
+    }));
+
+    const executedEffects: Array<{ pluginId: string; effectType: string }> = [];
+    const stepCtx = {
+      input: { requirementId: "reqwf_1", planVersion: 1 },
+      executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
+        executedEffects.push(e);
+        return {};
+      }
+    };
+
+    const definition = workflows.require("requirement.plan.approve.workflow");
+    await definition.steps[0].run(stepCtx as never);
+
+    expect(executedEffects).toHaveLength(1);
+    expect(executedEffects[0].effectType).toBe("execution.approve");
+  });
+});

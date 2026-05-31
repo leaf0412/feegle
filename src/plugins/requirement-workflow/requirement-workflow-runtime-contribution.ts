@@ -121,11 +121,19 @@ export function requirementWorkflowRuntimeContribution(
           {
             stepId: "approve",
             async run(stepCtx) {
+              const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [k: string]: unknown };
               const output = await stepCtx.executeEffect({
                 pluginId: "requirement-workflow",
                 effectType: "execution.approve",
-                input: stepCtx.input
+                input
               });
+              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+                await stepCtx.executeEffect({
+                  pluginId: input.sourcePlugin,
+                  effectType: "requirement.plan_approved.render",
+                  input: { ...input, ...(output as Record<string, unknown>) }
+                });
+              }
               return { kind: "complete", output };
             }
           }

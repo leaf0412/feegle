@@ -413,4 +413,63 @@ describe("parseFeishuCommand", () => {
       })
     ).toEqual({ type: "unknown", raw: expect.any(String) });
   });
+
+  it("parses requirement execute with requirementId and planVersion", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement execute",
+        requirement_id: "reqwf_1",
+        plan_version: "2"
+      })
+    ).toEqual({ type: "requirement_execute", requirementId: "reqwf_1", planVersion: 2 });
+  });
+
+  it("treats requirement execute with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement execute",
+        plan_version: "1"
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("treats requirement execute with invalid plan_version as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement execute",
+        requirement_id: "reqwf_1",
+        plan_version: "0"
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("parses requirement verify with requirementId", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement verify",
+        requirement_id: "reqwf_1"
+      })
+    ).toEqual({ type: "requirement_verify", requirementId: "reqwf_1" });
+  });
+
+  it("treats requirement verify with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({ action: "act:/requirement verify" })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("parses requirement accept with requirementId", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement accept",
+        requirement_id: "reqwf_1"
+      })
+    ).toEqual({ type: "requirement_accept", requirementId: "reqwf_1" });
+  });
+
+  it("treats requirement accept with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({ action: "act:/requirement accept" })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
 });

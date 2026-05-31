@@ -49,7 +49,7 @@ describe("Feishu requirement render effects", () => {
     expect(output).toEqual({ rendered: true, messageId: "om_card", documentId: "doc_1", docUrl: "https://feishu.cn/docx/doc_1" });
   });
 
-  it("registers all four requirement render effects", () => {
+  it("registers all five requirement render effects", () => {
     const { handlers, registry } = makeRegistry();
     const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om") };
     const cloudDoc = makeCloudDoc();
@@ -57,6 +57,7 @@ describe("Feishu requirement render effects", () => {
     expect(Object.keys(handlers).sort()).toEqual([
       "feishu:requirement.acceptance_result.render",
       "feishu:requirement.execution_progress.render",
+      "feishu:requirement.plan_approved.render",
       "feishu:requirement.plan_review.render",
       "feishu:requirement.verification_result.render"
     ]);
@@ -115,5 +116,107 @@ describe("Feishu requirement render effects", () => {
 
     expect(cloudDoc.createDoc).not.toHaveBeenCalled();
     expect(out).toEqual({ rendered: true, messageId: "om_x" });
+  });
+
+  it("plan_approved card contains 执行开发 button with act:/requirement execute action", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_approved") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    const out = await handlers["feishu:requirement.plan_approved.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 2 }
+    });
+
+    expect(cloudDoc.createDoc).not.toHaveBeenCalled();
+    expect(out).toEqual({ rendered: true, messageId: "om_approved" });
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("act:/requirement execute");
+    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
+    expect(cardJson).toContain('"plan_version":"2"');
+    expect(cardJson).toContain("执行开发");
+  });
+
+  it("plan_approved card throws when chatId is missing", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn() };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await expect(handlers["feishu:requirement.plan_approved.render"].execute({
+      input: { requirementId: "reqwf_1", planVersion: 1 }
+    })).rejects.toThrow("Missing required field: chatId");
+
+    expect(client.sendInteractiveCard).not.toHaveBeenCalled();
+  });
+
+  it("execution_progress card contains 验证 button with act:/requirement verify action", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_exec") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "done" } }
+    });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("act:/requirement verify");
+    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
+    expect(cardJson).toContain("验证");
+  });
+
+  it("verification_result card contains 验收 button when result.status is passed", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_verify") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await handlers["feishu:requirement.verification_result.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "passed" }, report: "All tests pass." }
+    });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("act:/requirement accept");
+    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
+    expect(cardJson).toContain("验收");
+  });
+
+  it("verification_result card has NO 验收 button when result.status is failed", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_fail") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await handlers["feishu:requirement.verification_result.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "failed" }, report: "Tests failed." }
+    });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    // The accept action must not appear — the title contains "验收结果" but there must be no action button
+    expect(cardJson).not.toContain("act:/requirement accept");
+    expect(cardJson).not.toContain('"tag":"action"');
+    expect(cardJson).not.toContain('"tag":"button"');
+  });
+
+  it("acceptance_result card has no action button", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_accept") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await handlers["feishu:requirement.acceptance_result.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", report: "Accepted." }
+    });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).not.toContain('"tag":"action"');
+    expect(cardJson).not.toContain('"tag":"button"');
+    expect(cardJson).toContain("🎉 需求已验收");
   });
 });
