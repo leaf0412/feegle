@@ -44,6 +44,39 @@ describe("Feishu requirement render effects", () => {
     expect(out).toEqual({ rendered: true, messageId: "om_card" });
   });
 
+  it("plan_review revision input is a multi-line text area (schema-2.0 multiline_text)", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await handlers["feishu:requirement.plan_review.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1, markdown: "# Plan" }
+    });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    // the correct 2.0 value is multiline_text (NOT "multiline", which 400s)
+    expect(cardJson).toContain('"input_type":"multiline_text"');
+    expect(cardJson).toContain('"auto_resize":true');
+    expect(cardJson).not.toContain('"input_type":"multiline"'); // the invalid value that caused ErrCode 10002
+  });
+
+  it("cancelled render locks the card in place with no buttons", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await handlers["feishu:requirement.cancelled.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", cardMessageId: "om_card" }
+    });
+
+    const [, card] = (client.updateInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("已取消");
+    expect(cardJson).not.toContain('"action_type":"form_submit"'); // nothing to re-click
+    expect(cardJson).not.toContain('"tag":"form"');
+  });
+
   it("sends a fresh card when cardMessageId is absent (first render from text intake)", async () => {
     const { handlers, registry } = makeRegistry();
     const client = makeClient();
@@ -85,13 +118,14 @@ describe("Feishu requirement render effects", () => {
     expect(output).toEqual({ rendered: true, messageId: "om_card", documentId: "doc_1", docUrl: "https://feishu.cn/docx/doc_1" });
   });
 
-  it("registers the four requirement render effects (plan_approved folded into development)", () => {
+  it("registers the requirement render effects (plan_approved folded into development; cancelled added)", () => {
     const { handlers, registry } = makeRegistry();
     const client = makeClient();
     const cloudDoc = makeCloudDoc();
     registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
     expect(Object.keys(handlers).sort()).toEqual([
       "feishu:requirement.acceptance_result.render",
+      "feishu:requirement.cancelled.render",
       "feishu:requirement.execution_progress.render",
       "feishu:requirement.plan_review.render",
       "feishu:requirement.verification_result.render"

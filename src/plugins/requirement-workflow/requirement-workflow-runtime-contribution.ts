@@ -91,11 +91,21 @@ export function requirementWorkflowRuntimeContribution(
           {
             stepId: "revise_plan",
             async run(stepCtx) {
+              const input = stepCtx.input as { sourcePlugin?: string; [k: string]: unknown };
               const output = await stepCtx.executeEffect({
                 pluginId: "requirement-workflow",
                 effectType: "plan.revise",
-                input: stepCtx.input
+                input
               });
+              // re-render the plan-review card in place with the new version (a
+              // revision = new plan = new cloud doc, so no docUrl is carried).
+              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+                await stepCtx.executeEffect({
+                  pluginId: input.sourcePlugin,
+                  effectType: "requirement.plan_review.render",
+                  input: { ...input, ...(output as Record<string, unknown>), docUrl: undefined }
+                });
+              }
               return { kind: "complete", output };
             }
           }
@@ -218,6 +228,14 @@ function buildCancelWorkflow() {
             effectType: "execution.cancel",
             input
           });
+          // lock the card in place so it can't be re-clicked
+          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+            await stepCtx.executeEffect({
+              pluginId: input.sourcePlugin,
+              effectType: "requirement.cancelled.render",
+              input
+            });
+          }
           return { kind: "complete" as const, output };
         }
       }

@@ -114,6 +114,47 @@ describe("requirement.plan.approve.workflow step (approve → develop on one car
   });
 });
 
+describe("requirement.cancel.workflow step (取消 → 锁卡)", () => {
+  it("cancels then renders the locked cancelled card in place", async () => {
+    const workflows = buildWorkflows();
+    const executed: string[] = [];
+    const stepCtx = {
+      input: { requirementId: "reqwf_1", sourcePlugin: "feishu", chatId: "oc_1", cardMessageId: "om_card" },
+      executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
+        executed.push(e.effectType);
+        return {};
+      }
+    };
+
+    await workflows.require("requirement.cancel.workflow").steps[0].run(stepCtx as never);
+
+    // a terminal action must update the card so it can't be re-clicked
+    expect(executed).toEqual(["execution.cancel", "requirement.cancelled.render"]);
+  });
+});
+
+describe("requirement.plan.revise.workflow step (要求修改 → 重渲染计划卡)", () => {
+  it("revises then re-renders the plan-review card in place with the new version", async () => {
+    const workflows = buildWorkflows();
+    const revised = { requirementId: "reqwf_1", planVersion: 2, markdown: "# Plan v2", summary: "S2" };
+    const executed: Array<{ effectType: string; input: Record<string, unknown> }> = [];
+    const stepCtx = {
+      input: { requirementId: "reqwf_1", planVersion: 1, feedback: "补充验收标准", sourcePlugin: "feishu", chatId: "oc_1", cardMessageId: "om_card" },
+      executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
+        executed.push({ effectType: e.effectType, input: e.input as Record<string, unknown> });
+        if (e.effectType === "plan.revise") return revised;
+        return {};
+      }
+    };
+
+    await workflows.require("requirement.plan.revise.workflow").steps[0].run(stepCtx as never);
+
+    expect(executed.map((e) => e.effectType)).toEqual(["plan.revise", "requirement.plan_review.render"]);
+    // a revision is a new plan → new cloud doc, so no docUrl is carried forward
+    expect(executed[1].input).toMatchObject({ planVersion: 2, summary: "S2", docUrl: undefined });
+  });
+});
+
 describe("requirement.plan.back.workflow step (回退到计划)", () => {
   it("routes the back intent and reverts to plan, re-rendering plan_review with the carried docUrl", async () => {
     const selector = new WorkflowSelector();

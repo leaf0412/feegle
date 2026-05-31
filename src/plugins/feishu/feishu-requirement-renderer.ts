@@ -21,9 +21,31 @@ type MinimalFormSubmitButton = {
   value: Record<string, string>;
 };
 
-type MinimalFormElement =
-  | { tag: "input"; name: string; placeholder: { tag: "plain_text"; content: string } }
-  | MinimalFormSubmitButton;
+type MinimalInputElement = {
+  tag: "input";
+  name: string;
+  placeholder: { tag: "plain_text"; content: string };
+  // schema 2.0 multi-line input: input_type "multiline_text" (NOT "multiline"),
+  // rows = initial line count, auto_resize grows it on PC up to max_rows.
+  input_type?: "multiline_text";
+  rows?: number;
+  auto_resize?: boolean;
+  max_rows?: number;
+};
+
+type MinimalFormElement = MinimalInputElement | MinimalFormSubmitButton;
+
+function multilineInput(name: string, placeholder: string): MinimalInputElement {
+  return {
+    tag: "input",
+    name,
+    placeholder: plainText(placeholder),
+    input_type: "multiline_text",
+    rows: 4,
+    auto_resize: true,
+    max_rows: 12
+  };
+}
 
 interface MinimalFeishuCard {
   schema: "2.0";
@@ -123,11 +145,7 @@ function buildPlanReviewLinkCard(
     tag: "form",
     name: "requirement_plan_actions",
     elements: [
-      {
-        tag: "input",
-        name: "revision_note",
-        placeholder: plainText("（可选）要求修改时填写：补充验收标准；拆解步骤粒度")
-      },
+      multilineInput("revision_note", "（可选）要求修改时填写：补充验收标准；拆解步骤粒度；指出风险点等，可多行输入"),
       formSubmitButton(
         "确认计划",
         "primary",
@@ -272,6 +290,14 @@ function buildAcceptanceResultCard(requirementId: string, input: RequirementRend
   );
 }
 
+function buildCancelledCard(requirementId: string): MinimalFeishuCard {
+  return buildMinimalCard(
+    `🚫 已取消 · ${requirementId}`,
+    "grey",
+    [`**需求 ID**：${requirementId}`, "", "需求已取消。如需重新开始，请重新发起需求。"].join("\n")
+  );
+}
+
 function registerSimpleCardEffects(
   registry: EffectHandlerRegistry,
   client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
@@ -283,6 +309,19 @@ function registerSimpleCardEffects(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildAcceptanceResultCard(requirementId, input);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
+      return { rendered: true, messageId };
+    }
+  });
+
+  // 取消 must lock the card in place (no buttons), so it cannot be re-clicked.
+  registry.register({
+    pluginId: "feishu",
+    effectType: "requirement.cancelled.render",
+    execute: async (effect) => {
+      const input = effect.input as RequirementRenderInput;
+      const { chatId, requirementId } = validateRequiredFields(input);
+      const card = buildCancelledCard(requirementId);
       const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }

@@ -102,10 +102,20 @@ export function buildPlanReviseHandler(deps: RequirementWorkflowHandlerDeps): Ef
     async execute(effect) {
       const input = effect.input as {
         requirementId: string;
-        requirementText: string;
+        requirementText?: string;
         feedback: string;
         requesterUserId: string;
       };
+
+      // The 要求修改 card action carries only the feedback, not the original
+      // requirement text — source it from the stored requirement so revision works.
+      const record = deps.workflowStore.get(input.requirementId);
+      if (!record) {
+        throw new Error(`Requirement workflow not found: ${input.requirementId}`);
+      }
+      const requirementText = typeof input.requirementText === "string" && input.requirementText.length > 0
+        ? input.requirementText
+        : record.requirementText;
 
       const planningService = new RequirementPlanningService({
         planStore: deps.planStore,
@@ -115,14 +125,15 @@ export function buildPlanReviseHandler(deps: RequirementWorkflowHandlerDeps): Ef
       const version = await planningService.revisePlan({
         requirementId: input.requirementId,
         requesterUserId: input.requesterUserId,
-        requirementText: input.requirementText,
+        requirementText,
         feedback: input.feedback
       });
 
       return {
         requirementId: input.requirementId,
         planVersion: version.version,
-        markdown: version.markdown
+        markdown: version.markdown,
+        summary: version.summary
       };
     }
   };

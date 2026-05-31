@@ -150,6 +150,31 @@ describe("requirement-workflow execution/verification/acceptance handlers — ha
     expect(effectHandlers.has("requirement-workflow", "acceptance.run")).toBe(true);
   });
 
+  it("plan.revise sources the requirement text from the store when the card action omits it", async () => {
+    const { workflowStore, planStore, effectHandlers } = buildTestContext(db);
+
+    // generate first so a stored requirement (with its text) exists
+    const gen = await effectHandlers.execute({
+      effectId: "e-gen",
+      pluginId: "requirement-workflow",
+      effectType: "plan.generate",
+      input: { workspaceId: "ws", projectId: null, conversationKey: "feishu:oc_1", requesterUserId: "u1", requirementText: "Add login page" }
+    }) as { requirementId: string };
+
+    // the 要求修改 card action carries only feedback — no requirementText
+    const revised = await effectHandlers.execute({
+      effectId: "e-revise",
+      pluginId: "requirement-workflow",
+      effectType: "plan.revise",
+      input: { requirementId: gen.requirementId, feedback: "补充验收标准", requesterUserId: "u1" }
+    }) as { requirementId: string; planVersion: number; summary: string };
+
+    expect(revised.planVersion).toBe(2);
+    expect(revised.summary).toBe("Revised");
+    expect(planStore.latest(gen.requirementId)?.version).toBe(2);
+    expect(workflowStore.get(gen.requirementId)?.status).toBe("plan_reviewing");
+  });
+
   it("execution.revert_to_plan sends a developed requirement back to plan_reviewing and returns the latest plan", async () => {
     const { workflowStore, executionStore, effectHandlers } = buildTestContext(db);
 
