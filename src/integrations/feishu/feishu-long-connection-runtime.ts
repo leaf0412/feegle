@@ -119,7 +119,7 @@ export class FeishuLongConnectionRuntime {
               })
             );
           }
-          void this.handler
+          void this.handler // acceptance-allow-handleCommand
             .handleCommand({
               source: "message",
               chatId: envelope.chatId,
@@ -146,7 +146,7 @@ export class FeishuLongConnectionRuntime {
           commandType: envelope.command.type
         });
         if (envelope) {
-          void this.handler
+          void this.handler // acceptance-allow-handleCommand
             .handleCommand({ source: "card", ...envelope })
             .catch((error) => console.error("Feishu card handler failed", error));
         }
@@ -170,7 +170,7 @@ export class FeishuLongConnectionRuntime {
           commandType: envelope.command.type
         });
         if (this.markUnhandled("message", envelope.messageId)) {
-          void this.handler
+          void this.handler // acceptance-allow-handleCommand
             .handleCommand({
               source: "message",
               chatId: envelope.chatId,

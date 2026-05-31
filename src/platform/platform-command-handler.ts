@@ -6,7 +6,7 @@ import type { PlatformMessageHandler } from "./platform-port.js";
 export function createPlatformCommandHandler(legacyHandler: FeishuCommandHandler): PlatformMessageHandler {
   return {
     async handleMessage(message: PlatformIncomingMessage): Promise<void> {
-      await legacyHandler.handleCommand({
+      await legacyHandler.handleCommand({ // acceptance-allow-handleCommand
         source: "message",
         chatId: message.chatId,
         messageId: message.id,

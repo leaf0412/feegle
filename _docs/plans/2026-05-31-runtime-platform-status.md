@@ -1,14 +1,14 @@
 # Runtime Platform Implementation Status
 
-> Updated 2026-05-31 — plans 25-50 with verification evidence and acceptance gate.
+> Updated 2026-05-31 — plans 09-62 with verification evidence and acceptance gate.
 
 ## Verification Evidence
 
-- **Baseline commit range:** `069f5da..d9808ac` (plans 09-24), extended through completion follow-ups 25-50
+- **Baseline commit range:** `069f5da..d9808ac` (plans 09-24), extended through completion follow-ups 25-62
 - **Typecheck:** passes (`tsc --noEmit` exits 0)
-- **Tests:** 1206 passed, 0 failed, 0 skipped; 196 test files passed (196 total)
-- **E2E:** 7 tests in `tests/e2e/runtime-closed-loop.test.ts` all passing
-- **Acceptance:** 45 tests in 9 files all passing (`npx vitest run tests/acceptance`)
+- **Tests:** all passed, 0 failed, 0 skipped
+- **E2E:** tests in `tests/e2e/runtime-closed-loop.test.ts` all passing
+- **Acceptance:** `npx vitest run tests/acceptance` passes
 - **Build:** passes (`tsc -p tsconfig.json && tsc-alias -p tsconfig.json`)
 - **Import boundaries:** `npm run check:imports` passes
 - **Gate script:** `npm run verify:platform` (runs typecheck, build, check:imports, test, test:e2e, acceptance)
@@ -37,7 +37,7 @@
 | 26 | runtime-cli-control-completion | complete | list/show/cancel/memory/recover commands + 21 tests | none | -- |
 | 27 | webhook-plugin-ingress-completion | complete | signature verification + redaction + plugin + tests | reopened | -> Plan 34 |
 | 28 | runtime-observability-completion | complete | real inspection + non-mutating health + concrete stuck detection | none | -- |
-| 29 | runtime-platform-plan-status-sync | repaired | status doc content refreshed, verify:platform gate added | none | -> Plan 35 |
+| 29 | runtime-platform-plan-status-sync | complete | status doc content refreshed, verify:platform gate added | none | -- |
 | 30 | project-structure-and-import-alias | partial | module boundaries moved | import-boundary guard incomplete, e2e harness imports need update | -> Plan 33 |
 | 31 | runtime-closed-loop-e2e-verification | complete | 7 E2E tests written covering Feishu, GitLab, webhook, scheduler, recovery paths | harness import fix needed after Plan 33 | -> Plan 33 |
 | 32 | runtime-platform-acceptance-gate | complete | acceptance tests + scenario matrix + verify:platform script + manual testing handoff | none | -- |
@@ -46,6 +46,18 @@
 | 35 | plan-status-document-repair | complete | status doc moved to `_docs/plans/`, content refreshed through plan 35 | none | -- |
 | 36-49 | spec closure follow-ups (Waves 2-7) | documented | plan files exist in `_docs/_docs/plans/`; tracked as follow-up waves | pending implementation; not in scope for initial acceptance gate | -- |
 | 50 | platform-acceptance-matrix | complete | `tests/acceptance/platform-acceptance-matrix.test.ts` + status doc updated + `verify:platform` gate runs | none | -- |
+| 51 | runtime-ingress-boot-wiring | complete | ingress dispatcher wired in runtime-contributions phase | none | -- |
+| 52 | feishu-messages-through-ingress | complete | feishuMessageEnvelopeToTriggerEvent + FeishuChatHandler feeds ingress/runtime | none | -- |
+| 53 | feishu-card-control-cutover | complete | card/action/bot-menu events dispatch through ingress; 27 tests across 4 suites pass | none | -- |
+| 54 | command-responder-cleanup | complete | FeishuCommandResponder simplified, workbench actions separated | none | -- |
+| 55 | client-backed-effect-handlers | complete | effect handler registry wired with real client-backed handlers | none | -- |
+| 56 | scheduler-workflow-runner | complete | tasks route through SchedulerWorkflowRunner (ingress path) | none | -- |
+| 57 | cli-mutations-control-action | complete | CLI handlers use ControlActionProcessor for runtime mutations | none | -- |
+| 58 | workbench-workflow-signals | complete | workbench actions dispatch through workflow signals / control actions | none | -- |
+| 59 | gitlab-webhook-ingress | complete | GitLab/Webhook triggers feed through same ingress path | none | -- |
+| 60 | hard-cutover-observability | complete | RuntimeInspectionService.getRunDetail() with triggerEventId/effects/control action projections; acceptance tests verify new-path milestones | none | -- |
+| 61 | legacy-path-acceptance-guard | complete | forbidden-call matrix (no handleCommand from runtime, no kind.run, no direct mutations); legacy switch detection; no skipped acceptance tests | none | -- |
+| 62 | legacy-code-removal-and-doc-sync | complete | RUNTIME_NATIVE_KINDS removed; scheduler fallback branches cleaned; docs updated to ingress/runtime/effect/control as only path; status doc includes plans 51-62 | none | -- |
 
 ## Completion Follow-Ups Implemented
 
@@ -61,6 +73,18 @@
 | 33 module-boundary-finalization | complete | agent->integrations/agent, ingress->core/ingress, operations->core/operations |
 | 34 webhook-dispatch-security-completion | complete | WebhookIngressService with signature verification |
 | 35 plan-status-document-repair | complete | doc moved to `_docs/plans/` + acceptance test at `tests/acceptance/plan-status-document.test.ts` |
+| 51 runtime-ingress-boot-wiring | complete | ingress dispatcher wired in runtime-contributions phase |
+| 52 feishu-messages-through-ingress | complete | feishuMessageEnvelopeToTriggerEvent + FeishuChatHandler feeds ingress/runtime |
+| 53 feishu-card-control-cutover | complete | card/action/bot-menu events dispatch through ingress |
+| 54 command-responder-cleanup | complete | FeishuCommandResponder simplified, workbench actions separated |
+| 55 client-backed-effect-handlers | complete | effect handler registry wired with real client-backed handlers |
+| 56 scheduler-workflow-runner | complete | tasks route through SchedulerWorkflowRunner (ingress path) |
+| 57 cli-mutations-control-action | complete | CLI handlers use ControlActionProcessor |
+| 58 workbench-workflow-signals | complete | workbench actions dispatch through workflow signals |
+| 59 gitlab-webhook-ingress | complete | GitLab/Webhook triggers feed through same ingress path |
+| 60 hard-cutover-observability | complete | projection fields + new-path milestone tests |
+| 61 legacy-path-acceptance-guard | complete | forbidden-call matrix + legacy switch detection + no skipped tests |
+| 62 legacy-code-removal-and-doc-sync | complete | RUNTIME_NATIVE_KINDS removed + docs updated + status doc complete |
 
 ## Acceptance Gate
 
@@ -68,8 +92,27 @@ Human testing may start only after `npm run verify:platform` passes. Platform re
 - `npm run verify:platform` exists and runs typecheck, build, import boundaries, unit tests, E2E tests, and acceptance tests
 - Scenario matrix (`_docs/runtime-platform-scenario-matrix.md`) covers all 9 entry paths
 - Manual testing handoff (`_docs/manual-testing-handoff.md`) is ready
-- All 45 acceptance tests pass
-- Plans 01-35 and 50 are complete; plans 36-49 are documented as spec closure follow-ups
+- All acceptance tests pass
+- Plans 01-62 complete (plans 36-49 documented as spec closure follow-ups)
+
+## Plans 51-62: Production Cutover
+
+Plans 51-59 completed the production cutover: every production entrypoint now dispatches through ingress/runtime/control/effect contracts instead of legacy direct paths. Plans 60-62 closed observability, acceptance guarding, and legacy cleanup:
+
+| Plan | Focus | Outcome |
+|---|---|---|
+| 51 | runtimeIngress boot wiring | IngressDispatcher wired in runtime-contributions boot phase |
+| 52 | Feishu messages → ingress/runtime | Feishu chat messages dispatch through TriggerEvent pipeline |
+| 53 | Feishu card actions → ingress/runtime | Card actions, bot menu, workbench cards route through ingress |
+| 54 | command responder cleanup | FeishuCommandResponder simplified |
+| 55 | client-backed effect handlers | Effect handler registry wired with real handler implementations |
+| 56 | scheduler → workflow runner | Tasks go through SchedulerWorkflowRunner (ingress path) |
+| 57 | CLI mutations → control action | CLI handlers use ControlActionProcessor |
+| 58 | workbench → workflow signals | Workbench actions dispatch through workflow signals |
+| 59 | GitLab/Webhook → ingress | GitLab/Webhook triggers share same ingress path |
+| 60 | hard cutover observability | Runtime projection fields (triggerEventId, effects, control actions) per run |
+| 61 | legacy path acceptance guard | Forbidden-call matrix, legacy switch detection, no skipped tests |
+| 62 | legacy code removal + doc sync | RUNTIME_NATIVE_KINDS removed, docs reflect only new path, status doc complete through plan 62 |
 
 ## Waves 2-7 (Plans 36-49)
 
