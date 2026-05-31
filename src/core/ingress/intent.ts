@@ -4,7 +4,9 @@ export const intentKinds = [
   "slash_command",
   "workflow_signal",
   "scheduled_workflow",
-  "diagnostic_request"
+  "diagnostic_request",
+  "requirement_plan_generate",
+  "requirement_plan_revise"
 ] as const;
 
 export type IntentKind = (typeof intentKinds)[number];
