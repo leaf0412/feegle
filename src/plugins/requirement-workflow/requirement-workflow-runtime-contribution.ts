@@ -53,6 +53,64 @@ export function requirementWorkflowRuntimeContribution(): RuntimeContributionMod
           }
         ]
       });
+
+      ctx.workflowSelector.register({
+        id: "requirement-plan-approve",
+        matches: (intent) => intent.kind === "requirement_plan_approve",
+        definitionId: "requirement.plan.approve.workflow"
+      });
+
+      ctx.workflowSelector.register({
+        id: "requirement-execute",
+        matches: (intent) => intent.kind === "requirement_execute",
+        definitionId: "requirement.execute.workflow"
+      });
+
+      ctx.workflows.register({
+        definitionId: "requirement.plan.approve.workflow",
+        version: 1,
+        concurrencyPolicy: "reject_if_running",
+        steps: [
+          {
+            stepId: "approve",
+            async run(stepCtx) {
+              const output = await stepCtx.executeEffect({
+                pluginId: "requirement-workflow",
+                effectType: "execution.approve",
+                input: stepCtx.input
+              });
+              return { kind: "complete", output };
+            }
+          }
+        ]
+      });
+
+      ctx.workflows.register({
+        definitionId: "requirement.execute.workflow",
+        version: 1,
+        concurrencyPolicy: "reject_if_running",
+        steps: [
+          {
+            stepId: "run_execution",
+            async run(stepCtx) {
+              const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
+              const output = await stepCtx.executeEffect({
+                pluginId: "requirement-workflow",
+                effectType: "execution.run",
+                input
+              });
+              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+                await stepCtx.executeEffect({
+                  pluginId: input.sourcePlugin,
+                  effectType: "requirement.execution_progress.render",
+                  input: { ...input, result: output }
+                });
+              }
+              return { kind: "complete", output };
+            }
+          }
+        ]
+      });
     }
   };
 }
