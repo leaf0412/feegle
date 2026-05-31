@@ -54,7 +54,7 @@ describe("runtime command module", () => {
       } as any,
     }),
     defaults: false,
-    modules: [runtimeCommandModule()],
+    modules: [runtimeCommandModule("ws_default")],
   });
 
   function makeContext(id: string, raw: string, args: string): any {
@@ -101,7 +101,7 @@ describe("runtime command module", () => {
           runtimeInspectionService: fakeInspectionService([]) as any,
         }),
         defaults: false,
-        modules: [runtimeCommandModule()],
+        modules: [runtimeCommandModule("ws_default")],
       });
       const handler = emptyReg.resolve("runtime_list");
       const def = emptyReg.findById("runtime_list")!;
@@ -170,7 +170,7 @@ describe("runtime command module", () => {
           } as any,
         }),
         defaults: false,
-        modules: [runtimeCommandModule()],
+        modules: [runtimeCommandModule("ws_default")],
       });
       const handler = failReg.resolve("runtime_approve");
       const def = failReg.findById("runtime_approve")!;
@@ -214,7 +214,7 @@ describe("runtime command module", () => {
           } as any,
         }),
         defaults: false,
-        modules: [runtimeCommandModule()],
+        modules: [runtimeCommandModule("ws_default")],
       });
       const handler = failReg.resolve("runtime_reject");
       const def = failReg.findById("runtime_reject")!;

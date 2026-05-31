@@ -6,7 +6,12 @@ import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 function stubResolvers() {
   return {
     identityResolver: {
-      resolve: () => ({ status: "resolved" as const, userId: "user_1", displayName: "Test User" })
+      resolve: () => ({
+        status: "resolved" as const,
+        userId: "user_1",
+        displayName: "Test User",
+        externalIdentity: { provider: "feishu", externalId: "ou_123" }
+      })
     },
     workspaceResolver: {
       resolve: () =>
@@ -19,7 +24,7 @@ function stubResolvers() {
     },
     permissionPolicy: {
       checkPermission: () => ({ allowed: true, role: "member" as const, reason: "member" }),
-      decide: () => ({ kind: "allow" as const })
+      decide: () => ({ kind: "allow" as const, reason: "test" })
     }
   };
 }

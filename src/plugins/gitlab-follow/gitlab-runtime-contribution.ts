@@ -10,7 +10,7 @@ export function gitlabRuntimeContribution(): RuntimeContributionModule {
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
           kind: "chat",
-          workspaceId: "ws_personal",
+          workspaceId: "ws_default",
           projectId: null,
           actor: { kind: "system" },
           payload: event.external

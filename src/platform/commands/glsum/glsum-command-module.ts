@@ -21,7 +21,7 @@ export function glsumCommandModule(): SlashCommandModule {
         registry.declarePlanned(glsumDefinition);
         return;
       }
-      const client = new GitLabClient(gl.token);
+      const client = new GitLabClient(gl.token ?? "");
       const agent = deps.providers?.resolveActiveAgent();
       const hooks = deps.pipelineHooks ?? consolePipelineHooks;
       registry.registerCommand(glsumDefinition, new GlsumCommandHandler(client, agent, hooks));

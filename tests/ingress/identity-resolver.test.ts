@@ -50,7 +50,8 @@ describe("IdentityResolver", () => {
     expect(result).toEqual({
       status: "resolved",
       userId: "user_1",
-      displayName: "Alice"
+      displayName: "Alice",
+      externalIdentity: { provider: "feishu", externalId: "ou_abc123" }
     });
   });
 

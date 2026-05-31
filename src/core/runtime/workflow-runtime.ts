@@ -2,6 +2,7 @@ import type { RuntimeStore } from "./runtime-store.js";
 import type { EffectInput, MemorySearchParams, RuntimeError, WorkflowSignal, WorkflowStep, WorkflowStepContext } from "./runtime-models.js";
 import type { WorkflowRegistry } from "./workflow-registry.js";
 import type { RuntimeEffectExecutor } from "./runtime-effect-executor.js";
+import type { PolicyService } from "../security/policy-service.js";
 
 interface WorkflowRuntimeStartInput {
   workflowInstanceId: string;
@@ -11,22 +12,26 @@ interface WorkflowRuntimeStartInput {
   definitionId: string;
   input: unknown;
   now: string;
+  actor?: string;
 }
 
-export type WorkflowStartResult = { status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; error?: RuntimeError };
+export type WorkflowStartResult = { status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; error?: RuntimeError; reason?: string };
 
 let effectCounter = 0;
 
 export class WorkflowRuntime {
   private readonly memoryService?: { searchActive(params: { scope?: string; kind?: string; query?: string }): Array<{ id: string; kind: string; scope: string; content: string }> };
+  private readonly policyService?: PolicyService;
 
   constructor(
     private readonly store: RuntimeStore,
     private readonly registry: WorkflowRegistry,
     private readonly effectExecutor: RuntimeEffectExecutor,
-    memoryService?: { searchActive(params: { scope?: string; kind?: string; query?: string }): Array<{ id: string; kind: string; scope: string; content: string }> }
+    memoryService?: { searchActive(params: { scope?: string; kind?: string; query?: string }): Array<{ id: string; kind: string; scope: string; content: string }> },
+    policyService?: PolicyService
   ) {
     this.memoryService = memoryService;
+    this.policyService = policyService;
   }
 
   async start(input: WorkflowRuntimeStartInput): Promise<WorkflowStartResult> {
@@ -145,6 +150,45 @@ export class WorkflowRuntime {
     for (const step of definition.steps) {
       const stepInput: WorkflowRuntimeStartInput = { ...input, input: currentInput };
       const stateId = this.startStep(stepInput, step, eventId);
+
+      // Policy check: deny step execution if actor lacks permission
+      if (this.policyService && input.actor) {
+        const policy = this.policyService.evaluate({
+          actor: input.actor,
+          action: "step.execute",
+          resource: { type: "step", id: step.stepId },
+          workspaceId: input.workspaceId
+        });
+        if (policy.kind === "deny") {
+          this.store.updateStepState({
+            id: stateId,
+            status: "skipped",
+            output: undefined,
+            waitCondition: null,
+            error: {
+              code: "PERMISSION_DENIED",
+              category: "permission",
+              message: `step execution denied by policy: ${policy.reason}`,
+              retryable: false,
+              recoverable: false,
+              evidence: { policyReason: policy.reason }
+            },
+            now: input.now
+          });
+          this.appendEvent(input, eventId(`step-denied-${step.stepId}`), "step.denied", {
+            stepId: step.stepId,
+            reason: policy.reason
+          }, stateId);
+          this.finish(input, "failed", step.stepId, {
+            code: "PERMISSION_DENIED",
+            category: "permission",
+            message: `step execution denied by policy: ${policy.reason}`,
+            retryable: false,
+            recoverable: false
+          }, eventId);
+          return { status: "failed", reason: policy.reason };
+        }
+      }
       const ctx = this.buildContext(stepInput, stateId);
       let result: Awaited<ReturnType<WorkflowStep["run"]>>;
       try {
@@ -207,7 +251,8 @@ export class WorkflowRuntime {
           workflowInstanceId: input.workflowInstanceId,
           runAttemptId: input.runAttemptId,
           stepStateId,
-          now: input.now
+          now: input.now,
+          actor: input.actor
         });
       },
       memory: this.memoryService
@@ -374,6 +419,7 @@ export class WorkflowRuntime {
     });
 
     // Build context with signal as input
+    const actor = input.signal.actor?.kind === "user" ? input.signal.actor.userId : undefined;
     const resumeInput: WorkflowRuntimeStartInput = {
       workflowInstanceId: input.workflowInstanceId,
       runAttemptId: input.runAttemptId,
@@ -381,7 +427,8 @@ export class WorkflowRuntime {
       projectId: null,
       definitionId: instance.definitionId ?? "",
       input: { previousOutput: waitingStep.output, signal: input.signal.payload },
-      now: input.now
+      now: input.now,
+      actor
     };
 
     // Run remaining steps from waiting step index
@@ -407,6 +454,46 @@ export class WorkflowRuntime {
       }
 
       const stateId = this.startResumeStep(input, step, resumeInput, eventId);
+
+      // Policy check: deny step execution in resume if actor lacks permission
+      if (this.policyService && actor) {
+        const stepPolicy = this.policyService.evaluate({
+          actor,
+          action: "step.execute",
+          resource: { type: "step", id: step.stepId },
+          workspaceId: input.workspaceId
+        });
+        if (stepPolicy.kind === "deny") {
+          this.store.updateStepState({
+            id: stateId,
+            status: "skipped",
+            output: undefined,
+            waitCondition: null,
+            error: {
+              code: "PERMISSION_DENIED",
+              category: "permission",
+              message: `step execution denied by policy: ${stepPolicy.reason}`,
+              retryable: false,
+              recoverable: false,
+              evidence: { policyReason: stepPolicy.reason }
+            },
+            now: input.now
+          });
+          this.appendResumeEvent(input, eventId(`step-denied-${step.stepId}`), "step.denied", {
+            stepId: step.stepId,
+            reason: stepPolicy.reason
+          }, stateId);
+          this.finishResume(input, "failed", step.stepId, {
+            code: "PERMISSION_DENIED",
+            category: "permission",
+            message: `step execution denied by policy: ${stepPolicy.reason}`,
+            retryable: false,
+            recoverable: false
+          }, eventId);
+          return { status: "failed", reason: stepPolicy.reason };
+        }
+      }
+
       const ctx = this.buildResumeContext(resumeInput, stateId);
       const result = await step.run(ctx);
 
@@ -489,7 +576,8 @@ export class WorkflowRuntime {
           workflowInstanceId: input.workflowInstanceId,
           runAttemptId: input.runAttemptId,
           stepStateId,
-          now: input.now
+          now: input.now,
+          actor: input.actor
         });
       },
       memory: this.memoryService

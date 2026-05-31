@@ -121,10 +121,20 @@ function stubIdentityResolver(): IdentityResolverPort {
       const provider = actorHint.provider as string | undefined;
       const externalUserId = actorHint.externalUserId as string | undefined;
       if (provider === "feishu" && externalUserId === "ou_e2e") {
-        return { status: "resolved" as const, userId: "user_e2e", displayName: "E2E User" };
+        return {
+          status: "resolved" as const,
+          userId: "user_e2e",
+          displayName: "E2E User",
+          externalIdentity: { provider: "feishu", externalId: "ou_e2e" }
+        };
       }
       // Default resolution for e2e
-      return { status: "resolved" as const, userId: "user_e2e", displayName: "E2E User" };
+      return {
+        status: "resolved" as const,
+        userId: "user_e2e",
+        displayName: "E2E User",
+        externalIdentity: { provider: provider ?? "unknown", externalId: externalUserId ?? "unknown" }
+      };
     }
   };
 }
@@ -157,7 +167,7 @@ function stubPermissionPolicy(): PermissionPolicyPort {
       if (!permission.allowed) {
         return { kind: "deny" as const, reason: permission.reason };
       }
-      return { kind: "allow" as const };
+      return { kind: "allow" as const, reason: "e2e test user" };
     }
   };
 }

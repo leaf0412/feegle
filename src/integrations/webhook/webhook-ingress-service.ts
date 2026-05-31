@@ -1,10 +1,11 @@
 import type { WebhookSourceRecord } from "./webhook-source-store.js";
 import { webhookPayloadToTriggerEvent } from "./webhook-trigger-event-adapter.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
+import type { SecretResolver } from "@core/security/secret-resolver.js";
 
-export interface WebhookSecretResolver {
-  resolve(secretRef: string): string | null;
-}
+export { SecretResolver } from "@core/security/secret-resolver.js";
+// Re-export only for legacy test compatibility; prefer importing from @core/security/secret-resolver.js directly.
+export type WebhookSecretResolver = SecretResolver;
 
 export interface WebhookSourceLookup {
   getById(id: string): WebhookSourceRecord | undefined;
@@ -21,7 +22,7 @@ export interface WebhookIngressDeps {
 export class WebhookIngressService {
   constructor(
     private readonly deps: WebhookIngressDeps,
-    private readonly secretResolver: WebhookSecretResolver
+    private readonly secretResolver: SecretResolver
   ) {}
 
   async handleWebhook(input: {
@@ -43,10 +44,14 @@ export class WebhookIngressService {
 
     // 2. If source has secretRef, resolve the secret and verify signature
     if (source.secretRef) {
-      const secret = this.secretResolver.resolve(source.secretRef);
-      if (secret === null) {
-        return { status: "failed", detail: `webhook secret resolution failed: ${source.secretRef}` };
+      const result = await this.secretResolver.resolve(source.secretRef, {
+        workspaceId: "",
+        pluginId: input.pluginId
+      });
+      if (result.status !== "resolved") {
+        return { status: "failed", detail: `webhook secret resolution failed: ${source.secretRef} (${result.status}: ${result.reason})` };
       }
+      const secret = result.value;
 
       const signature = this.extractSignature(input.headers);
       if (!signature) {

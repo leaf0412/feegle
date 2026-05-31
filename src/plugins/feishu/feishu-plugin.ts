@@ -46,7 +46,11 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution({ workspaceId: "ws_default" })]
+    runtimeContributions: [
+      feishuRuntimeContribution({
+        workspaceId: "ws_default"
+      })
+    ]
   };
 }
 

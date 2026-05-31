@@ -81,10 +81,13 @@ const recoverDefinition = defineSlashCommand(
 
 class ListCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_list";
-  constructor(private readonly inspection: RuntimeInspectionService) {}
+  constructor(
+    private readonly inspection: RuntimeInspectionService,
+    private readonly operatorWorkspaceId: string
+  ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
-    const workspaceId = context.args.trim() || "ws_personal";
+    const workspaceId = context.args.trim() || this.operatorWorkspaceId;
     const result = await this.inspection.inspect(workspaceId);
     if (result.totalWorkflows === 0) {
       return { kind: "text" as const, text: "暂无工作流。" };
@@ -110,13 +113,16 @@ class ListCommandHandler implements SlashCommandHandler {
 
 class ShowCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_show";
-  constructor(private readonly inspection: RuntimeInspectionService) {}
+  constructor(
+    private readonly inspection: RuntimeInspectionService,
+    private readonly operatorWorkspaceId: string
+  ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const id = context.args.trim();
     if (!id) return { kind: "text" as const, text: "用法: /runtime show <workflowInstanceId>" };
 
-    const result = await this.inspection.inspect("ws_personal");
+    const result = await this.inspection.inspect(this.operatorWorkspaceId);
     const wf = result.workflows.find((w) => w.id === id);
     if (!wf) return { kind: "text" as const, text: `工作流 ${id} 未找到。` };
 
@@ -164,7 +170,8 @@ class CancelCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_cancel";
   constructor(
     private readonly store: ControlActionStore,
-    private readonly processor: ControlActionProcessor
+    private readonly processor: ControlActionProcessor,
+    private readonly operatorWorkspaceId: string
   ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
@@ -175,7 +182,7 @@ class CancelCommandHandler implements SlashCommandHandler {
     const actionId = `ca_cancel_${Date.now()}`;
     this.store.create({
       id: actionId,
-      workspaceId: "ws_personal",
+      workspaceId: this.operatorWorkspaceId,
       actorUserId: context.sender.userId,
       actionType: "cancel_workflow",
       payload: { workflowInstanceId: id },
@@ -188,7 +195,10 @@ class CancelCommandHandler implements SlashCommandHandler {
 
 class ResumeCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_resume";
-  constructor(private readonly wfRuntime: WorkflowRuntime) {}
+  constructor(
+    private readonly wfRuntime: WorkflowRuntime,
+    private readonly operatorWorkspaceId: string
+  ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const id = context.args.trim();
@@ -198,7 +208,7 @@ class ResumeCommandHandler implements SlashCommandHandler {
       workflowInstanceId: id,
       runAttemptId: `cli_resume_${Date.now()}`,
       signal: { signalId: `cli_${Date.now()}`, kind: "control_action", payload: { action: "resume" } },
-      workspaceId: "ws_personal",
+      workspaceId: this.operatorWorkspaceId,
       now: new Date().toISOString()
     });
 
@@ -244,7 +254,8 @@ class RecoverCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_recover";
   constructor(
     private readonly store: ControlActionStore,
-    private readonly processor: ControlActionProcessor
+    private readonly processor: ControlActionProcessor,
+    private readonly operatorWorkspaceId: string
   ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
@@ -255,7 +266,7 @@ class RecoverCommandHandler implements SlashCommandHandler {
     const actionId = `ca_recover_${Date.now()}`;
     this.store.create({
       id: actionId,
-      workspaceId: "ws_personal",
+      workspaceId: this.operatorWorkspaceId,
       actorUserId: context.sender.userId,
       actionType: "trigger_recovery",
       payload: { workflowInstanceId: id, runAttemptId: "" },
@@ -266,13 +277,14 @@ class RecoverCommandHandler implements SlashCommandHandler {
   }
 }
 
-export function runtimeCommandModule(): SlashCommandModule {
+export function runtimeCommandModule(operatorWorkspaceId: string): SlashCommandModule {
   return {
     id: "runtime",
     register: (registry, deps) => {
+      const workspaceId = deps.operatorWorkspaceId ?? operatorWorkspaceId;
       if (deps.runtimeInspectionService) {
-        registry.registerCommand(listDefinition, new ListCommandHandler(deps.runtimeInspectionService));
-        registry.registerCommand(showDefinition, new ShowCommandHandler(deps.runtimeInspectionService));
+        registry.registerCommand(listDefinition, new ListCommandHandler(deps.runtimeInspectionService, workspaceId));
+        registry.registerCommand(showDefinition, new ShowCommandHandler(deps.runtimeInspectionService, workspaceId));
       } else {
         registry.declarePlanned(listDefinition);
         registry.declarePlanned(showDefinition);
@@ -282,7 +294,7 @@ export function runtimeCommandModule(): SlashCommandModule {
         registry.registerCommand(approveDefinition, new ApproveCommandHandler(deps.controlActionProcessor));
         registry.registerCommand(rejectDefinition, new RejectCommandHandler(deps.controlActionProcessor));
         if (deps.controlActionStore) {
-          registry.registerCommand(cancelDefinition, new CancelCommandHandler(deps.controlActionStore, deps.controlActionProcessor));
+          registry.registerCommand(cancelDefinition, new CancelCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
         } else {
           registry.declarePlanned(cancelDefinition);
         }
@@ -293,7 +305,7 @@ export function runtimeCommandModule(): SlashCommandModule {
       }
 
       if (deps.workflowRuntime) {
-        registry.registerCommand(resumeDefinition, new ResumeCommandHandler(deps.workflowRuntime));
+        registry.registerCommand(resumeDefinition, new ResumeCommandHandler(deps.workflowRuntime, workspaceId));
       } else {
         registry.declarePlanned(resumeDefinition);
       }
@@ -307,7 +319,7 @@ export function runtimeCommandModule(): SlashCommandModule {
       }
 
       if (deps.controlActionProcessor && deps.controlActionStore) {
-        registry.registerCommand(recoverDefinition, new RecoverCommandHandler(deps.controlActionStore, deps.controlActionProcessor));
+        registry.registerCommand(recoverDefinition, new RecoverCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
       } else {
         registry.declarePlanned(recoverDefinition);
       }

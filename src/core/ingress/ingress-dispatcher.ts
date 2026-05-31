@@ -1,6 +1,7 @@
 import type { IdentityResolverPort } from "./identity-resolver.js";
 import type { IntentResolverRegistry } from "./intent-resolver-registry.js";
 import type { PermissionPolicyPort } from "./permission-policy.js";
+import type { ResolvedInteractionContext } from "./resolved-context.js";
 import type { TriggerEvent } from "./trigger-event.js";
 import type { WorkspaceResolverPort } from "./workspace-resolver.js";
 import type { WorkflowSelector } from "./workflow-selector.js";
@@ -27,7 +28,17 @@ export interface IngressWorkflowRuntime {
     definitionId: string;
     input: unknown;
     now: string;
-  }): Promise<{ status: "succeeded" | "failed" | "waiting" }>;
+  }): Promise<{ status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; error?: import("@core/runtime/runtime-models.js").RuntimeError }>;
+}
+
+/**
+ * Provides a per-plugin default workspace when conversation binding resolution
+ * fails. Each plugin can register its configured default workspace so the
+ * ingress pipeline can fall back from conversation binding to a known operator
+ * workspace instead of a hardcoded ID.
+ */
+export interface PluginDefaultWorkspaceResolver {
+  resolveDefaultWorkspace(pluginId: string): string | undefined;
 }
 
 export interface IngressDeps {
@@ -38,6 +49,7 @@ export interface IngressDeps {
   workflowSelector: WorkflowSelector;
   workflowRuntime: IngressWorkflowRuntime;
   eventSink: IngressEventSink;
+  pluginDefaultWorkspace?: PluginDefaultWorkspaceResolver;
   idFactory: { workflowInstanceId(): string; runAttemptId(): string };
   clock: { nowIso(): string };
 }
@@ -49,35 +61,52 @@ export interface EnrichedIngressContext {
   policy: ReturnType<PermissionPolicyPort["decide"]> | null;
 }
 
-const FALLBACK_WORKSPACE_ID = "ws_personal";
+const UNRESOLVED_WORKSPACE_PLACEHOLDER = "unresolved";
 
 export class IngressDispatcher {
   constructor(private readonly deps: IngressDeps) {}
 
-  async dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" }> {
+  async dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; reason?: string }> {
     const now = this.deps.clock.nowIso();
-    const workspaceId = this.deps.idFactory.workflowInstanceId()
-      ? FALLBACK_WORKSPACE_ID
-      : FALLBACK_WORKSPACE_ID;
 
     const identity = this.deps.identityResolver.resolve(event.actorHint ?? undefined);
-    this.emitDiagnostic(event, "ingress.identity_resolved", { status: identity.status }, workspaceId, now);
+    this.emitDiagnostic(event, "ingress.identity_resolved", { status: identity.status }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
 
     const workspace = this.deps.workspaceResolver.resolve(event.conversationHint ?? undefined);
-    this.emitDiagnostic(event, "ingress.workspace_resolved", { status: workspace.status }, workspaceId, now);
+    const resolvedWorkspaceId =
+      workspace.status === "resolved"
+        ? workspace.workspaceId
+        : this.deps.pluginDefaultWorkspace?.resolveDefaultWorkspace(event.source.pluginId);
+
+    this.emitDiagnostic(
+      event,
+      "ingress.workspace_resolved",
+      { status: workspace.status, resolvedWorkspaceId: resolvedWorkspaceId ?? null },
+      resolvedWorkspaceId ?? UNRESOLVED_WORKSPACE_PLACEHOLDER,
+      now
+    );
+
+    // Fail explicitly when workspace is missing and no default is configured.
+    if (!resolvedWorkspaceId) {
+      this.emitDiagnostic(event, "ingress.workspace_unresolved", {
+        pluginId: event.source.pluginId,
+        reason: workspace.status === "missing_binding" ? workspace.reason : "no workspace binding or default"
+      }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
+      return { status: "failed" };
+    }
 
     let permission = null;
     let policy = null;
-    if (identity.status === "resolved" && workspace.status === "resolved") {
+    if (identity.status === "resolved") {
       permission = this.deps.permissionPolicy.checkPermission(
-        workspace.workspaceId,
+        resolvedWorkspaceId,
         identity.userId
       );
       this.emitDiagnostic(
         event,
         "ingress.permission_checked",
         { allowed: permission.allowed, role: permission.role },
-        workspace.workspaceId,
+        resolvedWorkspaceId,
         now
       );
 
@@ -87,13 +116,13 @@ export class IngressDispatcher {
       this.emitDiagnostic(
         event,
         "ingress.policy_decided",
-        { kind: policy.kind },
-        workspace.workspaceId,
+        { kind: policy.kind, reason: "reason" in policy ? policy.reason : undefined },
+        resolvedWorkspaceId,
         now
       );
 
       if (policy.kind === "deny") {
-        return { status: "failed" };
+        return { status: "failed", reason: "reason" in policy ? policy.reason : undefined };
       }
     }
 
@@ -105,11 +134,25 @@ export class IngressDispatcher {
     const intent = await this.deps.intentResolvers.resolve(enrichedEvent);
     const selected = this.deps.workflowSelector.select(intent);
 
+    // Build resolved interaction context so downstream consumers don't need
+    // their own fallback logic.
+    const resolvedContext: ResolvedInteractionContext = {
+      workspaceId: resolvedWorkspaceId,
+      projectId: workspace.status === "resolved" ? workspace.projectId : null,
+      userId: identity.status === "resolved" ? identity.userId : "system",
+      externalIdentity:
+        identity.status === "resolved"
+          ? identity.externalIdentity
+          : undefined,
+      sourcePlugin: event.source.pluginId,
+      sourceId: event.triggerEventId
+    };
+
     return this.deps.workflowRuntime.start({
       workflowInstanceId: this.deps.idFactory.workflowInstanceId(),
       runAttemptId: this.deps.idFactory.runAttemptId(),
-      workspaceId: intent.workspaceId,
-      projectId: intent.projectId,
+      workspaceId: resolvedContext.workspaceId,
+      projectId: resolvedContext.projectId,
       definitionId: selected.definitionId,
       input: intent.payload,
       now

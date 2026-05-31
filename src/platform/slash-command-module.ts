@@ -43,6 +43,9 @@ export interface SlashCommandRegistryDeps {
   runtimeInspectionService?: RuntimeInspectionService;
   recoveryService?: RecoveryService;
   controlActionStore?: ControlActionStore;
+  /** Operator workspace used by CLI/control-path commands when no per-conversation
+   *  workspace binding exists. Configured from the `defaultWorkspace` config key. */
+  operatorWorkspaceId?: string;
 }
 
 export interface SlashCommandModule {

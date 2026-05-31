@@ -8,7 +8,7 @@ describe("slash command readiness", () => {
     // Using defaults: false to avoid dependencies from other modules.
     const registry = buildSlashCommandRegistry({
       defaults: false,
-      modules: [runtimeCommandModule()],
+      modules: [runtimeCommandModule("ws_default")],
       // Provide all deps needed by the runtime command module
       runtimeInspectionService: {
         inspect: async (_workspaceId: string) => ({

@@ -1,6 +1,7 @@
 import type { RuntimeStore } from "./runtime-store.js";
 import type { EffectHandlerRegistry } from "./effect-handler-registry.js";
 import type { RuntimeError } from "./runtime-models.js";
+import type { PolicyService } from "../security/policy-service.js";
 
 export interface EffectExecutionInput {
   effectId: string;
@@ -13,6 +14,7 @@ export interface EffectExecutionInput {
   runAttemptId: string;
   stepStateId: string;
   now: string;
+  actor?: string;
 }
 
 function normalizeError(cause: unknown): RuntimeError {
@@ -36,10 +38,15 @@ function normalizeError(cause: unknown): RuntimeError {
 }
 
 export class RuntimeEffectExecutor {
+  private readonly policyService?: PolicyService;
+
   constructor(
     private readonly store: RuntimeStore,
-    private readonly handlers: EffectHandlerRegistry
-  ) {}
+    private readonly handlers: EffectHandlerRegistry,
+    policyService?: PolicyService
+  ) {
+    this.policyService = policyService;
+  }
 
   async execute(input: EffectExecutionInput): Promise<unknown> {
     if (input.idempotencyKey) {
@@ -66,6 +73,40 @@ export class RuntimeEffectExecutor {
       pluginId: input.pluginId,
       effectType: input.effectType
     });
+
+    // Policy check: deny effect execution if actor lacks permission
+    if (this.policyService && input.actor) {
+      const policy = this.policyService.evaluate({
+        actor: input.actor,
+        action: "effect.execute",
+        resource: { type: "effect", id: input.effectId },
+        workspaceId: input.workspaceId
+      });
+      if (policy.kind === "deny") {
+        const deniedError: RuntimeError = {
+          code: "PERMISSION_DENIED",
+          category: "permission",
+          message: `effect execution denied by policy: ${policy.reason}`,
+          retryable: false,
+          recoverable: false,
+          evidence: { policyReason: policy.reason }
+        };
+        this.store.updateEffectExecution({
+          id: input.effectId,
+          status: "failed",
+          outputSummary: null,
+          error: deniedError,
+          now: input.now
+        });
+        this.appendEvent(input, "effect.failed", {
+          effectId: input.effectId,
+          pluginId: input.pluginId,
+          effectType: input.effectType,
+          errorCode: deniedError.code
+        });
+        throw deniedError;
+      }
+    }
 
     if (!this.handlers.has(input.pluginId, input.effectType)) {
       const notFoundError: RuntimeError = {

@@ -22,14 +22,19 @@ function makeBasicDeps(overrides: {
   const sink: IngressEventSink = { emit: () => {} };
   return {
     identityResolver: overrides.identityResolver ?? {
-      resolve: () => ({ status: "resolved" as const, userId: "user_e2e", displayName: "Test User" })
+      resolve: () => ({
+        status: "resolved" as const,
+        userId: "user_e2e",
+        displayName: "Test User",
+        externalIdentity: { provider: "feishu", externalId: "ou_test" }
+      })
     },
     workspaceResolver: overrides.workspaceResolver ?? {
       resolve: () => ({ status: "resolved" as const, workspaceId: "ws_e2e", projectId: null, conversationKey: "test" })
     },
     permissionPolicy: overrides.permissionPolicy ?? {
       checkPermission: () => ({ allowed: true, role: "owner" as const, reason: "test" }),
-      decide: (p) => p.allowed ? { kind: "allow" as const } : { kind: "deny" as const, reason: "test" }
+      decide: () => ({ kind: "allow" as const, reason: "test" })
     },
     intentResolvers: overrides.intentResolvers ?? new IntentResolverRegistry(),
     workflowSelector: overrides.workflowSelector ?? new WorkflowSelector(),
@@ -73,7 +78,12 @@ describe("failure injection", () => {
       const denyDispatcher = new IngressDispatcher(
         makeBasicDeps({
           identityResolver: {
-            resolve: () => ({ status: "resolved" as const, userId: "user_e2e", displayName: "User" })
+            resolve: () => ({
+              status: "resolved" as const,
+              userId: "user_e2e",
+              displayName: "User",
+              externalIdentity: { provider: "feishu", externalId: "ou_test" }
+            })
           },
           workspaceResolver: {
             resolve: () => ({ status: "resolved" as const, workspaceId: "ws_e2e", projectId: null, conversationKey: "test" })
@@ -102,8 +112,10 @@ describe("failure injection", () => {
       const result = await denyDispatcher.dispatch(trigger);
       expect(result.status).toBe("failed");
 
-      // workflowInstanceId() is called during dispatch metadata, even for denied requests
-      expect(wfiCounter).toBe(1);
+      // With the new identity-binding pipeline, the id factory is only called
+      // when a workflow runtime start is actually attempted. A policy denial
+      // stops dispatch before reaching that point.
+      expect(wfiCounter).toBe(0);
     } finally {
       await harness.close();
     }
@@ -127,7 +139,12 @@ describe("failure injection", () => {
       const noMatchDispatcher = new IngressDispatcher(
         makeBasicDeps({
           identityResolver: {
-            resolve: () => ({ status: "resolved" as const, userId: "user_e2e", displayName: "User" })
+            resolve: () => ({
+              status: "resolved" as const,
+              userId: "user_e2e",
+              displayName: "User",
+              externalIdentity: { provider: "feishu", externalId: "ou_test" }
+            })
           },
           workspaceResolver: {
             resolve: () => ({ status: "resolved" as const, workspaceId: "ws_e2e", projectId: null, conversationKey: "test" })
@@ -327,7 +344,7 @@ describe("failure injection", () => {
           },
           permissionPolicy: {
             checkPermission: () => ({ allowed: false, role: "member" as const, reason: "test" }),
-            decide: (p) => p.allowed ? { kind: "allow" as const } : { kind: "deny" as const, reason: "test" }
+            decide: (p) => p.allowed ? { kind: "allow" as const, reason: "test" } : { kind: "deny" as const, reason: "test" }
           },
           intentResolvers: harness.intentResolvers,
           workflowSelector: harness.workflowSelector,

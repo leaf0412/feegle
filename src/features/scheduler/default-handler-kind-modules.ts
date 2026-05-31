@@ -87,7 +87,7 @@ export function gitlabFollowKindModule(): HandlerKindModule {
           store: gitlabFollowStore,
           agents,
           git: gitService,
-          config: gl ? { token: gl.token, host: gl.host, workspaceRoot: gl.workspace } : null
+          config: gl ? { token: gl.token ?? "", host: gl.host, workspaceRoot: gl.workspace } : null
         })
       );
     }

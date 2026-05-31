@@ -1,5 +1,6 @@
 import type { MemoryKind, MemoryScope } from "./memory-models.js";
 import type { MemoryStore } from "./memory-store.js";
+import type { PolicyService } from "../security/policy-service.js";
 
 export interface ActiveMemorySummary {
   id: string;
@@ -17,23 +18,64 @@ export interface MemorySearchParams {
 }
 
 export class MemoryService {
-  constructor(private readonly store: MemoryStore) {}
+  private readonly policyService?: PolicyService;
 
-  approve(id: string, now: string): void {
+  constructor(
+    private readonly store: MemoryStore,
+    policyService?: PolicyService
+  ) {
+    this.policyService = policyService;
+  }
+
+  approve(id: string, now: string, actor?: string, workspaceId?: string): void {
     const record = this.store.getById(id);
     if (!record) throw new Error(`memory record not found: ${id}`);
     if (record.status !== "pending_approval") {
       throw new Error(`memory record is not pending approval: ${id} status=${record.status}`);
     }
+
+    // Policy check: deny approval if actor lacks permission
+    if (this.policyService && actor && workspaceId) {
+      const policy = this.policyService.evaluate({
+        actor,
+        action: "memory.approve",
+        resource: { type: "memory", id },
+        workspaceId
+      });
+      if (policy.kind === "deny") {
+        throw Object.assign(
+          new Error(`memory approve denied by policy: ${policy.reason}`),
+          { code: "PERMISSION_DENIED" }
+        );
+      }
+    }
+
     this.store.approve(id, now);
   }
 
-  reject(id: string, now: string): void {
+  reject(id: string, now: string, actor?: string, workspaceId?: string): void {
     const record = this.store.getById(id);
     if (!record) throw new Error(`memory record not found: ${id}`);
     if (record.status !== "pending_approval") {
       throw new Error(`memory record is not pending approval: ${id} status=${record.status}`);
     }
+
+    // Policy check: deny rejection if actor lacks permission
+    if (this.policyService && actor && workspaceId) {
+      const policy = this.policyService.evaluate({
+        actor,
+        action: "memory.reject",
+        resource: { type: "memory", id },
+        workspaceId
+      });
+      if (policy.kind === "deny") {
+        throw Object.assign(
+          new Error(`memory reject denied by policy: ${policy.reason}`),
+          { code: "PERMISSION_DENIED" }
+        );
+      }
+    }
+
     this.store.reject(id, now);
   }
 

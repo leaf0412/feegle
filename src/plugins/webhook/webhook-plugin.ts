@@ -10,7 +10,7 @@ export function webhookRuntimeContribution(): RuntimeContributionModule {
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
           kind: "workflow_signal",
-          workspaceId: "ws_personal",
+          workspaceId: "ws_default",
           projectId: null,
           actor: { kind: "system" },
           payload: event.external

@@ -15,7 +15,8 @@ export interface BuildSlashCommandRegistryOptions extends SlashCommandRegistryDe
  */
 export function buildSlashCommandRegistry(deps: BuildSlashCommandRegistryOptions): SlashCommandRegistry {
   const registry = new SlashCommandRegistry();
-  const baseModules = (deps.defaults ?? true) ? defaultSlashCommandModules() : [];
+  const operatorWsId = deps.operatorWorkspaceId ?? deps.configStore?.get().defaultWorkspace ?? "ws_default";
+  const baseModules = (deps.defaults ?? true) ? defaultSlashCommandModules(operatorWsId) : [];
   for (const module of [...baseModules, ...(deps.modules ?? [])]) {
     module.register(registry, deps);
   }

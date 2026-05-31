@@ -401,6 +401,20 @@ export function migrate(db: RuntimeDb): void {
       created_at text not null,
       updated_at text not null
     );
+
+    create table if not exists agent_providers (
+      id text primary key,
+      workspace_id text not null,
+      provider_key text not null,
+      display_name text not null,
+      enabled integer not null default 1,
+      capabilities text,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+    create unique index if not exists agent_providers_key_idx
+      on agent_providers(workspace_id, provider_key);
   `);
 }
 

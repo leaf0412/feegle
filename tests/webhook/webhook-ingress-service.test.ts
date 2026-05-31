@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { WebhookIngressService } from "@integrations/webhook/webhook-ingress-service.js";
-import type { WebhookSecretResolver } from "@integrations/webhook/webhook-ingress-service.js";
+import type { SecretResolver, SecretResolverContext } from "@core/security/secret-resolver.js";
 import type { WebhookSourceRecord } from "@integrations/webhook/webhook-source-store.js";
 import { verifyWebhookSignature } from "@integrations/webhook/webhook-trigger-event-adapter.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
@@ -28,9 +28,15 @@ function makeFakeSourceStore(sources: WebhookSourceRecord[]) {
   };
 }
 
-function makeFakeSecretResolver(secrets: Record<string, string>): WebhookSecretResolver {
+function makeFakeSecretResolver(secrets: Record<string, string>): SecretResolver {
   return {
-    resolve: (secretRef: string) => secrets[secretRef] ?? null
+    async resolve(ref: string, _context: SecretResolverContext) {
+      const value = secrets[ref];
+      if (value === undefined) {
+        return { status: "missing", reason: `no secret stored for ${ref}` };
+      }
+      return { status: "resolved", value };
+    }
   };
 }
 
@@ -224,7 +230,7 @@ describe("WebhookIngressService", () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
-  it("returns failed when secret resolver returns null", async () => {
+  it("returns failed when secret resolver returns missing", async () => {
     const dispatch = vi.fn();
     const source = makeSource({ secretRef: "secret:webhook/github" });
     const service = new WebhookIngressService(
@@ -248,7 +254,8 @@ describe("WebhookIngressService", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.detail).toBe("webhook secret resolution failed: secret:webhook/github");
+    expect(result.detail).toContain("webhook secret resolution failed: secret:webhook/github");
+    expect(result.detail).toContain("missing:");
     expect(dispatch).not.toHaveBeenCalled();
   });
 

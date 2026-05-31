@@ -22,7 +22,11 @@ export const AgentProviderConfigSchema = z
     model: z.string().min(1).optional(),
     reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
     mode: z.string().min(1).optional(),
-    allowedTools: z.array(z.string().min(1)).optional()
+    allowedTools: z.array(z.string().min(1)).optional(),
+    // secretRef maps this provider's API key to a platform secret reference
+    // (e.g. "secret/openai-api-key"). When set, the SecretResolver is used
+    // instead of a plain-text env value.
+    secretRef: z.string().min(1).optional()
   })
   .passthrough();
 
@@ -56,7 +60,8 @@ export const FeishuConfigSchema = z.object({
 });
 
 export const GitLabConfigSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).optional(),
+  secretRef: z.string().min(1).optional(),
   host: z.string().min(1),
   workspace: z.string().min(1)
 });

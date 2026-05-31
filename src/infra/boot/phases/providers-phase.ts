@@ -8,6 +8,7 @@ import { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 import { GitLabFollowStore } from "@integrations/gitlab/gitlab-follow-store.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { buildQuoteClientRegistry } from "@integrations/stock/build-quote-client-registry.js";
+import { resolveGitLabToken } from "./resolve-gitlab-token.js";
 
 export interface ProvidersPhaseDeps {
   feishuClient: FeishuClientPort;
@@ -21,7 +22,9 @@ export function providersPhase(deps: ProvidersPhaseDeps): BootPhase {
     name: "providers",
     run: async (ctx: BootContext) => {
       ctx.provide("agents", await deps.resolveAgents(ctx));
-      ctx.provide("gitlab", new GitLabClient(ctx.require("configStore").get().gitlab?.token ?? ""));
+      const gitlabConfig = ctx.require("configStore").get().gitlab;
+      const gitlabToken = resolveGitLabToken(gitlabConfig);
+      ctx.provide("gitlab", new GitLabClient(gitlabToken));
       ctx.provide("gitlabFollowStore", new GitLabFollowStore(ctx.require("runtimeDb")));
       ctx.provide("gitService", new GitService());
       ctx.provide(

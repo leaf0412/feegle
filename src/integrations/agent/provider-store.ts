@@ -9,7 +9,8 @@ export const ProviderRecordSchema = z
     cwd: z.string().min(1).optional(),
     env: z.record(z.string()).optional(),
     model: z.string().min(1).optional(),
-    timeoutMs: z.number().positive().optional()
+    timeoutMs: z.number().positive().optional(),
+    secretRef: z.string().min(1).optional()
   })
   .passthrough();
 

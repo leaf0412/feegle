@@ -9,18 +9,17 @@ import { sessionCommandModule } from "./session-command-module.js";
 import { setupCommandModule } from "./setup-command-module.js";
 import { systemCommandModule } from "./system-command-module.js";
 
-const defaultModuleFactories = [
-  systemCommandModule,
-  setupCommandModule,
-  sessionCommandModule,
-  agentCommandModule,
-  repoCommandModule,
-  schedulerCommandModule,
-  providerCommandModule,
-  glsumCommandModule,
-  runtimeCommandModule
-];
-
-export function defaultSlashCommandModules(): SlashCommandModule[] {
-  return defaultModuleFactories.map((createModule) => createModule());
+export function defaultSlashCommandModules(operatorWorkspaceId?: string): SlashCommandModule[] {
+  const resolvedWorkspaceId = operatorWorkspaceId ?? "ws_default";
+  return [
+    systemCommandModule(),
+    setupCommandModule(),
+    sessionCommandModule(),
+    agentCommandModule(),
+    repoCommandModule(),
+    schedulerCommandModule(),
+    providerCommandModule(),
+    glsumCommandModule(),
+    runtimeCommandModule(resolvedWorkspaceId)
+  ];
 }

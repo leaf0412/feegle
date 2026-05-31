@@ -1,7 +1,12 @@
 import type { WorkspaceStore } from "@resources/workspace/workspace-store.js";
 
 export type ResolvedIdentity =
-  | { status: "resolved"; userId: string; displayName: string }
+  | {
+      status: "resolved";
+      userId: string;
+      displayName: string;
+      externalIdentity: { provider: string; externalId: string };
+    }
   | { status: "unknown"; reason: string };
 
 export interface IdentityResolverPort {
@@ -26,7 +31,10 @@ export class IdentityResolver implements IdentityResolverPort {
 
     const externalIdentity = this.workspaceStore.getExternalIdentity(provider, externalUserId);
     if (!externalIdentity) {
-      return { status: "unknown", reason: `no external identity for ${provider}:${externalUserId}` };
+      return {
+        status: "unknown",
+        reason: `no external identity for ${provider}:${externalUserId}`
+      };
     }
 
     const user = this.workspaceStore.getUser(externalIdentity.userId);
@@ -34,6 +42,14 @@ export class IdentityResolver implements IdentityResolverPort {
       return { status: "unknown", reason: `user not found for identity ${externalIdentity.id}` };
     }
 
-    return { status: "resolved", userId: user.id, displayName: user.displayName };
+    return {
+      status: "resolved",
+      userId: user.id,
+      displayName: user.displayName,
+      externalIdentity: {
+        provider: externalIdentity.provider,
+        externalId: externalIdentity.externalUserId
+      }
+    };
   }
 }
