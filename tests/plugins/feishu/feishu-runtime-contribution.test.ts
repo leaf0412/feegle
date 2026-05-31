@@ -207,4 +207,22 @@ describe("feishuRuntimeContribution", () => {
       })
     ).rejects.toThrow("Missing required field: card");
   });
+
+  it("registers the four requirement render effects", async () => {
+    const mockClient = createMockClient();
+    const handlers = new EffectHandlerRegistry();
+    const ctx = new RuntimeContributionContext({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers: handlers
+    });
+
+    await feishuRuntimeContribution(mockClient).register(ctx);
+
+    expect(handlers.has("feishu", "requirement.plan_review.render")).toBe(true);
+    expect(handlers.has("feishu", "requirement.execution_progress.render")).toBe(true);
+    expect(handlers.has("feishu", "requirement.verification_result.render")).toBe(true);
+    expect(handlers.has("feishu", "requirement.acceptance_result.render")).toBe(true);
+  });
 });
