@@ -73,3 +73,32 @@ export function feishuCardActionToTriggerEvent(input: {
     }
   };
 }
+
+export function feishuBotMenuToTriggerEvent(input: {
+  triggerEventId: string;
+  receivedAt: string;
+  chatId: string;
+  messageId: string;
+  senderUserId: string;
+  commandText: string;
+}): TriggerEvent {
+  return {
+    triggerEventId: input.triggerEventId,
+    source: {
+      pluginId: "feishu",
+      adapterId: "long_connection",
+      triggerType: "bot_menu"
+    },
+    receivedAt: input.receivedAt,
+    external: {
+      chatId: input.chatId,
+      messageId: input.messageId,
+      commandText: input.commandText
+    },
+    actorHint: { provider: "feishu", externalUserId: input.senderUserId },
+    conversationHint: { conversationKey: `feishu:${input.chatId}` },
+    payloadSummary: {
+      commandText: input.commandText
+    }
+  };
+}

@@ -46,6 +46,7 @@
 | 35 | plan-status-document-repair | complete | status doc moved to `_docs/plans/`, content refreshed through plan 35 | none | -- |
 | 36-49 | spec closure follow-ups (Waves 2-7) | documented | plan files exist in `_docs/_docs/plans/`; tracked as follow-up waves | pending implementation; not in scope for initial acceptance gate | -- |
 | 50 | platform-acceptance-matrix | complete | `tests/acceptance/platform-acceptance-matrix.test.ts` + status doc updated + `verify:platform` gate runs | none | -- |
+| 53 | feishu-card-control-cutover | complete | card/action/bot-menu events dispatch through ingress instead of direct handleCommand; card action intent resolvers + workflow + unknown action rejection; 27 tests across 4 suites pass | none | -- |
 
 ## Completion Follow-Ups Implemented
 

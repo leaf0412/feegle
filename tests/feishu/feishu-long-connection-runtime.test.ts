@@ -238,6 +238,127 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(handled).toHaveLength(0);
   });
 
+  it("dispatches card action events to runtime ingress when configured", async () => {
+    const registered: {
+      "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
+    } = {};
+    const dispatched: unknown[] = [];
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig(),
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      },
+      {
+        dispatch: async (event) => {
+          dispatched.push(event);
+          return { status: "succeeded" };
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["card.action.trigger"]?.({
+      action: {
+        value: {
+          action: "act:/workbench plan approve",
+          plan_id: "plan_1",
+          version: 1
+        }
+      },
+      context: { open_chat_id: "oc_card", open_message_id: "om_card_action" }
+    });
+
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      triggerEventId: "feishu:om_card_action",
+      source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "card_action" },
+      external: { chatId: "oc_card", messageId: "om_card_action" }
+    });
+    // Legacy handler is also called during cutover (will be removed later)
+    expect(handled).toHaveLength(1);
+    expect(handled[0]).toMatchObject({
+      source: "card",
+      chatId: "oc_card",
+      messageId: "om_card_action"
+    });
+  });
+
+  it("dispatches bot menu events through ingress instead of handleCommand when configured", async () => {
+    const registered: {
+      "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
+    } = {};
+    const dispatched: unknown[] = [];
+    const handled: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: {
+        "im.message.receive_v1": (event: FeishuMessageReceiveEvent) => Promise<void>;
+        "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void>;
+        "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
+      }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig(),
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      {
+        handleCommand: async (input) => {
+          handled.push(input);
+        }
+      },
+      {
+        dispatch: async (event) => {
+          dispatched.push(event);
+          return { status: "succeeded" };
+        }
+      }
+    );
+
+    await runtime.start();
+    await registered["application.bot.menu_v6"]?.({
+      event: {
+        event_key: "help",
+        operator: { operator_id: { open_id: "ou_bob" } }
+      }
+    });
+
+    // Bot menu should go through ingress, NOT through the legacy handler
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "bot_menu" },
+      external: { chatId: "ou_bob" }
+    });
+    expect(handled).toHaveLength(0);
+  });
+
   it("routes bot menu clicks through the command handler as slash commands", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;

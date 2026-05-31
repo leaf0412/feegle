@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  feishuBotMenuToTriggerEvent,
   feishuCardActionToTriggerEvent,
   feishuMessageEnvelopeToTriggerEvent
 } from "@integrations/feishu/feishu-trigger-event-adapter.js";
@@ -40,5 +41,22 @@ describe("feishu trigger event adapter", () => {
     expect(event.source.triggerType).toBe("card_action");
     expect(event.external).toHaveProperty("actionType", "approve_step");
     expect(event.conversationHint).toEqual({ conversationKey: "feishu:oc_2" });
+  });
+
+  it("converts a bot menu event into a TriggerEvent with bot_menu trigger type", () => {
+    const event = feishuBotMenuToTriggerEvent({
+      triggerEventId: "trg_bot_menu",
+      receivedAt: "2026-05-31T00:00:00.000Z",
+      chatId: "ou_alice",
+      messageId: "menu:ou_alice:help:1717000000000",
+      senderUserId: "ou_alice",
+      commandText: "help"
+    });
+
+    expect(event.source.triggerType).toBe("bot_menu");
+    expect(event.source.pluginId).toBe("feishu");
+    expect(event.external).toHaveProperty("commandText", "help");
+    expect(event.conversationHint).toEqual({ conversationKey: "feishu:ou_alice" });
+    expect(event.actorHint).toEqual({ provider: "feishu", externalUserId: "ou_alice" });
   });
 });
