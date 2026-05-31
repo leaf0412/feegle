@@ -2,6 +2,14 @@ import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 
+function intentPayloadSource(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const sourcePlugin = (payload as Record<string, unknown>).sourcePlugin;
+  return typeof sourcePlugin === "string" ? sourcePlugin : undefined;
+}
+
 export function gitlabRuntimeContribution(getClient: () => GitLabClient): RuntimeContributionModule {
   return {
     id: "gitlab-runtime",
@@ -15,13 +23,16 @@ export function gitlabRuntimeContribution(getClient: () => GitLabClient): Runtim
           workspaceId: workspaceIdFromEvent(event),
           projectId: projectIdFromEvent(event),
           actor: { kind: "system" },
-          payload: event.external
+          payload: {
+            ...event.external,
+            sourcePlugin: "gitlab"
+          }
         })
       });
 
       ctx.workflowSelector.register({
         id: "gitlab-review",
-        matches: (intent) => intent.kind === "chat",
+        matches: (intent) => intent.kind === "chat" && intentPayloadSource(intent.payload) === "gitlab",
         definitionId: "gitlab.review.workflow"
       });
 

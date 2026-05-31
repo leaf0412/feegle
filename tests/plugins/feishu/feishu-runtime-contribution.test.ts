@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
 import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import { feishuRuntimeContribution } from "@plugins/feishu/feishu-runtime-contribution.js";
+import { gitlabRuntimeContribution } from "@plugins/gitlab-follow/gitlab-runtime-contribution.js";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 
 function createMockClient(): FeishuClientPort {
   return {
@@ -59,6 +61,38 @@ describe("feishuRuntimeContribution", () => {
     expect(intent.kind).toBe("chat");
     expect(intent.workspaceId).toBe("ws_test");
     expect(intent.projectId).toBe("project_test");
+    expect(ctx.workflowSelector.select(intent).definitionId).toBe("feishu.chat.workflow");
+  });
+
+  it("keeps Feishu chat selection isolated when GitLab runtime is also registered", async () => {
+    const mockClient = createMockClient();
+    const ctx = new RuntimeContributionContext({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers: new EffectHandlerRegistry()
+    });
+
+    gitlabRuntimeContribution(() => ({} as GitLabClient)).register(ctx);
+    await feishuRuntimeContribution(mockClient).register(ctx);
+
+    const intent = await ctx.intentResolvers.resolve({
+      triggerEventId: "trg_feishu",
+      source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
+      receivedAt: "2026-05-31T00:00:00.000Z",
+      external: {
+        chatId: "oc_1",
+        messageId: "om_1",
+        raw: "hello",
+        resolvedWorkspaceId: "ws_test",
+        resolvedProjectId: "project_test",
+        commandType: "chat"
+      },
+      actorHint: { provider: "feishu", externalUserId: "ou_1" },
+      conversationHint: { conversationKey: "feishu:oc_1" },
+      payloadSummary: { commandType: "chat", textLength: 5 }
+    });
+
     expect(ctx.workflowSelector.select(intent).definitionId).toBe("feishu.chat.workflow");
   });
 

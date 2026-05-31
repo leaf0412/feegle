@@ -11,6 +11,31 @@ function intentKindFromEvent(event: TriggerEvent): IntentKind {
   return "slash_command";
 }
 
+function intentPayloadSource(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const sourcePlugin = (payload as Record<string, unknown>).sourcePlugin;
+  return typeof sourcePlugin === "string" ? sourcePlugin : undefined;
+}
+
+function feishuPayloadFromEvent(event: TriggerEvent): Record<string, unknown> {
+  return {
+    ...event.external,
+    sourcePlugin: "feishu",
+    text: textFromEvent(event)
+  };
+}
+
+function textFromEvent(event: TriggerEvent): string | undefined {
+  const raw = event.external.raw;
+  if (typeof raw === "string") {
+    return raw;
+  }
+  const commandText = event.external.commandText;
+  return typeof commandText === "string" ? commandText : undefined;
+}
+
 const WORKBENCH_ACTIONS = new Set([
   "workbench_plan_approve",
   "workbench_plan_reject",
@@ -43,7 +68,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
             event.actorHint && typeof event.actorHint.externalUserId === "string"
               ? { kind: "user", userId: event.actorHint.externalUserId }
               : { kind: "system" },
-          payload: event.external
+          payload: feishuPayloadFromEvent(event)
         })
       });
 
@@ -70,6 +95,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
                 ? { kind: "user", userId: event.actorHint.externalUserId }
                 : { kind: "system" },
             payload: {
+              sourcePlugin: "feishu",
               actionType,
               ...actionPayload,
               chatId: event.external.chatId,
@@ -92,7 +118,10 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
             event.actorHint && typeof event.actorHint.externalUserId === "string"
               ? { kind: "user", userId: event.actorHint.externalUserId }
               : { kind: "system" },
-          payload: event.external
+          payload: {
+            ...event.external,
+            sourcePlugin: "feishu"
+          }
         })
       });
 
@@ -109,7 +138,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
             event.actorHint && typeof event.actorHint.externalUserId === "string"
               ? { kind: "user", userId: event.actorHint.externalUserId }
               : { kind: "system" },
-          payload: event.external
+          payload: feishuPayloadFromEvent(event)
         })
       });
 
@@ -117,19 +146,19 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
 
       ctx.workflowSelector.register({
         id: "feishu-chat",
-        matches: (intent) => intent.kind === "chat",
+        matches: (intent) => intent.kind === "chat" && intentPayloadSource(intent.payload) === "feishu",
         definitionId: "feishu.chat.workflow"
       });
 
       ctx.workflowSelector.register({
         id: "feishu-slash",
-        matches: (intent) => intent.kind === "slash_command",
+        matches: (intent) => intent.kind === "slash_command" && intentPayloadSource(intent.payload) === "feishu",
         definitionId: "feishu.slash.workflow"
       });
 
       ctx.workflowSelector.register({
         id: "feishu-control-action",
-        matches: (intent) => intent.kind === "control_action",
+        matches: (intent) => intent.kind === "control_action" && intentPayloadSource(intent.payload) === "feishu",
         definitionId: "feishu.control_action.workflow"
       });
 
