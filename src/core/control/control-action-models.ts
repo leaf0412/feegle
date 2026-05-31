@@ -21,7 +21,7 @@ export const CancelWorkflowPayloadSchema = z.object({
 
 export const TriggerRecoveryPayloadSchema = z.object({
   workflowInstanceId: z.string().min(1),
-  runAttemptId: z.string().min(1)
+  runAttemptId: z.string().optional().default("")
 });
 
 export const ConfirmMemoryPayloadSchema = z.object({
@@ -70,6 +70,10 @@ export const ApproveRecoveryPayloadSchema = z.object({
   recoveryId: z.string().min(1)
 });
 
+export const RejectRecoveryPayloadSchema = z.object({
+  recoveryId: z.string().min(1)
+});
+
 export type ApproveStepPayload = z.infer<typeof ApproveStepPayloadSchema>;
 export type RejectStepPayload = z.infer<typeof RejectStepPayloadSchema>;
 export type ResumeWorkflowPayload = z.infer<typeof ResumeWorkflowPayloadSchema>;
@@ -85,6 +89,7 @@ export type PauseSchedulePayload = z.infer<typeof PauseSchedulePayloadSchema>;
 export type ResumeSchedulePayload = z.infer<typeof ResumeSchedulePayloadSchema>;
 export type RevokeMemoryPayload = z.infer<typeof RevokeMemoryPayloadSchema>;
 export type ApproveRecoveryPayload = z.infer<typeof ApproveRecoveryPayloadSchema>;
+export type RejectRecoveryPayload = z.infer<typeof RejectRecoveryPayloadSchema>;
 
 export const actionTypeSchemas = {
   approve_step: ApproveStepPayloadSchema,
@@ -101,7 +106,8 @@ export const actionTypeSchemas = {
   pause_schedule: PauseSchedulePayloadSchema,
   resume_schedule: ResumeSchedulePayloadSchema,
   revoke_memory: RevokeMemoryPayloadSchema,
-  approve_recovery: ApproveRecoveryPayloadSchema
+  approve_recovery: ApproveRecoveryPayloadSchema,
+  reject_recovery: RejectRecoveryPayloadSchema
 } as const;
 
 export type ActionType = keyof typeof actionTypeSchemas;

@@ -3,8 +3,6 @@ import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
 import type { ControlActionProcessor } from "@core/control/control-action-processor.js";
 import type { ControlActionStore } from "@core/control/control-action-store.js";
-import type { WorkflowRuntime } from "@core/runtime/workflow-runtime.js";
-import type { MemoryService } from "@core/memory/memory-service.js";
 import type { RuntimeInspectionService } from "@core/operations/runtime-inspection-service.js";
 
 const listDefinition = defineSlashCommand(
@@ -196,7 +194,8 @@ class CancelCommandHandler implements SlashCommandHandler {
 class ResumeCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_resume";
   constructor(
-    private readonly wfRuntime: WorkflowRuntime,
+    private readonly store: ControlActionStore,
+    private readonly processor: ControlActionProcessor,
     private readonly operatorWorkspaceId: string
   ) {}
 
@@ -204,49 +203,72 @@ class ResumeCommandHandler implements SlashCommandHandler {
     const id = context.args.trim();
     if (!id) return { kind: "text" as const, text: "用法: /runtime resume <workflowInstanceId>" };
 
-    const result = await this.wfRuntime.resume({
-      workflowInstanceId: id,
-      runAttemptId: `cli_resume_${Date.now()}`,
-      signal: { signalId: `cli_${Date.now()}`, kind: "control_action", payload: { action: "resume" } },
+    const now = new Date().toISOString();
+    const actionId = `ca_resume_${Date.now()}`;
+    this.store.create({
+      id: actionId,
       workspaceId: this.operatorWorkspaceId,
-      now: new Date().toISOString()
+      actorUserId: context.sender.userId,
+      actionType: "resume_workflow",
+      payload: { workflowInstanceId: id },
+      now,
     });
-
-    return { kind: "text" as const, text: `工作流 ${id} 已恢复。状态: ${result.status}` };
+    const result = await this.processor.process(actionId, now);
+    return { kind: "text" as const, text: result.status === "completed" ? `工作流 ${id} 已恢复。` : `恢复工作流 ${id} 失败: ${result.error?.message ?? "未知错误"}` };
   }
 }
 
 class MemoryApproveCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_memory_approve";
-  constructor(private readonly memory: MemoryService) {}
+  constructor(
+    private readonly store: ControlActionStore,
+    private readonly processor: ControlActionProcessor,
+    private readonly operatorWorkspaceId: string
+  ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const id = context.args.trim();
     if (!id) return { kind: "text" as const, text: "用法: /runtime memory approve <memoryId>" };
-    try {
-      this.memory.approve(id, new Date().toISOString());
-      return { kind: "text" as const, text: `记忆 ${id} 已批准。` };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { kind: "text" as const, text: `记忆 ${id} 批准失败: ${message}` };
-    }
+
+    const now = new Date().toISOString();
+    const actionId = `ca_mem_approve_${Date.now()}`;
+    this.store.create({
+      id: actionId,
+      workspaceId: this.operatorWorkspaceId,
+      actorUserId: context.sender.userId,
+      actionType: "confirm_memory",
+      payload: { memoryId: id },
+      now,
+    });
+    const result = await this.processor.process(actionId, now);
+    return { kind: "text" as const, text: result.status === "completed" ? `记忆 ${id} 已批准。` : `记忆 ${id} 批准失败: ${result.error?.message ?? "未知错误"}` };
   }
 }
 
 class MemoryRejectCommandHandler implements SlashCommandHandler {
   readonly id = "runtime_memory_reject";
-  constructor(private readonly memory: MemoryService) {}
+  constructor(
+    private readonly store: ControlActionStore,
+    private readonly processor: ControlActionProcessor,
+    private readonly operatorWorkspaceId: string
+  ) {}
 
   async execute(context: SlashCommandContext): Promise<SlashCommandReply> {
     const id = context.args.trim();
     if (!id) return { kind: "text" as const, text: "用法: /runtime memory reject <memoryId>" };
-    try {
-      this.memory.reject(id, new Date().toISOString());
-      return { kind: "text" as const, text: `记忆 ${id} 已拒绝。` };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { kind: "text" as const, text: `记忆 ${id} 拒绝失败: ${message}` };
-    }
+
+    const now = new Date().toISOString();
+    const actionId = `ca_mem_reject_${Date.now()}`;
+    this.store.create({
+      id: actionId,
+      workspaceId: this.operatorWorkspaceId,
+      actorUserId: context.sender.userId,
+      actionType: "delete_memory",
+      payload: { memoryId: id },
+      now,
+    });
+    const result = await this.processor.process(actionId, now);
+    return { kind: "text" as const, text: result.status === "completed" ? `记忆 ${id} 已拒绝。` : `记忆 ${id} 拒绝失败: ${result.error?.message ?? "未知错误"}` };
   }
 }
 
@@ -305,15 +327,17 @@ export function runtimeCommandModule(operatorWorkspaceId?: string): SlashCommand
         registry.declarePlanned(cancelDefinition);
       }
 
-      if (deps.workflowRuntime && workspaceId) {
-        registry.registerCommand(resumeDefinition, new ResumeCommandHandler(deps.workflowRuntime, workspaceId));
+      // Resume: now requires controlActionStore + controlActionProcessor instead of workflowRuntime
+      if (deps.controlActionProcessor && deps.controlActionStore && workspaceId) {
+        registry.registerCommand(resumeDefinition, new ResumeCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
       } else {
         registry.declarePlanned(resumeDefinition);
       }
 
-      if (deps.memoryService) {
-        registry.registerCommand(memoryApproveDefinition, new MemoryApproveCommandHandler(deps.memoryService));
-        registry.registerCommand(memoryRejectDefinition, new MemoryRejectCommandHandler(deps.memoryService));
+      // Memory approve/reject: now require controlActionStore + controlActionProcessor instead of memoryService
+      if (deps.controlActionProcessor && deps.controlActionStore && workspaceId) {
+        registry.registerCommand(memoryApproveDefinition, new MemoryApproveCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
+        registry.registerCommand(memoryRejectDefinition, new MemoryRejectCommandHandler(deps.controlActionStore, deps.controlActionProcessor, workspaceId));
       } else {
         registry.declarePlanned(memoryApproveDefinition);
         registry.declarePlanned(memoryRejectDefinition);
