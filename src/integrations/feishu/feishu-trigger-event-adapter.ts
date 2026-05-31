@@ -27,7 +27,8 @@ export function feishuMessageEnvelopeToTriggerEvent(input: {
       commandType: input.commandType,
       raw: input.raw,
       shouldRespond: input.shouldRespond,
-      chatType: input.chatType
+      chatType: input.chatType,
+      sessionKey: input.sessionKey
     },
     actorHint: input.senderUserId
       ? { provider: "feishu", externalUserId: input.senderUserId }

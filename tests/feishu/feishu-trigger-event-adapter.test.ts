@@ -14,7 +14,8 @@ describe("feishu trigger event adapter", () => {
       messageId: "om_1",
       senderUserId: "ou_1",
       commandType: "chat",
-      textLength: 5
+      textLength: 5,
+      sessionKey: "feishu:oc_1:ou_1"
     });
 
     expect(event.source).toEqual({
@@ -24,6 +25,7 @@ describe("feishu trigger event adapter", () => {
     });
     expect(event.conversationHint).toEqual({ conversationKey: "feishu:oc_1" });
     expect(event.actorHint).toEqual({ provider: "feishu", externalUserId: "ou_1" });
+    expect(event.external).toHaveProperty("sessionKey", "feishu:oc_1:ou_1");
     expect(event.payloadSummary).toEqual({ commandType: "chat", textLength: 5 });
   });
 
