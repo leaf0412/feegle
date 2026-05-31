@@ -378,6 +378,20 @@ export function migrate(db: RuntimeDb): void {
   ensureColumn(db, "control_actions", "error_message", "text");
 
   db.exec(`
+    create table if not exists automations (
+      id text primary key,
+      workspace_id text not null,
+      name text not null,
+      trigger text not null,
+      condition_type text not null,
+      condition_value text not null,
+      effect text not null,
+      enabled integer not null default 1,
+      created_at text not null,
+      updated_at text not null,
+      foreign key (workspace_id) references workspaces(id) on delete cascade
+    );
+
     create table if not exists webhook_sources (
       id text primary key,
       name text not null,
