@@ -12,6 +12,8 @@ export interface IngressEventSink {
     workspaceId: string;
     workflowInstanceId: string | null;
     runAttemptId: string | null;
+    stepStateId: string | null;
+    effectExecutionId: string | null;
     category: string;
     type: string;
     payload: unknown;
@@ -60,15 +62,13 @@ export interface EnrichedIngressContext {
   permission: ReturnType<PermissionPolicyPort["checkPermission"]> | null;
   policy: ReturnType<PermissionPolicyPort["decide"]> | null;
 }
-
-const UNRESOLVED_WORKSPACE_PLACEHOLDER = "unresolved";
-
 export class IngressDispatcher {
   constructor(private readonly deps: IngressDeps) {}
 
   async dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; reason?: string }> {
     const now = this.deps.clock.nowIso();
 
+    // Resolve identity eagerly so we can fail fast.
     const resolvedIdentity = this.deps.identityResolver.resolve(event.actorHint ?? undefined);
     const systemActorKind = getTrustedSystemActorKind(event.actorHint);
     const identity = resolvedIdentity.status === "unknown" && systemActorKind
@@ -79,38 +79,43 @@ export class IngressDispatcher {
           externalIdentity: { provider: "system", externalId: systemActorKind }
         }
       : resolvedIdentity;
-    this.emitDiagnostic(event, "ingress.identity_resolved", { status: identity.status }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
     if (identity.status !== "resolved") {
       const reason = identity.status === "unknown" ? identity.reason : "identity resolution failed";
-      this.emitDiagnostic(event, "ingress.identity_unresolved", {
-        pluginId: event.source.pluginId,
-        reason
-      }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
       return { status: "failed", reason: `identity unresolved: ${reason}` };
     }
 
+    // Resolve workspace before emitting any diagnostic events so FK
+    // constraints on runtime_events are always satisfied.
     const workspace = this.deps.workspaceResolver.resolve(event.conversationHint ?? undefined);
     const resolvedWorkspaceId =
       workspace.status === "resolved"
         ? workspace.workspaceId
         : this.deps.pluginDefaultWorkspace?.resolveDefaultWorkspace(event.source.pluginId);
 
+    // Fail explicitly when workspace is missing and no default is configured.
+    // No diagnostic events are emitted for unresolved workspace — the caller
+    // receives a failed status and can surface the reason through its own
+    // error reporting.
+    if (!resolvedWorkspaceId) {
+      return { status: "failed", reason: workspace.status === "missing_binding" ? workspace.reason : "no workspace binding or default" };
+    }
+
+    // From here on every diagnostic event has a real workspace FK target.
     this.emitDiagnostic(
       event,
-      "ingress.workspace_resolved",
-      { status: workspace.status, resolvedWorkspaceId: resolvedWorkspaceId ?? null },
-      resolvedWorkspaceId ?? UNRESOLVED_WORKSPACE_PLACEHOLDER,
+      "ingress.identity_resolved",
+      { status: identity.status, userId: identity.userId },
+      resolvedWorkspaceId,
       now
     );
 
-    // Fail explicitly when workspace is missing and no default is configured.
-    if (!resolvedWorkspaceId) {
-      this.emitDiagnostic(event, "ingress.workspace_unresolved", {
-        pluginId: event.source.pluginId,
-        reason: workspace.status === "missing_binding" ? workspace.reason : "no workspace binding or default"
-      }, UNRESOLVED_WORKSPACE_PLACEHOLDER, now);
-      return { status: "failed" };
-    }
+    this.emitDiagnostic(
+      event,
+      "ingress.workspace_resolved",
+      { status: workspace.status, resolvedWorkspaceId },
+      resolvedWorkspaceId,
+      now
+    );
 
     let permission = null;
     let policy = null;
@@ -187,6 +192,8 @@ export class IngressDispatcher {
       workspaceId,
       workflowInstanceId: null,
       runAttemptId: null,
+      stepStateId: null,
+      effectExecutionId: null,
       category: "diagnostic",
       type,
       payload,
