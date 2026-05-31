@@ -8,7 +8,19 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["src/core/*"],
+      "@infra/*": ["src/infra/*"],
+      "@platform/*": ["src/platform/*"],
+      "@plugins/*": ["src/plugins/*"],
+      "@integrations/*": ["src/integrations/*"],
+      "@features/*": ["src/features/*"],
+      "@resources/*": ["src/resources/*"],
+      "@domain/*": ["src/domain/*"],
+      "@tests/*": ["tests/*"]
+    }
   },
   "include": ["src", "tests", "vitest.config.ts"]
 }
