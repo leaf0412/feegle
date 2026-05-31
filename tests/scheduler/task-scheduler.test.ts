@@ -180,8 +180,13 @@ describe("TaskScheduler", () => {
     expect(calls).toEqual(["workflow-runner"]);
   });
 
+<<<<<<< HEAD
   it("routes every kind through workflow runner when available, skipping legacy handler", async () => {
     const task = makeTask("task-workflow-all", { kind: "stock-monitor" });
+=======
+  it("routes all kinds through workflow runner when available (not just RUNTIME_NATIVE_KINDS)", async () => {
+    const task = makeTask("task-legacy", { kind: "stock-monitor" });
+>>>>>>> worktree-agent-a6492a46f9e6daa74
     const registry = new TaskRegistry(memoryStore([task], []));
     const calls: string[] = [];
     const kind: HandlerKind<Record<string, never>> = {
@@ -249,7 +254,8 @@ describe("TaskScheduler", () => {
 
     await scheduler.runOnce("task-legacy");
 
-    expect(calls).toEqual(["legacy-handler"]);
+    // All kinds route through workflow runner when available (RUNTIME_NATIVE_KINDS removed in Plan 62)
+    expect(calls).toEqual(["workflow-runner"]);
   });
 
   it("handles workflow runner failure through normal failure path", async () => {

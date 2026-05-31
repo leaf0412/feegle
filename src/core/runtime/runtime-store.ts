@@ -38,8 +38,17 @@ export interface RunAttemptSummaryRow {
   id: string;
   status: string;
   workflowInstanceId: string;
+  triggerEventId: string | null;
   createdAt: string;
   finishedAt: string | null;
+}
+
+export interface ControlActionRow {
+  id: string;
+  actionType: string;
+  status: string;
+  actorUserId: string | null;
+  createdAt: string;
 }
 
 export interface StepSummaryRow {
@@ -193,6 +202,45 @@ export class RuntimeStore {
     return this.db
       .prepare("select id, status from run_attempts where id = ?")
       .get(id) as { id: string; status: RunAttemptStatus } | undefined;
+  }
+
+  /**
+   * Returns a richer run attempt row including trigger_event_id, workflow_instance_id,
+   * created_at, and finished_at. Used by RuntimeInspectionService for projection.
+   */
+  getRunAttemptDetail(id: string): RunAttemptSummaryRow | undefined {
+    const row = this.db
+      .prepare(
+        `select id, status, workflow_instance_id, trigger_event_id, created_at, finished_at
+         from run_attempts where id = ?`
+      )
+      .get(id) as {
+        id: string;
+        status: string;
+        workflow_instance_id: string;
+        trigger_event_id: string | null;
+        created_at: string;
+        finished_at: string | null;
+      } | undefined;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      status: row.status,
+      workflowInstanceId: row.workflow_instance_id,
+      triggerEventId: row.trigger_event_id,
+      createdAt: row.created_at,
+      finishedAt: row.finished_at
+    };
+  }
+
+  /**
+   * Returns the workspace_id for a workflow instance. Used by projection queries.
+   */
+  getWorkflowWorkspaceId(workflowInstanceId: string): string | null {
+    const row = this.db
+      .prepare("select workspace_id from workflow_instances where id = ?")
+      .get(workflowInstanceId) as { workspace_id: string } | undefined;
+    return row?.workspace_id ?? null;
   }
 
   finishRunAttempt(input: {
@@ -513,7 +561,7 @@ export class RuntimeStore {
   listRunAttempts(workflowInstanceId: string): RunAttemptSummaryRow[] {
     const rows = this.db
       .prepare(
-        `select id, status, workflow_instance_id, created_at, finished_at
+        `select id, status, workflow_instance_id, trigger_event_id, created_at, finished_at
          from run_attempts
          where workflow_instance_id = ?
          order by created_at asc`
@@ -522,6 +570,7 @@ export class RuntimeStore {
         id: string;
         status: string;
         workflow_instance_id: string;
+        trigger_event_id: string | null;
         created_at: string;
         finished_at: string | null;
       }>;
@@ -529,6 +578,7 @@ export class RuntimeStore {
       id: row.id,
       status: row.status,
       workflowInstanceId: row.workflow_instance_id,
+      triggerEventId: row.trigger_event_id,
       createdAt: row.created_at,
       finishedAt: row.finished_at
     }));
@@ -599,6 +649,36 @@ export class RuntimeStore {
       id: row.id,
       workflowInstanceId: row.workflow_instance_id,
       status: row.status,
+      createdAt: row.created_at
+    }));
+  }
+
+  // ---- Per-run projection queries (Plan 60 hard cutover observability) ----
+
+  /**
+   * Returns the most recent control_actions for a workspace. Read-only.
+   */
+  listLatestControlActions(workspaceId: string, limit: number = 10): ControlActionRow[] {
+    const rows = this.db
+      .prepare(
+        `select id, action_type, status, actor_user_id, created_at
+         from control_actions
+         where workspace_id = ?
+         order by created_at desc
+         limit ?`
+      )
+      .all(workspaceId, limit) as Array<{
+        id: string;
+        action_type: string;
+        status: string;
+        actor_user_id: string | null;
+        created_at: string;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      actionType: row.action_type,
+      status: row.status,
+      actorUserId: row.actor_user_id,
       createdAt: row.created_at
     }));
   }

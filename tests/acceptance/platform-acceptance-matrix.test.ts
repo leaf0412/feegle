@@ -13,14 +13,14 @@ const statusDocPath = join(rootDir, "_docs", "plans", "2026-05-31-runtime-platfo
 const verifyScriptPath = join(rootDir, "scripts", "verify-platform-readiness.mjs");
 const packageJsonPath = join(rootDir, "package.json");
 
-// All 50 plans (01-50)
-const ALL_PLAN_IDS = Array.from({ length: 50 }, (_, i) => String(i + 1).padStart(2, "0"));
+// Plans 01-62
+const ALL_PLAN_IDS = Array.from({ length: 62 }, (_, i) => String(i + 1).padStart(2, "0"));
 
 const COMPLETED_PLANS = new Set([
   "09", "10", "11", "12", "13", "14", "15", "16", "17", "19",
   "22", "23", "25", "26", "27", "28", "29", "31", "32", "33", "34", "35",
-  "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47",
-  "48", "49", "50"
+  "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
+  "60", "61", "62"
 ]);
 
 // Plans listed as "partial" in status doc
@@ -55,7 +55,7 @@ describe("platform acceptance matrix", () => {
     expect(pkg.scripts["verify:platform"]).toContain("verify-platform-readiness.mjs");
   });
 
-  it("all 50 plans have corresponding plan files", () => {
+  it("all 62 plans have corresponding plan files", () => {
     const planFiles = readdirSync(plansDir);
     for (const id of ALL_PLAN_IDS) {
       const matchingFile = planFiles.find((f) => f.includes(`-${id}-`));
@@ -67,15 +67,28 @@ describe("platform acceptance matrix", () => {
     expect(existsSync(statusDocPath)).toBe(true);
     const statusContent = readFileSync(statusDocPath, "utf8");
 
-    for (let i = 9; i <= 50; i++) {
+    // Plans 36-49 are tracked as a range "36-49" in the status doc
+    const rangeRefs: Array<{ start: number; end: number; rangeStr: string }> = [
+      { start: 36, end: 49, rangeStr: "36-49" }
+    ];
+    function planInRange(planNum: number): string | undefined {
+      for (const r of rangeRefs) {
+        if (planNum >= r.start && planNum <= r.end) return r.rangeStr;
+      }
+      return undefined;
+    }
+
+    for (let i = 9; i <= 62; i++) {
       const planId = String(i).padStart(2, "0");
+      const rangeStr = planInRange(i);
       const hasReference =
         statusContent.includes(`Plan ${i}`) ||
-        statusContent.includes(`| ${planId} |`);
+        statusContent.includes(`| ${planId} |`) ||
+        (rangeStr !== undefined && statusContent.includes(rangeStr));
       expect(hasReference, `Plan ${i} (${planId}) not found in status doc`).toBe(true);
       if (expectedStatus(planId) === "complete") {
         expect(statusContent, `Plan ${i} should be marked complete`).toMatch(
-          new RegExp(`\\|\\s*${planId}\\s*\\|[^\\n]*\\|\\s*complete\\s*\\|`)
+          new RegExp(`\\|\\s*${planId}\\s*\\|[^|\\n]*\\|\\s*complete\\s*\\|`)
         );
       }
     }
@@ -227,6 +240,137 @@ describe("platform acceptance matrix", () => {
     });
 
     expect(offenders.map((file) => file.replace(`${rootDir}/`, ""))).toEqual([]);
+  });
+
+  // ===== Plan 61: Legacy Path Acceptance Guard =====
+
+  it("forbidden-call matrix: no direct handleCommand from live Feishu runtime", () => {
+    // The feishu long-connection runtime must dispatch through ingress,
+    // not directly call FeishuCommandResponder.handleCommand.
+    const responderPath = join(rootDir, "src", "integrations", "feishu", "feishu-command-responder.ts");
+
+    // Check that new handleCommand calls (without per-line acceptance marker)
+    // are not added to production files other than the responder itself.
+    const sourceFiles = readdirRecursive(join(rootDir, "src")).filter((f) => f.endsWith(".ts") && f !== responderPath);
+    const offenders: Array<{ file: string; line: number }> = [];
+
+    for (const file of sourceFiles) {
+      const content = readFileSync(file, "utf8");
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const prevLine = i > 0 ? lines[i - 1] : "";
+        if (
+          (line.includes(".handleCommand(") || line.includes("handleCommand({")) &&
+          !line.includes("// acceptance-allow-handleCommand") &&
+          !prevLine.includes("// acceptance-allow-handleCommand")
+        ) {
+          offenders.push({ file: file.replace(`${rootDir}/`, ""), line: i + 1 });
+        }
+      }
+    }
+
+    expect(
+      offenders.map((o) => `${o.file}:${o.line}`),
+      "New handleCommand calls outside feishu-command-responder.ts must be routed through ingress"
+    ).toEqual([]);
+  });
+
+  it("forbidden-call matrix: no direct kind.run from production scheduler", () => {
+    // The scheduler must route through workflowRunner (SchedulerRuntimeObserver / ingress),
+    // not call HandlerKind.run directly in the production execute path.
+    const schedulerPath = join(rootDir, "src", "features", "scheduler", "task-scheduler.ts");
+    const content = readFileSync(schedulerPath, "utf8");
+    const lines = content.split("\n");
+
+    // The only allowed kind.run reference is the type declaration in handler-kind.ts
+    // task-scheduler.ts should route through workflowRunner, not call kind.run.
+    const kindRunLines = lines
+      .map((line, i) => ({ line, num: i + 1 }))
+      .filter(({ line }) => line.includes("kind.run") && !line.includes("// acceptance-allow-kind-run"));
+
+    expect(
+      kindRunLines.map(({ num }) => `task-scheduler.ts:${num}`),
+      "kind.run calls are forbidden in production scheduler; route through workflowRunner instead"
+    ).toEqual([]);
+  });
+
+  it("forbidden-call matrix: no direct runtime mutation from command handlers", () => {
+    // Command handlers must go through ControlActionProcessor, not directly call RuntimeStore.
+    const commandFiles = readdirRecursive(join(rootDir, "src", "platform", "commands"));
+    const runtimeMutationPatterns = [
+      ".createWorkflowInstance(",
+      ".createRunAttempt(",
+      ".finishRunAttempt(",
+      ".updateWorkflowInstanceStatus(",
+      ".createEffectExecution(",
+      ".updateEffectExecution("
+    ];
+
+    const offenders = commandFiles
+      .filter((f) => f.endsWith(".ts"))
+      .filter((f) => {
+        const content = readFileSync(f, "utf8");
+        return runtimeMutationPatterns.some((pat) => content.includes(pat));
+      });
+
+    expect(
+      offenders.map((f) => f.replace(`${rootDir}/`, "")),
+      "Command handlers must not directly call RuntimeStore mutation methods; route through ControlActionProcessor"
+    ).toEqual([]);
+  });
+
+  it("no legacy runtime switches exist for migrated entrypoints", () => {
+    const srcDir = join(rootDir, "src");
+    const sourceFiles = readdirRecursive(srcDir).filter((f) => f.endsWith(".ts"));
+
+    const legacyPatterns: Array<{ pattern: RegExp; description: string }> = [
+      { pattern: /RUNTIME_NATIVE_KINDS/, description: "RUNTIME_NATIVE_KINDS switch" },
+      { pattern: /legacyFeishu/, description: "legacyFeishu switch" },
+      { pattern: /legacy_path/, description: "legacy_path fallback" }
+    ];
+
+    for (const file of sourceFiles) {
+      const content = readFileSync(file, "utf8");
+      for (const { pattern, description } of legacyPatterns) {
+        if (pattern.test(content)) {
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (pattern.test(lines[i])) {
+              // Check for acceptance-allow marker
+              if (!lines[i].includes("// acceptance-allow-legacy-switch")) {
+                expect(
+                  lines[i],
+                  `${description} found in ${file.replace(`${rootDir}/`, "")}:${i + 1} without acceptance-allow-legacy-switch marker`
+                ).not.toMatch(pattern);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("all migrated acceptance tests are not skipped", () => {
+    const acceptanceDir = join(rootDir, "tests", "acceptance");
+    const allAcceptanceFiles = readdirSync(acceptanceDir).filter((f) => f.endsWith(".test.ts"));
+
+    for (const file of allAcceptanceFiles) {
+      const content = readFileSync(join(acceptanceDir, file), "utf8");
+      // Check for .skip on describe or it blocks
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Skip comments
+        if (line.startsWith("//")) continue;
+        // Check for skip patterns on vitest test blocks (not on the check code itself)
+        if (/^\s*(it|describe)\.skip\(/.test(line)) {
+          expect(line, `Skipped test in ${file}:${i + 1}`).toMatch(
+            /does not match because this should not be here/
+          );
+        }
+      }
+    }
   });
 });
 

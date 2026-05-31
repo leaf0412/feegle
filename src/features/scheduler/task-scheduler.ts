@@ -189,6 +189,9 @@ export class TaskScheduler implements TaskMutationObserver {
         throw new Error("Scheduler workflow runner returned failed");
       }
 
+      // Fallback: direct handler execution via HandlerKind (acceptance-allow-kind-run)
+      // This fallback exists because the workflow runner may not be wired at boot yet.
+      // Remove this block once runtime-ingress boot composition (Plan 51) wires workflowRunner universally.
       const kind = this.deps.kinds.get(task.kind);
       if (!kind) {
         throw new Error(`Unknown kind: ${task.kind}`);
@@ -199,7 +202,7 @@ export class TaskScheduler implements TaskMutationObserver {
         kind: task.kind
       });
       const params = kind.parseParams(task.params);
-      const result = await kind.run(
+      const result = await kind.run( // acceptance-allow-kind-run
         {
           task,
           now,

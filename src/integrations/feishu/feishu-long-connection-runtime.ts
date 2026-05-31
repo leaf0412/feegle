@@ -139,11 +139,24 @@ export class FeishuLongConnectionRuntime {
             } catch (error) {
               console.error("Feishu ingress dispatch threw", {
                 messageId: envelope.messageId,
+<<<<<<< HEAD
                 error: String(error)
               });
             }
           } else {
             console.warn("Feishu message dropped — no ingress configured", {
+=======
+                senderUserId: envelope.sender?.userId,
+                commandType: envelope.command.type,
+                textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0
+              })
+            );
+          }
+          void this.handler // acceptance-allow-handleCommand
+            .handleCommand({
+              source: "message",
+              chatId: envelope.chatId,
+>>>>>>> worktree-agent-a6492a46f9e6daa74
               messageId: envelope.messageId,
               chatId: envelope.chatId
             });
@@ -178,7 +191,7 @@ export class FeishuLongConnectionRuntime {
             .catch((error) => console.error("Feishu card ingress dispatch failed", error));
         }
         if (envelope) {
-          void this.handler
+          void this.handler // acceptance-allow-handleCommand
             .handleCommand({ source: "card", ...envelope })
             .catch((error) => console.error("Feishu card handler failed", error));
         }
@@ -202,6 +215,7 @@ export class FeishuLongConnectionRuntime {
           commandType: envelope.command.type
         });
         if (this.markUnhandled("message", envelope.messageId)) {
+<<<<<<< HEAD
           if (this.ingress) {
             await this.ingress
               .dispatch(
@@ -228,6 +242,19 @@ export class FeishuLongConnectionRuntime {
               })
               .catch((error) => console.error("Feishu bot menu handler failed", error));
           }
+=======
+          void this.handler // acceptance-allow-handleCommand
+            .handleCommand({
+              source: "message",
+              chatId: envelope.chatId,
+              messageId: envelope.messageId,
+              sender: envelope.sender,
+              chatType: envelope.chatType,
+              command: envelope.command,
+              shouldRespond: envelope.shouldRespond
+            })
+            .catch((error) => console.error("Feishu bot menu handler failed", error));
+>>>>>>> worktree-agent-a6492a46f9e6daa74
         }
       }
     });

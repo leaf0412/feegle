@@ -57,12 +57,12 @@ describe("RuntimeInspectionService", () => {
       now
     });
 
-    // Run attempt for wf_1
+    // Run attempt for wf_1 (with trigger event id for projection)
     store.createRunAttempt({
       id: "ra_1",
       workflowInstanceId: "wf_1",
       status: "waiting",
-      triggerEventId: null,
+      triggerEventId: "trg_f101",
       now
     });
 
@@ -110,6 +110,12 @@ describe("RuntimeInspectionService", () => {
       now
     });
 
+    // Add a control action for projection testing
+    db.prepare(
+      `insert into control_actions (id, workspace_id, actor_user_id, action_type, status, payload_json, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("ca_101", "ws_1", "user_1", "approve", "pending", "{}", now, now);
+
     return { db, store, now };
   }
 
@@ -134,7 +140,7 @@ describe("RuntimeInspectionService", () => {
       db.close();
     });
 
-    it("listRunAttempts returns attempts for a workflow instance", () => {
+    it("listRunAttempts returns attempts with triggerEventId for a workflow instance", () => {
       const { store } = seedDb();
 
       const attempts = store.listRunAttempts("wf_1");
@@ -142,7 +148,8 @@ describe("RuntimeInspectionService", () => {
       expect(attempts[0]).toMatchObject({
         id: "ra_1",
         status: "waiting",
-        workflowInstanceId: "wf_1"
+        workflowInstanceId: "wf_1",
+        triggerEventId: "trg_f101"
       });
     });
 
@@ -204,7 +211,7 @@ describe("RuntimeInspectionService", () => {
   });
 
   describe("RuntimeInspectionService.inspect()", () => {
-    it("returns correct workflow totals from store", async () => {
+    it("returns correct workflow totals with control actions projection from store", async () => {
       const { db, store } = seedDb();
       const service = new RuntimeInspectionService(store);
 
@@ -218,6 +225,13 @@ describe("RuntimeInspectionService", () => {
         status: expect.any(String),
         currentStepId: null,
         definitionId: "demo.workflow"
+      });
+      // Verify control actions projection (Plan 60)
+      expect(result.latestControlActions).toHaveLength(1);
+      expect(result.latestControlActions[0]).toMatchObject({
+        id: "ca_101",
+        actionType: "approve",
+        status: "pending"
       });
       db.close();
     });
@@ -236,6 +250,7 @@ describe("RuntimeInspectionService", () => {
       expect(result.waitingCount).toBe(0);
       expect(result.failedCount).toBe(0);
       expect(result.workflows).toHaveLength(0);
+      expect(result.latestControlActions).toHaveLength(0);
       db.close();
     });
 
@@ -279,6 +294,47 @@ describe("RuntimeInspectionService", () => {
       });
 
       db.close();
+    });
+  });
+
+  describe("RuntimeInspectionService.getRunDetail()", () => {
+    it("returns run detail with ingress event, workflow, effects, and control action projections", async () => {
+      const { db, store } = seedDb();
+      const service = new RuntimeInspectionService(store);
+
+      const detail = await service.getRunDetail("ra_1", "ws_1");
+      expect(detail).not.toBeNull();
+      expect(detail!.runAttempt).toMatchObject({
+        id: "ra_1",
+        status: "waiting",
+        triggerEventId: "trg_f101",
+        workflowInstanceId: "wf_1"
+      });
+      expect(detail!.workflow).toMatchObject({
+        id: "wf_1",
+        status: "waiting",
+        definitionId: "demo.workflow"
+      });
+      expect(detail!.effects).toHaveLength(1);
+      expect(detail!.effects[0]).toMatchObject({
+        id: "eff_1",
+        pluginId: "core",
+        effectType: "notify"
+      });
+      // Control actions for workspace (Plan 60 projection)
+      expect(detail!.controlActions).toHaveLength(1);
+      expect(detail!.controlActions[0]).toMatchObject({
+        id: "ca_101",
+        actionType: "approve"
+      });
+      db.close();
+    });
+
+    it("returns null for nonexistent run attempt", async () => {
+      const { store } = seedDb();
+      const service = new RuntimeInspectionService(store);
+      const detail = await service.getRunDetail("nonexistent");
+      expect(detail).toBeNull();
     });
   });
 });
