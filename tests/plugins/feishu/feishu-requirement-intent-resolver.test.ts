@@ -53,11 +53,10 @@ describe("feishu requirement resolver registration", () => {
     const intent = await reg.resolve(evt("需求文档：做个X") as never);
     expect(intent.kind).toBe("requirement_intake");
   });
-  it("does NOT claim a plain chat message", () => {
+  it("does NOT claim a plain chat message", async () => {
     const reg = new IntentResolverRegistry();
     registerFeishuRequirementIntentResolvers(reg);
-    expect(() => { /* no resolver should match */ return (reg as never as { resolve: (e: unknown) => unknown }); }).toBeDefined();
     // canResolve must be false for plain chat -> resolve throws "No intent resolver"
-    return expect(reg.resolve(evt("今天天气不错") as never)).rejects.toThrow();
+    await expect(reg.resolve(evt("今天天气不错") as never)).rejects.toThrow();
   });
 });

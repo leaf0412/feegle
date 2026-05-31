@@ -120,7 +120,7 @@ export function registerFeishuRequirementIntentResolvers(registry: IntentResolve
         commandType,
         chatId,
         messageId,
-        conversationKey: `feishu:${chatId}`,
+        conversationKey: (event.conversationHint?.conversationKey as string) ?? `feishu:${chatId}`,
         text: raw,
         requirementId
       });
