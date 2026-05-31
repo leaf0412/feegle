@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "vitest run tests/e2e/",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "start:feishu": "npm run build && node dist/src/integrations/feishu/feishu-long-connection-entry.js",
