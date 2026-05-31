@@ -18,7 +18,7 @@ export class RequirementExecutionStore {
       updatedAt: now
     };
     this.records.set(input.requirementId, record);
-    return record;
+    return { ...record };
   }
 
   approve(input: {
@@ -28,6 +28,11 @@ export class RequirementExecutionStore {
     const record = this.records.get(input.requirementId);
     if (record === undefined) {
       throw new Error(`Requirement execution not found: ${input.requirementId}`);
+    }
+    if (record.status !== "pending_approval") {
+      throw new Error(
+        `Requirement execution cannot be approved from status ${record.status}: ${input.requirementId}`
+      );
     }
     const updated: RequirementExecutionRecord = {
       ...record,
@@ -83,7 +88,7 @@ export class RequirementExecutionStore {
       ...record,
       status: "implementation_ready",
       summary: input.summary,
-      diffStats: input.diffStats,
+      diffStats: input.diffStats ? { ...input.diffStats } : undefined,
       updatedAt: new Date().toISOString()
     };
     this.records.set(input.requirementId, updated);
@@ -91,6 +96,7 @@ export class RequirementExecutionStore {
   }
 
   latest(requirementId: string): RequirementExecutionRecord | undefined {
-    return this.records.get(requirementId);
+    const record = this.records.get(requirementId);
+    return record ? { ...record } : undefined;
   }
 }

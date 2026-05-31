@@ -40,4 +40,12 @@ describe("RequirementExecutionStore", () => {
     const store = new RequirementExecutionStore();
     expect(store.latest("nope")).toBeUndefined();
   });
+
+  it("approve rejects a non-pending execution", () => {
+    const store = new RequirementExecutionStore();
+    store.createPendingExecution({ requirementId: "reqwf_3", planVersion: 1, requestedByUserId: "user_1" });
+    store.approve({ requirementId: "reqwf_3", approvedByUserId: "user_1" });
+    expect(() => store.approve({ requirementId: "reqwf_3", approvedByUserId: "user_1" }))
+      .toThrow("cannot be approved from status approved");
+  });
 });
