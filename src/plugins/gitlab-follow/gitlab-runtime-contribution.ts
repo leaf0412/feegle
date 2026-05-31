@@ -1,7 +1,8 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
+import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 
-export function gitlabRuntimeContribution(): RuntimeContributionModule {
+export function gitlabRuntimeContribution(getClient: () => GitLabClient): RuntimeContributionModule {
   return {
     id: "gitlab-runtime",
     register: (ctx) => {
@@ -49,16 +50,62 @@ export function gitlabRuntimeContribution(): RuntimeContributionModule {
       ctx.effectHandlers.register({
         pluginId: "gitlab",
         effectType: "post_comment",
-        execute: (effect) => {
-          return { posted: true, body: (effect.input as Record<string, unknown>).body };
+        execute: async (effect) => {
+          const input = effect.input as {
+            host?: string;
+            namespace?: string;
+            project?: string;
+            issueIid?: number;
+            body?: string;
+          };
+          if (!input.host || !input.namespace || !input.project) {
+            throw new Error(
+              "Missing required gitlab fields: host, namespace, project (strings), issueIid (number)"
+            );
+          }
+          if (typeof input.issueIid !== "number") {
+            throw new Error("Missing required field: issueIid (number)");
+          }
+          if (!input.body || typeof input.body !== "string") {
+            throw new Error("Missing required field: body (string)");
+          }
+          const client = getClient();
+          await client.postNote(
+            { host: input.host, namespace: input.namespace, project: input.project, issueIid: input.issueIid },
+            input.body
+          );
+          return { posted: true, body: input.body };
         }
       });
 
       ctx.effectHandlers.register({
         pluginId: "gitlab",
         effectType: "update_status",
-        execute: (effect) => {
-          return { updated: true, status: (effect.input as Record<string, unknown>).status };
+        execute: async (effect) => {
+          const input = effect.input as {
+            host?: string;
+            namespace?: string;
+            project?: string;
+            issueIid?: number;
+            status?: string;
+          };
+          if (!input.host || !input.namespace || !input.project) {
+            throw new Error(
+              "Missing required gitlab fields: host, namespace, project (strings), issueIid (number)"
+            );
+          }
+          if (typeof input.issueIid !== "number") {
+            throw new Error("Missing required field: issueIid (number)");
+          }
+          if (!input.status || typeof input.status !== "string") {
+            throw new Error("Missing required field: status (string)");
+          }
+          const client = getClient();
+          await client.updateIssueStatus(
+            { host: input.host, namespace: input.namespace, project: input.project, issueIid: input.issueIid },
+            input.status
+          );
+          return { updated: true, status: input.status };
         }
       });
     }
