@@ -16,10 +16,11 @@ describe("TaskScheduler failure policy", () => {
     const scheduler = makeScheduler(task, {
       clock,
       notify: { sendText: async () => {}, sendCard: async (_target, card) => { sentCards.push(card); } },
-      kind: {
-        run: async () => {
+      kind: {},
+      workflowRunner: {
+        startScheduledTask: async () => {
           if (shouldFail) throw new Error("boom");
-          return { outcome: "noop" };
+          return { status: "succeeded" };
         }
       }
     });
@@ -44,7 +45,10 @@ describe("TaskScheduler failure policy", () => {
     const scheduler = makeScheduler(task, {
       failureTarget: null,
       counter,
-      kind: { run: async () => { throw new Error("boom"); } }
+      kind: {},
+      workflowRunner: {
+        startScheduledTask: async () => { throw new Error("boom"); }
+      }
     });
 
     await expect(scheduler.runOnce(task.id)).rejects.toThrow("boom");
@@ -61,7 +65,10 @@ describe("TaskScheduler failure policy", () => {
     const scheduler = makeScheduler(task, {
       clock,
       failureTarget: null,
-      kind: { run: async () => { throw new Error("boom"); } },
+      kind: {},
+      workflowRunner: {
+        startScheduledTask: async () => { throw new Error("boom"); }
+      },
       runtimeWorkspaceId: "ws_runtime",
       recovery: {
         createDiagnosticBundle: async (input: unknown) => {
@@ -101,6 +108,7 @@ function makeScheduler(
     clock?: ReturnType<typeof mutableClock>;
     notify?: { sendText(_target: unknown, _text: string): Promise<void>; sendCard(_target: unknown, _card: unknown): Promise<void> };
     kind: Partial<HandlerKind<Record<string, never>>>;
+    workflowRunner?: { startScheduledTask(input: unknown): Promise<{ status: "succeeded" | "failed" }> };
     runtimeWorkspaceId?: string;
     recovery?: { createDiagnosticBundle(input: unknown): Promise<unknown> };
     memory?: { createCandidate(input: unknown): unknown };
@@ -145,7 +153,8 @@ function makeScheduler(
     runtimeWorkspaceId: options.runtimeWorkspaceId,
     recovery: options.recovery,
     memory: options.memory,
-    controlActions: options.controlActions
+    controlActions: options.controlActions,
+    workflowRunner: options.workflowRunner
   });
 }
 

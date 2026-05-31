@@ -56,10 +56,13 @@ describe("TaskScheduler", () => {
       agents: new AgentProviderRegistry(),
       host: { read: async () => ({ hostname: "local", pid: 1 }) },
       clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
-      logger: silentLogger
+      logger: silentLogger,
+      workflowRunner: {
+        startScheduledTask: async () => ({ status: "succeeded" })
+      }
     });
 
-    await expect(scheduler.runOnce("task-ok")).resolves.toMatchObject({ status: "ok", note: "sent heartbeat" });
+    await expect(scheduler.runOnce("task-ok")).resolves.toMatchObject({ status: "ok" });
 
     expect(written.at(-1)?.lastRun?.status).toBe("ok");
     expect(history).toHaveLength(1);
@@ -77,9 +80,7 @@ describe("TaskScheduler", () => {
       description: "test",
       parseParams: () => ({}),
       describeParams: () => "none",
-      run: async () => {
-        throw new Error("boom");
-      }
+      run: async () => ({ outcome: "sent" })
     };
     const scheduler = new TaskScheduler({
       registry,
@@ -93,7 +94,12 @@ describe("TaskScheduler", () => {
       agents: new AgentProviderRegistry(),
       host: { read: async () => ({ hostname: "local", pid: 1 }) },
       clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
-      logger: silentLogger
+      logger: silentLogger,
+      workflowRunner: {
+        startScheduledTask: async () => {
+          throw new Error("boom");
+        }
+      }
     });
 
     await expect(scheduler.runOnce("task-fail")).rejects.toThrow("boom");
@@ -101,44 +107,6 @@ describe("TaskScheduler", () => {
     expect(written.at(-1)?.lastRun?.status).toBe("failed");
     expect(written.at(-1)?.consecutiveFailures).toBe(1);
     expect(history[0]).toMatchObject({ taskId: "task-fail", outcome: "failed", note: "boom" });
-  });
-
-  it("notifies runtime observer before executing a scheduled task", async () => {
-    const task = makeTask("task-observed");
-    const registry = new TaskRegistry(memoryStore([task], []));
-    const calls: string[] = [];
-    const kind: HandlerKind<Record<string, never>> = {
-      id: "heartbeat",
-      title: "Heartbeat",
-      description: "test",
-      parseParams: () => ({}),
-      describeParams: () => "none",
-      run: async () => {
-        calls.push("handler");
-        return { outcome: "sent" };
-      }
-    };
-    const scheduler = new TaskScheduler({
-      registry,
-      kinds: new HandlerKindRegistry().register(kind),
-      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
-      dedup: { checkAndMark: async () => true },
-      runsLog: { append: async () => {} },
-      notify: { sendText: async () => {}, sendCard: async () => {} },
-      agents: new AgentProviderRegistry(),
-      host: { read: async () => ({ hostname: "local", pid: 1 }) },
-      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
-      logger: silentLogger,
-      runtimeObserver: {
-        beforeTaskRun: async () => {
-          calls.push("runtime");
-        }
-      }
-    });
-
-    await scheduler.runOnce("task-observed");
-
-    expect(calls).toEqual(["runtime", "handler"]);
   });
 
   it("routes supported kind through workflow runner and skips legacy handler", async () => {
@@ -180,13 +148,8 @@ describe("TaskScheduler", () => {
     expect(calls).toEqual(["workflow-runner"]);
   });
 
-<<<<<<< HEAD
-  it("routes every kind through workflow runner when available, skipping legacy handler", async () => {
-    const task = makeTask("task-workflow-all", { kind: "stock-monitor" });
-=======
-  it("routes all kinds through workflow runner when available (not just RUNTIME_NATIVE_KINDS)", async () => {
+  it("routes all kinds through workflow runner when available", async () => {
     const task = makeTask("task-legacy", { kind: "stock-monitor" });
->>>>>>> worktree-agent-a6492a46f9e6daa74
     const registry = new TaskRegistry(memoryStore([task], []));
     const calls: string[] = [];
     const kind: HandlerKind<Record<string, never>> = {
@@ -219,15 +182,15 @@ describe("TaskScheduler", () => {
       }
     });
 
-    await scheduler.runOnce("task-workflow-all");
+    await scheduler.runOnce("task-legacy");
 
     expect(calls).toEqual(["workflow-runner"]);
   });
 
-  it("falls back to legacy handler when workflow runner is not available", async () => {
-    const task = makeTask("task-legacy", { kind: "stock-monitor" });
-    const registry = new TaskRegistry(memoryStore([task], []));
-    const calls: string[] = [];
+  it("fails explicitly when workflowRunner is not available", async () => {
+    const task = makeTask("task-no-runner", { kind: "stock-monitor" });
+    const written: Task[] = [];
+    const registry = new TaskRegistry(memoryStore([task], written));
     const kind: HandlerKind<Record<string, never>> = {
       id: "stock-monitor",
       title: "Stock Monitor",
@@ -235,7 +198,6 @@ describe("TaskScheduler", () => {
       parseParams: () => ({}),
       describeParams: () => "none",
       run: async () => {
-        calls.push("legacy-handler");
         return { outcome: "sent" };
       }
     };
@@ -252,10 +214,10 @@ describe("TaskScheduler", () => {
       logger: silentLogger
     });
 
-    await scheduler.runOnce("task-legacy");
-
-    // All kinds route through workflow runner when available (RUNTIME_NATIVE_KINDS removed in Plan 62)
-    expect(calls).toEqual(["workflow-runner"]);
+    await expect(scheduler.runOnce("task-no-runner")).rejects.toThrow(
+      "TaskScheduler: workflowRunner is required"
+    );
+    expect(written.at(-1)?.lastRun?.status).toBe("failed");
   });
 
   it("handles workflow runner failure through normal failure path", async () => {

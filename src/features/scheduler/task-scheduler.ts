@@ -189,39 +189,11 @@ export class TaskScheduler implements TaskMutationObserver {
         throw new Error("Scheduler workflow runner returned failed");
       }
 
-      // Fallback: direct handler execution via HandlerKind (acceptance-allow-kind-run)
-      // This fallback exists because the workflow runner may not be wired at boot yet.
-      // Remove this block once runtime-ingress boot composition (Plan 51) wires workflowRunner universally.
-      const kind = this.deps.kinds.get(task.kind);
-      if (!kind) {
-        throw new Error(`Unknown kind: ${task.kind}`);
-      }
-      await this.deps.runtimeObserver?.beforeTaskRun({
-        taskId: task.id,
-        taskName: task.name,
-        kind: task.kind
-      });
-      const params = kind.parseParams(task.params);
-      const result = await kind.run( // acceptance-allow-kind-run
-        {
-          task,
-          now,
-          logger: this.deps.logger,
-          notify: this.deps.notify,
-          agents: this.deps.agents,
-          dedup: this.deps.dedup,
-          host: this.deps.host
-        },
-        params
-      );
-      const durationMs = Date.now() - startedAt;
-      const lastRun = await this.applySuccess(task, outcomeToStatus(result.outcome), durationMs, result.note, now);
-      this.hooks?.emit({
-        event: "task.completed",
-        content: result.note,
-        extra: { taskId: task.id, taskName: task.name, kind: task.kind, durationMs }
-      });
-      return lastRun;
+      throw new Error(
+          `TaskScheduler: workflowRunner is required to execute task "${task.id}" (kind: ${task.kind}). ` +
+          "Direct HandlerKind.run fallback has been removed. " +
+          "Ensure the boot sequence wires workflowRunner via SchedulerWorkflowRunner."
+        );
     } catch (error) {
       const durationMs = Date.now() - startedAt;
       const note = errorMessage(error);

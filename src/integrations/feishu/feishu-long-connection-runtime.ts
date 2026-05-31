@@ -139,26 +139,16 @@ export class FeishuLongConnectionRuntime {
             } catch (error) {
               console.error("Feishu ingress dispatch threw", {
                 messageId: envelope.messageId,
-<<<<<<< HEAD
+                senderUserId: envelope.sender?.userId,
+                commandType: envelope.command.type,
+                textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0,
                 error: String(error)
               });
             }
           } else {
             console.warn("Feishu message dropped — no ingress configured", {
-=======
-                senderUserId: envelope.sender?.userId,
-                commandType: envelope.command.type,
-                textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0
-              })
-            );
-          }
-          void this.handler // acceptance-allow-handleCommand
-            .handleCommand({
-              source: "message",
-              chatId: envelope.chatId,
->>>>>>> worktree-agent-a6492a46f9e6daa74
               messageId: envelope.messageId,
-              chatId: envelope.chatId
+              commandType: envelope.command.type
             });
           }
         }
@@ -175,25 +165,27 @@ export class FeishuLongConnectionRuntime {
           messageId: envelope.messageId,
           commandType: envelope.command.type
         });
-        if (this.ingress) {
-          await this.ingress
-            .dispatch(
-              feishuCardActionToTriggerEvent({
-                triggerEventId: `feishu:${envelope.messageId}`,
-                receivedAt: new Date().toISOString(),
-                chatId: envelope.chatId,
-                messageId: envelope.messageId,
-                senderUserId: envelope.sender?.userId,
-                actionType: envelope.command.type,
-                actionPayload: envelope.command as unknown as Record<string, unknown>
-              })
-            )
-            .catch((error) => console.error("Feishu card ingress dispatch failed", error));
-        }
-        if (envelope) {
-          void this.handler // acceptance-allow-handleCommand
-            .handleCommand({ source: "card", ...envelope })
-            .catch((error) => console.error("Feishu card handler failed", error));
+        if (this.markUnhandled("card", envelope.messageId)) {
+          if (this.ingress) {
+            await this.ingress
+              .dispatch(
+                feishuCardActionToTriggerEvent({
+                  triggerEventId: `feishu:${envelope.messageId}`,
+                  receivedAt: new Date().toISOString(),
+                  chatId: envelope.chatId,
+                  messageId: envelope.messageId,
+                  senderUserId: envelope.sender?.userId,
+                  actionType: envelope.command.type,
+                  actionPayload: envelope.command as unknown as Record<string, unknown>
+                })
+              )
+              .catch((error) => console.error("Feishu card ingress dispatch failed", error));
+          } else {
+            console.warn("Feishu card action dropped — no ingress configured", {
+              messageId: envelope.messageId,
+              commandType: envelope.command.type
+            });
+          }
         }
       },
       "im.message.recalled_v1": async (event) => {
@@ -215,7 +207,6 @@ export class FeishuLongConnectionRuntime {
           commandType: envelope.command.type
         });
         if (this.markUnhandled("message", envelope.messageId)) {
-<<<<<<< HEAD
           if (this.ingress) {
             await this.ingress
               .dispatch(
@@ -230,31 +221,11 @@ export class FeishuLongConnectionRuntime {
               )
               .catch((error) => console.error("Feishu bot menu ingress dispatch failed", error));
           } else {
-            void this.handler
-              .handleCommand({
-                source: "message",
-                chatId: envelope.chatId,
-                messageId: envelope.messageId,
-                sender: envelope.sender,
-                chatType: envelope.chatType,
-                command: envelope.command,
-                shouldRespond: envelope.shouldRespond
-              })
-              .catch((error) => console.error("Feishu bot menu handler failed", error));
-          }
-=======
-          void this.handler // acceptance-allow-handleCommand
-            .handleCommand({
-              source: "message",
-              chatId: envelope.chatId,
+            console.warn("Feishu bot menu event dropped — no ingress configured", {
               messageId: envelope.messageId,
-              sender: envelope.sender,
-              chatType: envelope.chatType,
-              command: envelope.command,
-              shouldRespond: envelope.shouldRespond
-            })
-            .catch((error) => console.error("Feishu bot menu handler failed", error));
->>>>>>> worktree-agent-a6492a46f9e6daa74
+              commandType: envelope.command.type
+            });
+          }
         }
       }
     });

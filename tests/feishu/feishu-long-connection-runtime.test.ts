@@ -71,8 +71,8 @@ describe("FeishuLongConnectionRuntime", () => {
 
     try {
       await runtime.start();
-      // Message event: no ingress configured, so it's dropped with a warning.
-      // Card event: still routes through handler.handleCommand.
+      // Message and card events: no ingress configured, both dropped with warnings.
+      // Neither should call handler.handleCommand.
       await registered["im.message.receive_v1"]?.({
         message: {
           message_id: "om_1",
@@ -101,16 +101,8 @@ describe("FeishuLongConnectionRuntime", () => {
         "im.message.recalled_v1",
         "im.message.receive_v1"
       ]);
-      // Message no longer calls handleCommand — only card action does
-      expect(handled).toEqual([
-        {
-          source: "card",
-          chatId: "oc_1",
-          messageId: "om_2",
-          command: { type: "push_repository", requirementId: "req_1", repositoryId: "repo_1" },
-          shouldRespond: true
-        }
-      ]);
+      // Neither message nor card action calls handleCommand
+      expect(handled).toEqual([]);
       expect(consoleInfo).toHaveBeenCalledWith("Feishu message event received", expect.any(Object));
     } finally {
       expect(consoleInfo).toHaveBeenCalled();
@@ -295,13 +287,8 @@ describe("FeishuLongConnectionRuntime", () => {
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "card_action" },
       external: { chatId: "oc_card", messageId: "om_card_action" }
     });
-    // Legacy handler is also called during cutover (will be removed later)
-    expect(handled).toHaveLength(1);
-    expect(handled[0]).toMatchObject({
-      source: "card",
-      chatId: "oc_card",
-      messageId: "om_card_action"
-    });
+    // handler.handleCommand must NOT be called for card actions
+    expect(handled).toHaveLength(0);
   });
 
   it("dispatches bot menu events through ingress instead of handleCommand when configured", async () => {
@@ -359,7 +346,7 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(handled).toHaveLength(0);
   });
 
-  it("routes bot menu clicks through the command handler as slash commands", async () => {
+  it("drops bot menu events when ingress is not configured", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
@@ -367,6 +354,7 @@ describe("FeishuLongConnectionRuntime", () => {
       "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     class FakeEventDispatcher {
       register(handles: {
@@ -396,10 +384,12 @@ describe("FeishuLongConnectionRuntime", () => {
         operator: { operator_id: { open_id: "ou_alice" } }
       }
     });
-    expect(handled).toHaveLength(1);
-    const first = handled[0] as { chatId: string; command: { type: string } };
-    expect(first.chatId).toBe("ou_alice");
-    expect(first.command.type).toBe("help");
+    // Bot menu event dropped — no ingress configured, no handler fallback
+    expect(handled).toHaveLength(0);
+    expect(consoleWarn).toHaveBeenCalledWith(
+      "Feishu bot menu event dropped — no ingress configured",
+      expect.any(Object)
+    );
   });
 
   it("marks recalled message ids in the recall tracker", async () => {
@@ -503,19 +493,20 @@ describe("FeishuLongConnectionRuntime", () => {
       context: { open_chat_id: "oc_1", open_message_id: "om_1" }
     });
 
-    // ingress.dispatch should only be called once (second message deduped)
-    expect(dispatchCalls).toHaveLength(1);
-    // Card action still calls handler
-    expect(handled).toHaveLength(1);
+    // ingress.dispatch should be called for message (once, deduped) and card (once, different dedup prefix)
+    expect(dispatchCalls).toHaveLength(2);
+    // Neither message nor card action calls handler.handleCommand
+    expect(handled).toHaveLength(0);
   });
 
-  it("handles repeated card navigation actions from the same card message", async () => {
+  it("drops repeated card navigation actions without ingress", async () => {
     const registered: {
       "im.message.receive_v1"?: (event: FeishuMessageReceiveEvent) => Promise<void>;
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
       "im.message.recalled_v1"?: (event: FeishuMessageRecalledEvent) => Promise<void>;
     } = {};
     const handled: unknown[] = [];
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     class FakeEventDispatcher {
       register(handles: {
@@ -554,30 +545,13 @@ describe("FeishuLongConnectionRuntime", () => {
       context: { open_chat_id: "oc_1", open_message_id: "om_help_card" }
     });
 
-    expect(handled).toEqual([
-      {
-        source: "card",
-        chatId: "oc_1",
-        messageId: "om_help_card",
-        command: {
-          type: "platform_action",
-          action: { kind: "nav", command: "/help", args: "agent", raw: "nav:/help agent" },
-          sessionKey: undefined
-        },
-        shouldRespond: true
-      },
-      {
-        source: "card",
-        chatId: "oc_1",
-        messageId: "om_help_card",
-        command: {
-          type: "platform_action",
-          action: { kind: "nav", command: "/help", args: "repo", raw: "nav:/help repo" },
-          sessionKey: undefined
-        },
-        shouldRespond: true
-      }
-    ]);
+    // Card events dropped — no ingress configured, no handler fallback
+    expect(handled).toEqual([]);
+    // Only first card action triggers warning (second is deduped by card: prefix)
+    expect(consoleWarn).toHaveBeenCalledWith(
+      "Feishu card action dropped — no ingress configured",
+      expect.any(Object)
+    );
   });
 
   it("uses platform allow-list config before invoking dispatch", async () => {

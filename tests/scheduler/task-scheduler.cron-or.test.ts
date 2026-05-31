@@ -124,7 +124,13 @@ function buildScheduler(args: { task: Task; onRun: () => void }): TaskScheduler 
     agents: new AgentProviderRegistry(),
     host: { read: async () => ({ hostname: "local", pid: 1 }) },
     clock: { now: () => new Date() },
-    logger: silentLogger
+    logger: silentLogger,
+    workflowRunner: {
+      startScheduledTask: async () => {
+        args.onRun();
+        return { status: "succeeded" };
+      }
+    }
   });
 }
 
