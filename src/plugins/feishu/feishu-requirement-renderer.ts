@@ -83,20 +83,23 @@ function readCardMessageId(input: RequirementRenderInput): string | undefined {
     : undefined;
 }
 
-// Single evolving card: a card action carries the clicked card's message id, so
-// we patch that message in place. The first render (from a text intake) has no
-// cardMessageId and sends a fresh card. Returns the message id either way.
-async function deliverCard(
-  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">,
-  chatId: string,
-  cardMessageId: string | undefined,
-  card: unknown
-): Promise<string | undefined> {
-  if (cardMessageId) {
-    await client.updateInteractiveCard(cardMessageId, card);
-    return cardMessageId;
+// Lock the card a button was clicked on: re-render it buttonless so it reads as
+// a settled history entry and can't be re-clicked. The next interactive card is
+// sent as a NEW message, so each click lands on its own message id.
+function buildLockedCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
+  const title = typeof input.lockedTitle === "string" && input.lockedTitle.length > 0
+    ? input.lockedTitle
+    : `已处理 · ${requirementId}`;
+  const note = typeof input.lockedNote === "string" ? input.lockedNote : "";
+  const docUrl = typeof input.docUrl === "string" && input.docUrl.length > 0 ? input.docUrl : undefined;
+  const lines = [`**需求 ID**：${requirementId}`];
+  if (note) {
+    lines.push("", note);
   }
-  return client.sendInteractiveCard(chatId, card);
+  if (docUrl) {
+    lines.push("", `[查看计划文档（云文档）](${docUrl})`);
+  }
+  return buildMinimalCard(title, "grey", lines.join("\n"));
 }
 
 function actionValue(requirementId: string, action: string, planVersion?: number): Record<string, string> {
@@ -290,14 +293,6 @@ function buildAcceptanceResultCard(requirementId: string, input: RequirementRend
   );
 }
 
-function buildCancelledCard(requirementId: string): MinimalFeishuCard {
-  return buildMinimalCard(
-    `🚫 已取消 · ${requirementId}`,
-    "grey",
-    [`**需求 ID**：${requirementId}`, "", "需求已取消。如需重新开始，请重新发起需求。"].join("\n")
-  );
-}
-
 function registerSimpleCardEffects(
   registry: EffectHandlerRegistry,
   client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
@@ -309,21 +304,29 @@ function registerSimpleCardEffects(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildAcceptanceResultCard(requirementId, input);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
+      const messageId = await client.sendInteractiveCard(chatId, card);
       return { rendered: true, messageId };
     }
   });
 
-  // 取消 must lock the card in place (no buttons), so it cannot be re-clicked.
+  // Lock the clicked card in place (buttonless) so it can't be re-clicked. This
+  // is how every action settles its source card before the next card is sent;
+  // 取消 uses it as its terminal state.
   registry.register({
     pluginId: "feishu",
-    effectType: "requirement.cancelled.render",
+    effectType: "requirement.card_locked.render",
     execute: async (effect) => {
       const input = effect.input as RequirementRenderInput;
-      const { chatId, requirementId } = validateRequiredFields(input);
-      const card = buildCancelledCard(requirementId);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
-      return { rendered: true, messageId };
+      if (!input.requirementId) {
+        throw new Error("Missing required field: requirementId");
+      }
+      const cardMessageId = readCardMessageId(input);
+      if (!cardMessageId) {
+        throw new Error("Missing required field: cardMessageId");
+      }
+      const card = buildLockedCard(input.requirementId, input);
+      await client.updateInteractiveCard(cardMessageId, card);
+      return { rendered: true, messageId: cardMessageId };
     }
   });
 }
@@ -359,7 +362,7 @@ function registerPlanReviewEffect(
       }
 
       const card = buildPlanReviewLinkCard(requirementId, planVersion, summary, docUrl);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
+      const messageId = await client.sendInteractiveCard(chatId, card);
 
       return { rendered: true, messageId, ...(documentId ? { documentId } : {}), docUrl };
     }
@@ -377,7 +380,7 @@ function registerDevelopmentEffect(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildDevelopmentCard(requirementId, input);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
+      const messageId = await client.sendInteractiveCard(chatId, card);
       return { rendered: true, messageId };
     }
   });
@@ -394,7 +397,7 @@ function registerVerificationResultEffect(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildVerificationResultCard(requirementId, input);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
+      const messageId = await client.sendInteractiveCard(chatId, card);
       return { rendered: true, messageId };
     }
   });

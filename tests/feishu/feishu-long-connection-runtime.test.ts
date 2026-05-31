@@ -291,7 +291,7 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(handled).toHaveLength(0);
   });
 
-  it("dedups card actions by callback token, not messageId, so an evolving card accepts successive clicks", async () => {
+  it("dedups card actions by messageId so Feishu redelivery of the same card click runs once", async () => {
     const registered: {
       "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
     } = {};
@@ -320,18 +320,17 @@ describe("FeishuLongConnectionRuntime", () => {
     );
     await runtime.start();
 
-    const click = (token: string) =>
+    const click = (messageId: string) =>
       registered["card.action.trigger"]?.({
-        token,
         action: { value: { action: "act:/requirement plan approve", requirement_id: "reqwf_1", plan_version: "1" } },
-        context: { open_chat_id: "oc_card", open_message_id: "om_evolving" }
+        context: { open_chat_id: "oc_card", open_message_id: messageId }
       });
 
-    // same evolving card (one messageId), two distinct clicks → both dispatch
-    await click("tok_first");
-    await click("tok_second");
-    // Feishu redelivery repeats a token → that one is deduped
-    await click("tok_second");
+    // each interactive card is its own message; two different cards → two dispatches
+    await click("om_card_a");
+    await click("om_card_b");
+    // redelivery repeats the same messageId → deduped
+    await click("om_card_a");
 
     expect(dispatched).toHaveLength(2);
   });

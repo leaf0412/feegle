@@ -45,7 +45,7 @@ describe("requirement execution workflow selectors", () => {
 });
 
 describe("requirement.plan.approve.workflow step (approve → develop on one card)", () => {
-  it("approves, renders 开发中, runs development, then renders the completed dev card", async () => {
+  it("locks the plan card, approves, runs development, then sends a NEW completed dev card", async () => {
     const workflows = buildWorkflows();
     const runOutput = { status: "implementation_ready", worktreePath: "/tmp/wt" };
     const executed: Array<{ pluginId: string; effectType: string; input: Record<string, unknown> }> = [];
@@ -61,22 +61,22 @@ describe("requirement.plan.approve.workflow step (approve → develop on one car
     const result = await workflows.require("requirement.plan.approve.workflow").steps[0].run(stepCtx as never);
 
     expect(result).toEqual({ kind: "complete", output: runOutput });
-    // approve → render(开发中) → run → render(完成) — no separate 执行开发 button
+    // lock clicked plan card → approve → run → send NEW dev result card
     expect(executed.map((e) => e.effectType)).toEqual([
+      "requirement.card_locked.render",
       "execution.approve",
-      "requirement.execution_progress.render",
       "execution.run",
       "requirement.execution_progress.render"
     ]);
-    expect(executed[1]).toMatchObject({ pluginId: "feishu", input: { phase: "developing" } });
-    expect(executed[3]).toMatchObject({ pluginId: "feishu", input: { phase: "completed", result: runOutput } });
+    // the dev result card is a fresh message, not the clicked card
+    expect(executed[3]).toMatchObject({ pluginId: "feishu", input: { phase: "completed", result: runOutput, cardMessageId: undefined } });
   });
 
-  it("renders the failed dev card and rethrows when development throws — the card never stays on 开发中", async () => {
+  it("sends a NEW failed dev card and rethrows when development throws", async () => {
     const workflows = buildWorkflows();
     const executed: Array<{ effectType: string; input: Record<string, unknown> }> = [];
     const stepCtx = {
-      input: { requirementId: "reqwf_1", planVersion: 1, sourcePlugin: "feishu", chatId: "oc_1" },
+      input: { requirementId: "reqwf_1", planVersion: 1, sourcePlugin: "feishu", chatId: "oc_1", cardMessageId: "om_card" },
       executeEffect: async (e: { pluginId: string; effectType: string; input: unknown }) => {
         executed.push({ effectType: e.effectType, input: e.input as Record<string, unknown> });
         if (e.effectType === "execution.run") throw new Error("no git repo at workspace");
@@ -89,15 +89,15 @@ describe("requirement.plan.approve.workflow step (approve → develop on one car
     );
 
     expect(executed.map((e) => e.effectType)).toEqual([
+      "requirement.card_locked.render",
       "execution.approve",
-      "requirement.execution_progress.render",
       "execution.run",
       "requirement.execution_progress.render"
     ]);
     expect(executed[3].input).toMatchObject({ phase: "failed", error: "no git repo at workspace" });
   });
 
-  it("skips renders when sourcePlugin is absent (still approves and runs)", async () => {
+  it("skips renders/lock when sourcePlugin is absent (still approves and runs)", async () => {
     const workflows = buildWorkflows();
     const executed: string[] = [];
     const stepCtx = {
@@ -128,8 +128,8 @@ describe("requirement.cancel.workflow step (取消 → 锁卡)", () => {
 
     await workflows.require("requirement.cancel.workflow").steps[0].run(stepCtx as never);
 
-    // a terminal action must update the card so it can't be re-clicked
-    expect(executed).toEqual(["execution.cancel", "requirement.cancelled.render"]);
+    // 取消 is terminal: lock the clicked card (it becomes the 已取消 card), then cancel
+    expect(executed).toEqual(["requirement.card_locked.render", "execution.cancel"]);
   });
 });
 
@@ -149,9 +149,9 @@ describe("requirement.plan.revise.workflow step (要求修改 → 重渲染计�
 
     await workflows.require("requirement.plan.revise.workflow").steps[0].run(stepCtx as never);
 
-    expect(executed.map((e) => e.effectType)).toEqual(["plan.revise", "requirement.plan_review.render"]);
-    // a revision is a new plan → new cloud doc, so no docUrl is carried forward
-    expect(executed[1].input).toMatchObject({ planVersion: 2, summary: "S2", docUrl: undefined });
+    expect(executed.map((e) => e.effectType)).toEqual(["requirement.card_locked.render", "plan.revise", "requirement.plan_review.render"]);
+    // a revision is a new plan → new cloud doc + fresh card, so no docUrl/cardMessageId carried
+    expect(executed[2].input).toMatchObject({ planVersion: 2, summary: "S2", docUrl: undefined, cardMessageId: undefined });
   });
 });
 
@@ -188,11 +188,11 @@ describe("requirement.plan.back.workflow step (回退到计划)", () => {
 
     await workflows.require("requirement.plan.back.workflow").steps[0].run(stepCtx as never);
 
-    expect(executed.map((e) => e.effectType)).toEqual(["execution.revert_to_plan", "requirement.plan_review.render"]);
-    // the re-render carries docUrl so the renderer reuses the existing cloud doc
-    expect(executed[1]).toMatchObject({
+    expect(executed.map((e) => e.effectType)).toEqual(["requirement.card_locked.render", "execution.revert_to_plan", "requirement.plan_review.render"]);
+    // the fresh plan card carries docUrl so the renderer reuses the existing cloud doc
+    expect(executed[2]).toMatchObject({
       pluginId: "feishu",
-      input: { docUrl: "https://feishu.cn/docx/doc_1", summary: "S", planVersion: 2 }
+      input: { docUrl: "https://feishu.cn/docx/doc_1", summary: "S", planVersion: 2, cardMessageId: undefined }
     });
   });
 });

@@ -13,6 +13,37 @@ import {
 
 export type { RequirementWorkflowHandlerDeps };
 
+type StepCtx = {
+  input: unknown;
+  executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown>;
+};
+
+function readSourcePlugin(input: Record<string, unknown>): string | undefined {
+  return typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0 ? input.sourcePlugin : undefined;
+}
+
+// Lock the card a button was clicked on (buttonless, settled state) before the
+// next card is sent. Each interactive card is its own message, so locking the
+// clicked one + appending a new one keeps every click on a distinct messageId —
+// no runtime event-id collisions, and stale cards can't be re-clicked.
+async function lockClickedCard(
+  stepCtx: StepCtx,
+  input: Record<string, unknown>,
+  lockedTitle: string,
+  lockedNote: string
+): Promise<void> {
+  const sourcePlugin = readSourcePlugin(input);
+  const cardMessageId = typeof input.cardMessageId === "string" && input.cardMessageId.length > 0 ? input.cardMessageId : undefined;
+  if (!sourcePlugin || !cardMessageId) {
+    return;
+  }
+  await stepCtx.executeEffect({
+    pluginId: sourcePlugin,
+    effectType: "requirement.card_locked.render",
+    input: { ...input, lockedTitle, lockedNote }
+  });
+}
+
 export function requirementWorkflowRuntimeContribution(
   getDeps?: () => RequirementWorkflowHandlerDeps
 ): RuntimeContributionModule {
@@ -91,19 +122,22 @@ export function requirementWorkflowRuntimeContribution(
           {
             stepId: "revise_plan",
             async run(stepCtx) {
-              const input = stepCtx.input as { sourcePlugin?: string; [k: string]: unknown };
+              const input = stepCtx.input as Record<string, unknown> & { requirementId?: string };
+              const reqId = typeof input.requirementId === "string" ? input.requirementId : "";
+              await lockClickedCard(stepCtx, input, `✏️ 已提交修改 · ${reqId}`, "正在生成新版本计划，新计划卡见下方。");
               const output = await stepCtx.executeEffect({
                 pluginId: "requirement-workflow",
                 effectType: "plan.revise",
                 input
               });
-              // re-render the plan-review card in place with the new version (a
-              // revision = new plan = new cloud doc, so no docUrl is carried).
-              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+              // a revision = new plan = new cloud doc, so no docUrl is carried, and
+              // the new plan-review card is a fresh message.
+              const sourcePlugin = readSourcePlugin(input);
+              if (sourcePlugin) {
                 await stepCtx.executeEffect({
-                  pluginId: input.sourcePlugin,
+                  pluginId: sourcePlugin,
                   effectType: "requirement.plan_review.render",
-                  input: { ...input, ...(output as Record<string, unknown>), docUrl: undefined }
+                  input: { ...input, ...(output as Record<string, unknown>), cardMessageId: undefined, docUrl: undefined }
                 });
               }
               return { kind: "complete", output };
@@ -130,25 +164,25 @@ export function requirementWorkflowRuntimeContribution(
           {
             stepId: "approve_and_develop",
             async run(stepCtx) {
-              const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [k: string]: unknown };
-              const sourcePlugin = typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0
-                ? input.sourcePlugin
-                : undefined;
-              const render = (extra: Record<string, unknown>): Promise<unknown> | undefined =>
+              const input = stepCtx.input as Record<string, unknown> & { requirementId: string };
+              const sourcePlugin = readSourcePlugin(input);
+              const renderDev = (extra: Record<string, unknown>): Promise<unknown> | undefined =>
                 sourcePlugin
                   ? stepCtx.executeEffect({
                       pluginId: sourcePlugin,
                       effectType: "requirement.execution_progress.render",
-                      input: { ...input, ...extra }
+                      // a fresh card for the dev result — never reuse the clicked card's id
+                      input: { ...input, cardMessageId: undefined, ...extra }
                     })
                   : undefined;
 
+              // settle the plan-review card the user clicked, then develop
+              await lockClickedCard(stepCtx, input, `✅ 已确认计划 · ${input.requirementId}`, "已开始开发，结果见下方卡片。");
               await stepCtx.executeEffect({
                 pluginId: "requirement-workflow",
                 effectType: "execution.approve",
                 input
               });
-              await render({ phase: "developing" });
 
               let output: unknown;
               try {
@@ -158,11 +192,11 @@ export function requirementWorkflowRuntimeContribution(
                   input
                 });
               } catch (error) {
-                await render({ phase: "failed", error: error instanceof Error ? error.message : String(error) });
+                await renderDev({ phase: "failed", error: error instanceof Error ? error.message : String(error) });
                 throw error;
               }
 
-              await render({ phase: "completed", result: output });
+              await renderDev({ phase: "completed", result: output });
               return { kind: "complete", output };
             }
           }
@@ -221,21 +255,15 @@ function buildCancelWorkflow() {
     steps: [
       {
         stepId: "cancel",
-        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
-          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
+        async run(stepCtx: StepCtx) {
+          const input = stepCtx.input as Record<string, unknown> & { requirementId: string };
+          // 取消 is terminal: locking the clicked card IS the result card.
+          await lockClickedCard(stepCtx, input, `🚫 已取消 · ${input.requirementId}`, "需求已取消。如需重新开始，请重新发起需求。");
           const output = await stepCtx.executeEffect({
             pluginId: "requirement-workflow",
             effectType: "execution.cancel",
             input
           });
-          // lock the card in place so it can't be re-clicked
-          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
-            await stepCtx.executeEffect({
-              pluginId: input.sourcePlugin,
-              effectType: "requirement.cancelled.render",
-              input
-            });
-          }
           return { kind: "complete" as const, output };
         }
       }
@@ -251,20 +279,22 @@ function buildBackWorkflow() {
     steps: [
       {
         stepId: "revert_to_plan",
-        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
-          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; docUrl?: string; [key: string]: unknown };
+        async run(stepCtx: StepCtx) {
+          const input = stepCtx.input as Record<string, unknown> & { requirementId: string; docUrl?: string };
+          await lockClickedCard(stepCtx, input, `↩︎ 已回退 · ${input.requirementId}`, "已回退到计划，新的计划卡见下方。");
           const reverted = await stepCtx.executeEffect({
             pluginId: "requirement-workflow",
             effectType: "execution.revert_to_plan",
             input
           });
-          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
-            // re-render the plan-review card in place; docUrl rides the action so
-            // the cloud doc is re-linked without creating a new one.
+          const sourcePlugin = readSourcePlugin(input);
+          if (sourcePlugin) {
+            // a fresh plan-review card; docUrl rides the action so the cloud doc
+            // is re-linked without creating a new one.
             await stepCtx.executeEffect({
-              pluginId: input.sourcePlugin,
+              pluginId: sourcePlugin,
               effectType: "requirement.plan_review.render",
-              input: { ...input, ...(reverted as Record<string, unknown>), docUrl: input.docUrl }
+              input: { ...input, ...(reverted as Record<string, unknown>), cardMessageId: undefined, docUrl: input.docUrl }
             });
           }
           return { kind: "complete" as const, output: reverted };
@@ -282,18 +312,20 @@ function buildVerifyWorkflow() {
     steps: [
       {
         stepId: "run_verification",
-        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
-          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
+        async run(stepCtx: StepCtx) {
+          const input = stepCtx.input as Record<string, unknown> & { requirementId: string };
+          await lockClickedCard(stepCtx, input, `✅ 已进入验证 · ${input.requirementId}`, "验证结果见下方卡片。");
           const output = await stepCtx.executeEffect({
             pluginId: "requirement-workflow",
             effectType: "verification.run",
             input
           });
-          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+          const sourcePlugin = readSourcePlugin(input);
+          if (sourcePlugin) {
             await stepCtx.executeEffect({
-              pluginId: input.sourcePlugin,
+              pluginId: sourcePlugin,
               effectType: "requirement.verification_result.render",
-              input: { ...input, result: output }
+              input: { ...input, cardMessageId: undefined, result: output }
             });
           }
           return { kind: "complete" as const, output };
@@ -311,18 +343,20 @@ function buildAcceptWorkflow() {
     steps: [
       {
         stepId: "accept",
-        async run(stepCtx: { input: unknown; executeEffect(e: { pluginId: string; effectType: string; input: unknown }): Promise<unknown> }) {
-          const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
+        async run(stepCtx: StepCtx) {
+          const input = stepCtx.input as Record<string, unknown> & { requirementId: string };
+          await lockClickedCard(stepCtx, input, `✅ 已提交验收 · ${input.requirementId}`, "验收结果见下方卡片。");
           const output = await stepCtx.executeEffect({
             pluginId: "requirement-workflow",
             effectType: "acceptance.run",
             input
           });
-          if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+          const sourcePlugin = readSourcePlugin(input);
+          if (sourcePlugin) {
             await stepCtx.executeEffect({
-              pluginId: input.sourcePlugin,
+              pluginId: sourcePlugin,
               effectType: "requirement.acceptance_result.render",
-              input: { ...input, result: output }
+              input: { ...input, cardMessageId: undefined, result: output }
             });
           }
           return { kind: "complete" as const, output };

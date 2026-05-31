@@ -17,10 +17,6 @@ export interface FeishuCommandEnvelope {
   command: FeishuCommand;
   shouldRespond?: boolean;
   message?: PlatformIncomingMessage;
-  // Per-click callback token from a card action (unique per click, repeated on
-  // Feishu redelivery). Used as the dedup key so an in-place-updating card can
-  // accept successive actions on the same messageId. Absent for text messages.
-  actionToken?: string;
 }
 
 export interface FeishuTextMessageDropReason {
@@ -112,7 +108,6 @@ export interface FeishuCardActionTriggerEvent {
   };
   open_chat_id?: string;
   open_message_id?: string;
-  token?: string;
   action?: {
     value?: unknown;
     option?: unknown;
@@ -209,8 +204,7 @@ export function extractCardActionCommand(event: FeishuCardActionTriggerEvent): F
     messageId,
     sender: feishuSender(event.operator ?? event.user_id),
     shouldRespond: true,
-    command: parseFeishuCardActionValue(resolveCardActionPayload(event.action)),
-    ...(typeof event.token === "string" && event.token.length > 0 ? { actionToken: event.token } : {})
+    command: parseFeishuCardActionValue(resolveCardActionPayload(event.action))
   };
 }
 

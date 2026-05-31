@@ -234,6 +234,6 @@ describe("feishuRuntimeContribution", () => {
     expect(handlers.has("feishu", "requirement.execution_progress.render")).toBe(true);
     expect(handlers.has("feishu", "requirement.verification_result.render")).toBe(true);
     expect(handlers.has("feishu", "requirement.acceptance_result.render")).toBe(true);
-    expect(handlers.has("feishu", "requirement.cancelled.render")).toBe(true);
+    expect(handlers.has("feishu", "requirement.card_locked.render")).toBe(true);
   });
 });

@@ -165,11 +165,11 @@ export class FeishuLongConnectionRuntime {
           messageId: envelope.messageId,
           commandType: envelope.command.type
         });
-        // Dedup by the per-click callback token, not the message id: a card that
-        // updates in place keeps one messageId across many actions, so a
-        // messageId key would drop every action after the first. The token is
-        // unique per click and stable across Feishu redelivery.
-        if (this.markUnhandled("card", envelope.actionToken ?? envelope.messageId)) {
+        // Dedup by message id: every interactive card is its own message, so a
+        // click lands on a unique messageId and Feishu's redelivery repeats it.
+        // (Cards lock-then-append rather than mutate one message, so successive
+        // actions never share a messageId.)
+        if (this.markUnhandled("card", envelope.messageId)) {
           if (this.ingress) {
             await this.ingress
               .dispatch(
