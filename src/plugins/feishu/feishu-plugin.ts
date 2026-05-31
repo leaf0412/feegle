@@ -10,7 +10,6 @@ import {
 } from "@integrations/feishu/feishu-command-responder.js";
 import { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
-import { workbenchRuntimeContribution } from "@features/workbench/workbench-runtime-contribution.js";
 
 export interface FeishuPluginDeps {
   feegleHome: string;
@@ -50,7 +49,7 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient), workbenchRuntimeContribution()]
+    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient)]
   };
 }
 
