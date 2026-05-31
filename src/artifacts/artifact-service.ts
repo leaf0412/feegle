@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ArtifactKind, ArtifactRecord } from "./artifact-models.js";
 import { defaultRetentionDays } from "./artifact-models.js";
 import type { ArtifactStore } from "./artifact-store.js";
+import { redactSensitive } from "../security/redaction.js";
 
 export class ArtifactService {
   constructor(
@@ -23,7 +24,8 @@ export class ArtifactService {
     const workspaceDir = join(this.rootDirectory, input.workspaceId);
     await mkdir(workspaceDir, { recursive: true });
     const filePath = join(workspaceDir, input.fileName);
-    await writeFile(filePath, input.content, "utf8");
+    const safeContent = redactSensitive(input.content);
+    await writeFile(filePath, safeContent, "utf8");
 
     const record: ArtifactRecord = {
       id: input.artifactId,

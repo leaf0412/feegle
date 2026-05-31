@@ -64,4 +64,44 @@ export class ArtifactStore {
       filePath: row.file_path
     }));
   }
+
+  pin(id: string, now: string): void {
+    this.db
+      .prepare(`update artifacts set pinned = 1, updated_at = ? where id = ?`)
+      .run(now, id);
+  }
+
+  unpin(id: string, now: string): void {
+    this.db
+      .prepare(`update artifacts set pinned = 0, updated_at = ? where id = ?`)
+      .run(now, id);
+  }
+
+  markDeleted(id: string, now: string): void {
+    this.db
+      .prepare(
+        `update artifacts set content_type = 'deleted', summary_json = ?, updated_at = ? where id = ?`
+      )
+      .run(JSON.stringify({ deleted: true, deletedAt: now }), now, id);
+  }
+
+  listExpiredUnpinned(now: string): Array<{ id: string; filePath: string; retentionDays: number; pinned: boolean }> {
+    const rows = this.db
+      .prepare(
+        `select id, file_path, retention_days, pinned
+         from artifacts
+         where pinned = 0 and content_type != 'deleted'
+         order by created_at asc`
+      )
+      .all() as Array<{ id: string; file_path: string; retention_days: number; pinned: 0 | 1 }>;
+
+    return rows
+      .filter((row) => row.retention_days > 0)
+      .map((row) => ({
+        id: row.id,
+        filePath: row.file_path,
+        retentionDays: row.retention_days,
+        pinned: row.pinned === 1
+      }));
+  }
 }
