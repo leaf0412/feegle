@@ -5,6 +5,7 @@ import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
+import { registerFeishuRequirementRenderEffects } from "./feishu-requirement-renderer.js";
 
 function intentKindFromEvent(event: TriggerEvent): IntentKind {
   const commandType = event.external.commandType;
@@ -299,6 +300,8 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
           return { updated: true, messageId: input.messageId };
         }
       });
+
+      registerFeishuRequirementRenderEffects(ctx.effectHandlers, client);
     }
   };
 }
