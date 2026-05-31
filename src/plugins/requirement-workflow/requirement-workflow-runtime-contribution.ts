@@ -1,6 +1,17 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { RequirementWorkflowHandlerDeps } from "./requirement-workflow-effect-handlers.js";
+import {
+  buildPlanGenerateHandler,
+  buildPlanReviseHandler,
+  buildExecutionApproveHandler,
+  buildExecutionCancelHandler
+} from "./requirement-workflow-effect-handlers.js";
 
-export function requirementWorkflowRuntimeContribution(): RuntimeContributionModule {
+export type { RequirementWorkflowHandlerDeps };
+
+export function requirementWorkflowRuntimeContribution(
+  getDeps?: () => RequirementWorkflowHandlerDeps
+): RuntimeContributionModule {
   return {
     id: "requirement-workflow-runtime",
     register(ctx) {
@@ -166,6 +177,14 @@ export function requirementWorkflowRuntimeContribution(): RuntimeContributionMod
       ctx.workflows.register(buildVerifyWorkflow());
       ctx.workflows.register(buildAcceptWorkflow());
       ctx.workflows.register(buildCancelWorkflow());
+
+      if (getDeps) {
+        const deps = getDeps();
+        ctx.effectHandlers.register(buildPlanGenerateHandler(deps));
+        ctx.effectHandlers.register(buildPlanReviseHandler(deps));
+        ctx.effectHandlers.register(buildExecutionApproveHandler(deps));
+        ctx.effectHandlers.register(buildExecutionCancelHandler(deps));
+      }
     }
   };
 }
