@@ -17,6 +17,7 @@ import {
   buildPlanRevisionRequestCard
 } from "@integrations/feishu/feishu-workbench-cards.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
+import { workbenchRuntimeContribution } from "@features/workbench/workbench-runtime-contribution.js";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
 import { resolveWorkspaceDir } from "@infra/app/workspace-dir.js";
@@ -62,7 +63,7 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient)]
+    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient), workbenchRuntimeContribution()]
   };
 }
 

@@ -11,6 +11,19 @@ function intentKindFromEvent(event: TriggerEvent): IntentKind {
   return "slash_command";
 }
 
+const WORKBENCH_ACTIONS = new Set([
+  "workbench_plan_approve",
+  "workbench_plan_reject",
+  "workbench_plan_cancel",
+  "workbench_plan_push",
+  "workbench_plan_cleanup",
+  "workbench_plan_revise",
+  "workbench_plan_revision_submit",
+  "workbench_plan_revise_execution",
+  "workbench_plan_revise_execution_submit",
+  "workbench_plan_base_branch_submit"
+]);
+
 export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
@@ -29,6 +42,37 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
               : { kind: "system" },
           payload: event.external
         })
+      });
+
+      ctx.intentResolvers.register({
+        id: "feishu-card-action",
+        canResolve: (event) => {
+          if (event.source.pluginId !== "feishu" || event.source.triggerType !== "card_action") {
+            return false;
+          }
+          const actionType = event.external.actionType;
+          return typeof actionType === "string" && WORKBENCH_ACTIONS.has(actionType);
+        },
+        resolve: (event) => {
+          const actionType = event.external.actionType as string;
+          const actionPayload = event.external.actionPayload as Record<string, unknown> ?? {};
+          return {
+            intentId: `intent:${event.triggerEventId}`,
+            kind: "workflow_signal",
+            workspaceId: workspaceIdFromEvent(event),
+            projectId: projectIdFromEvent(event),
+            actor:
+              event.actorHint && typeof event.actorHint.externalUserId === "string"
+                ? { kind: "user", userId: event.actorHint.externalUserId }
+                : { kind: "system" },
+            payload: {
+              actionType,
+              ...actionPayload,
+              chatId: event.external.chatId,
+              messageId: event.external.messageId
+            }
+          };
+        }
       });
 
       ctx.workflowSelector.register({
