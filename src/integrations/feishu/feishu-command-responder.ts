@@ -113,7 +113,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       case "requirement_plan_approve":
       case "requirement_plan_revise":
       case "requirement_cancel":
-      case "requirement_execute":
       case "requirement_verify":
       case "requirement_accept":
       case "bind_repo_submit":

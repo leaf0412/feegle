@@ -107,60 +107,51 @@ export function requirementWorkflowRuntimeContribution(
         definitionId: "requirement.plan.approve.workflow"
       });
 
-      ctx.workflowSelector.register({
-        id: "requirement-execute",
-        matches: (intent) => intent.kind === "requirement_execute",
-        definitionId: "requirement.execute.workflow"
-      });
-
+      // Approving the plan starts development on the same card: no separate
+      // "执行开发" button. The card flips to 开发中 (locked), then to the dev
+      // result (结束/取消) or, if the run throws, to 开发失败 (取消) before the
+      // failure surfaces — the card never stays stuck on 开发中.
       ctx.workflows.register({
         definitionId: "requirement.plan.approve.workflow",
         version: 1,
         concurrencyPolicy: "reject_if_running",
         steps: [
           {
-            stepId: "approve",
+            stepId: "approve_and_develop",
             async run(stepCtx) {
               const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [k: string]: unknown };
-              const output = await stepCtx.executeEffect({
+              const sourcePlugin = typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0
+                ? input.sourcePlugin
+                : undefined;
+              const render = (extra: Record<string, unknown>): Promise<unknown> | undefined =>
+                sourcePlugin
+                  ? stepCtx.executeEffect({
+                      pluginId: sourcePlugin,
+                      effectType: "requirement.execution_progress.render",
+                      input: { ...input, ...extra }
+                    })
+                  : undefined;
+
+              await stepCtx.executeEffect({
                 pluginId: "requirement-workflow",
                 effectType: "execution.approve",
                 input
               });
-              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
-                await stepCtx.executeEffect({
-                  pluginId: input.sourcePlugin,
-                  effectType: "requirement.plan_approved.render",
-                  input: { ...input, ...(output as Record<string, unknown>) }
-                });
-              }
-              return { kind: "complete", output };
-            }
-          }
-        ]
-      });
+              await render({ phase: "developing" });
 
-      ctx.workflows.register({
-        definitionId: "requirement.execute.workflow",
-        version: 1,
-        concurrencyPolicy: "reject_if_running",
-        steps: [
-          {
-            stepId: "run_execution",
-            async run(stepCtx) {
-              const input = stepCtx.input as { requirementId: string; sourcePlugin?: string; [key: string]: unknown };
-              const output = await stepCtx.executeEffect({
-                pluginId: "requirement-workflow",
-                effectType: "execution.run",
-                input
-              });
-              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
-                await stepCtx.executeEffect({
-                  pluginId: input.sourcePlugin,
-                  effectType: "requirement.execution_progress.render",
-                  input: { ...input, result: output }
+              let output: unknown;
+              try {
+                output = await stepCtx.executeEffect({
+                  pluginId: "requirement-workflow",
+                  effectType: "execution.run",
+                  input
                 });
+              } catch (error) {
+                await render({ phase: "failed", error: error instanceof Error ? error.message : String(error) });
+                throw error;
               }
+
+              await render({ phase: "completed", result: output });
               return { kind: "complete", output };
             }
           }

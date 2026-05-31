@@ -66,7 +66,7 @@ describe("resolveFeishuRequirementCardActionIntent", () => {
   });
 
   it("maps each requirement action type 1:1", () => {
-    for (const a of ["requirement_plan_approve", "requirement_plan_revise", "requirement_execute", "requirement_verify", "requirement_accept", "requirement_cancel"]) {
+    for (const a of ["requirement_plan_approve", "requirement_plan_revise", "requirement_verify", "requirement_accept", "requirement_cancel"]) {
       const intent = resolveFeishuRequirementCardActionIntent({ ...base(), actionType: a, actionPayload: { requirementId: "reqwf_1" } });
       expect(intent?.kind).toBe(a);
       expect(intent?.payload).toMatchObject({ sourcePlugin: "feishu", requirementId: "reqwf_1" });
@@ -230,7 +230,7 @@ describe("intent payload completeness (workspaceId / projectId / requesterUserId
       resolvedProjectId: null,
       resolvedUserId: "user_abc",
       sourcePlugin: "feishu",
-      actionType: "requirement_execute",
+      actionType: "requirement_verify",
       actionPayload: { requirementId: "reqwf_2" },
       chatId: "oc_ws",
       messageId: "om_ws"
@@ -238,7 +238,9 @@ describe("intent payload completeness (workspaceId / projectId / requesterUserId
     expect(intent?.payload).toMatchObject({
       workspaceId: "ws_abc",
       projectId: null,
-      requesterUserId: "user_abc"
+      requesterUserId: "user_abc",
+      // card actions thread the clicked card's id so renders update it in place
+      cardMessageId: "om_ws"
     });
   });
 });

@@ -41,7 +41,6 @@ export type FeishuCommand =
   | { type: "requirement_plan_approve"; requirementId: string; planVersion: number }
   | { type: "requirement_plan_revise"; requirementId: string; planVersion: number; feedback: string }
   | { type: "requirement_cancel"; requirementId: string }
-  | { type: "requirement_execute"; requirementId: string; planVersion: number }
   | { type: "requirement_verify"; requirementId: string }
   | { type: "requirement_accept"; requirementId: string }
   | {
@@ -160,15 +159,6 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       return { type: "unknown", raw: stringifyUnknown(value) };
     }
     return { type: "requirement_plan_revise", requirementId, planVersion, feedback };
-  }
-
-  if (value.action === "act:/requirement execute") {
-    const requirementId = value.requirement_id;
-    const planVersion = parsePositiveInteger(value.plan_version);
-    if (typeof requirementId !== "string" || requirementId === "" || planVersion === undefined) {
-      return { type: "unknown", raw: stringifyUnknown(value) };
-    }
-    return { type: "requirement_execute", requirementId, planVersion };
   }
 
   if (value.action === "act:/requirement verify") {

@@ -85,15 +85,14 @@ describe("Feishu requirement render effects", () => {
     expect(output).toEqual({ rendered: true, messageId: "om_card", documentId: "doc_1", docUrl: "https://feishu.cn/docx/doc_1" });
   });
 
-  it("registers all five requirement render effects", () => {
+  it("registers the four requirement render effects (plan_approved folded into development)", () => {
     const { handlers, registry } = makeRegistry();
-    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om") };
+    const client = makeClient();
     const cloudDoc = makeCloudDoc();
     registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
     expect(Object.keys(handlers).sort()).toEqual([
       "feishu:requirement.acceptance_result.render",
       "feishu:requirement.execution_progress.render",
-      "feishu:requirement.plan_approved.render",
       "feishu:requirement.plan_review.render",
       "feishu:requirement.verification_result.render"
     ]);
@@ -154,54 +153,68 @@ describe("Feishu requirement render effects", () => {
     expect(out).toEqual({ rendered: true, messageId: "om_x" });
   });
 
-  it("plan_approved card contains 执行开发 button with act:/requirement execute action", async () => {
+  it("development card (developing phase) is locked — no buttons while the agent runs", async () => {
     const { handlers, registry } = makeRegistry();
-    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_approved") };
-    const cloudDoc = makeCloudDoc();
-    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
 
-    const out = await handlers["feishu:requirement.plan_approved.render"].execute({
-      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 2 }
+    await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", cardMessageId: "om_card", phase: "developing" }
     });
 
-    expect(cloudDoc.createDoc).not.toHaveBeenCalled();
-    expect(out).toEqual({ rendered: true, messageId: "om_approved" });
-    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const [, card] = (client.updateInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
     const cardJson = JSON.stringify(card);
-    expect(cardJson).toContain("act:/requirement execute");
-    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
-    expect(cardJson).toContain('"plan_version":"2"');
-    expect(cardJson).toContain("执行开发");
+    expect(cardJson).toContain("开发中");
+    expect(cardJson).not.toContain('"action_type":"form_submit"'); // locked: nothing to re-click
   });
 
-  it("plan_approved card throws when chatId is missing", async () => {
+  it("development card (completed phase) offers 结束 (verify) and 取消, not a 执行开发 button", async () => {
     const { handlers, registry } = makeRegistry();
-    const client = { sendInteractiveCard: vi.fn() };
-    const cloudDoc = makeCloudDoc();
-    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
 
-    await expect(handlers["feishu:requirement.plan_approved.render"].execute({
-      input: { requirementId: "reqwf_1", planVersion: 1 }
+    await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", cardMessageId: "om_card", phase: "completed", result: { status: "implementation_ready" } }
+    });
+
+    const [, card] = (client.updateInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("开发完成");
+    expect(cardJson).toContain("结束");
+    expect(cardJson).toContain("act:/requirement verify");
+    expect(cardJson).toContain("取消");
+    expect(cardJson).toContain("act:/requirement plan cancel");
+    expect(cardJson).not.toContain("act:/requirement execute");
+  });
+
+  it("development card (failed phase) shows the error and only a 取消 button", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", cardMessageId: "om_card", phase: "failed", error: "no git repo" }
+    });
+
+    const [, card] = (client.updateInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("开发失败");
+    expect(cardJson).toContain("no git repo");
+    expect(cardJson).toContain("act:/requirement plan cancel");
+    expect(cardJson).not.toContain("act:/requirement verify");
+  });
+
+  it("development render throws when chatId is missing", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await expect(handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { requirementId: "reqwf_1", phase: "developing" }
     })).rejects.toThrow("Missing required field: chatId");
 
     expect(client.sendInteractiveCard).not.toHaveBeenCalled();
-  });
-
-  it("execution_progress card contains 验证 button with act:/requirement verify action", async () => {
-    const { handlers, registry } = makeRegistry();
-    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_exec") };
-    const cloudDoc = makeCloudDoc();
-    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
-
-    await handlers["feishu:requirement.execution_progress.render"].execute({
-      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "done" } }
-    });
-
-    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
-    const cardJson = JSON.stringify(card);
-    expect(cardJson).toContain("act:/requirement verify");
-    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
-    expect(cardJson).toContain("验证");
+    expect(client.updateInteractiveCard).not.toHaveBeenCalled();
   });
 
   it("verification_result card contains 验收 button when result.status is passed", async () => {
@@ -267,14 +280,9 @@ describe("Feishu requirement render effects", () => {
       input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1, markdown: "# Plan", summary: "X" }
     },
     {
-      name: "plan_approved",
-      effect: "feishu:requirement.plan_approved.render",
-      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1 }
-    },
-    {
-      name: "execution_progress",
+      name: "development (completed)",
       effect: "feishu:requirement.execution_progress.render",
-      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "done" } }
+      input: { chatId: "oc_1", requirementId: "reqwf_1", phase: "completed", result: { status: "done" } }
     },
     {
       name: "verification_result (passed)",

@@ -159,46 +159,73 @@ function buildPlanReviewLinkCard(
   };
 }
 
-function buildPlanApprovedCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
-  const planVersion = typeof input.planVersion === "number" ? input.planVersion : 1;
-  const bodyContent = [`**需求 ID**：${requirementId}`, `**计划版本**：v${planVersion}`].join("\n");
-  const executeButton = formSubmitButton(
-    "执行开发",
-    "primary",
-    "submit_requirement_execute",
-    actionValue(requirementId, "act:/requirement execute", planVersion)
-  );
-  return {
-    schema: "2.0",
-    config: { wide_screen_mode: true, update_multi: true },
-    header: { template: "green", title: plainText(`✅ 计划已批准 (v${planVersion}) · ${requirementId}`) },
-    body: {
-      elements: [
-        { tag: "markdown", content: bodyContent },
-        singleButtonForm("requirement_execute_action", executeButton)
-      ]
-    }
-  };
+type DevelopmentPhase = "developing" | "completed" | "failed";
+
+function readDevelopmentPhase(input: RequirementRenderInput): DevelopmentPhase {
+  if (input.phase === "developing" || input.phase === "failed") {
+    return input.phase;
+  }
+  return "completed";
 }
 
-function buildExecutionProgressCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
+// One evolving card across the development phase: approve flips it to
+// "developing" (locked, no buttons) while the agent runs, then to "completed"
+// (结束/取消) or "failed" (取消) when the synchronous run resolves.
+function buildDevelopmentCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
+  const phase = readDevelopmentPhase(input);
+  const base = {
+    schema: "2.0" as const,
+    config: { wide_screen_mode: true as const, update_multi: true as const }
+  };
+  const cancelButton = formSubmitButton(
+    "取消",
+    "danger",
+    "submit_requirement_plan_cancel",
+    actionValue(requirementId, "act:/requirement plan cancel")
+  );
+
+  if (phase === "developing") {
+    return {
+      ...base,
+      header: { template: "blue", title: plainText(`🛠 开发中 · ${requirementId}`) },
+      body: {
+        elements: [{ tag: "markdown", content: [`**需求 ID**：${requirementId}`, "", "正在执行开发，请稍候…"].join("\n") }]
+      }
+    };
+  }
+
+  if (phase === "failed") {
+    const error = typeof input.error === "string" && input.error.length > 0 ? input.error : "开发执行失败";
+    return {
+      ...base,
+      header: { template: "red", title: plainText(`❌ 开发失败 · ${requirementId}`) },
+      body: {
+        elements: [
+          { tag: "markdown", content: [`**需求 ID**：${requirementId}`, "", `开发执行失败：${error}`].join("\n") },
+          { tag: "form", name: "requirement_dev_failed_actions", elements: [cancelButton] }
+        ]
+      }
+    };
+  }
+
   const result = input.result as Record<string, unknown> | undefined;
-  const status = result && typeof result.status === "string" ? result.status : "unknown";
-  const bodyContent = [`**需求 ID**：${requirementId}`, `**状态**：${status}`].join("\n");
-  const verifyButton = formSubmitButton(
-    "验证",
+  const status = result && typeof result.status === "string" ? result.status : "implementation_ready";
+  const finishButton = formSubmitButton(
+    "结束",
     "primary",
     "submit_requirement_verify",
     actionValue(requirementId, "act:/requirement verify")
   );
   return {
-    schema: "2.0",
-    config: { wide_screen_mode: true, update_multi: true },
-    header: { template: "blue", title: plainText(`需求执行进度 · ${requirementId}`) },
+    ...base,
+    header: { template: "green", title: plainText(`✅ 开发完成 · ${requirementId}`) },
     body: {
       elements: [
-        { tag: "markdown", content: bodyContent },
-        singleButtonForm("requirement_verify_action", verifyButton)
+        {
+          tag: "markdown",
+          content: [`**需求 ID**：${requirementId}`, `**状态**：${status}`, "", "开发已完成。点「结束」进入验证，或「取消」放弃本需求。"].join("\n")
+        },
+        { tag: "form", name: "requirement_dev_actions", elements: [finishButton, cancelButton] }
       ]
     }
   };
@@ -282,24 +309,7 @@ function registerPlanReviewEffect(
   });
 }
 
-function registerPlanApprovedEffect(
-  registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
-): void {
-  registry.register({
-    pluginId: "feishu",
-    effectType: "requirement.plan_approved.render",
-    execute: async (effect) => {
-      const input = effect.input as RequirementRenderInput;
-      const { chatId, requirementId } = validateRequiredFields(input);
-      const card = buildPlanApprovedCard(requirementId, input);
-      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
-      return { rendered: true, messageId };
-    }
-  });
-}
-
-function registerExecutionProgressEffect(
+function registerDevelopmentEffect(
   registry: EffectHandlerRegistry,
   client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
 ): void {
@@ -309,7 +319,7 @@ function registerExecutionProgressEffect(
     execute: async (effect) => {
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
-      const card = buildExecutionProgressCard(requirementId, input);
+      const card = buildDevelopmentCard(requirementId, input);
       const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }
@@ -339,8 +349,7 @@ export function registerFeishuRequirementRenderEffects(
   cloudDoc: FeishuCloudDocClientPort
 ): void {
   registerPlanReviewEffect(registry, client, cloudDoc);
-  registerPlanApprovedEffect(registry, client);
-  registerExecutionProgressEffect(registry, client);
+  registerDevelopmentEffect(registry, client);
   registerVerificationResultEffect(registry, client);
   registerSimpleCardEffects(registry, client);
 }

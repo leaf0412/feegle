@@ -414,33 +414,15 @@ describe("parseFeishuCommand", () => {
     ).toEqual({ type: "unknown", raw: expect.any(String) });
   });
 
-  it("parses requirement execute with requirementId and planVersion", () => {
-    expect(
-      parseFeishuCardActionValue({
-        action: "act:/requirement execute",
-        requirement_id: "reqwf_1",
-        plan_version: "2"
-      })
-    ).toEqual({ type: "requirement_execute", requirementId: "reqwf_1", planVersion: 2 });
-  });
-
-  it("treats requirement execute with missing requirement_id as unknown", () => {
-    expect(
-      parseFeishuCardActionValue({
-        action: "act:/requirement execute",
-        plan_version: "1"
-      })
-    ).toEqual({ type: "unknown", raw: expect.any(String) });
-  });
-
-  it("treats requirement execute with invalid plan_version as unknown", () => {
-    expect(
-      parseFeishuCardActionValue({
-        action: "act:/requirement execute",
-        requirement_id: "reqwf_1",
-        plan_version: "0"
-      })
-    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  it("no longer maps act:/requirement execute to a requirement_execute command (approve now develops directly)", () => {
+    const parsed = parseFeishuCardActionValue({
+      action: "act:/requirement execute",
+      requirement_id: "reqwf_1",
+      plan_version: "2"
+    });
+    // the dedicated execute command is gone; it falls through to the generic
+    // platform_action parser and must never be a requirement_execute again.
+    expect(parsed.type).not.toBe("requirement_execute");
   });
 
   it("parses requirement verify with requirementId", () => {

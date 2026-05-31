@@ -8,7 +8,6 @@ export const intentKinds = [
   "requirement_plan_generate",
   "requirement_plan_revise",
   "requirement_plan_approve",
-  "requirement_execute",
   "requirement_verify",
   "requirement_accept",
   "requirement_intake",
