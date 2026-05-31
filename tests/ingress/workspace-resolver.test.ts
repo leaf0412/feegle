@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { WorkspaceStore } from "../../src/workspace/workspace-store.js";
+import { WorkspaceStore } from "../../src/resources/workspace/workspace-store.js";
 import { WorkspaceResolver } from "../../src/ingress/workspace-resolver.js";
 
 describe("WorkspaceResolver", () => {

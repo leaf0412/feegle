@@ -11,7 +11,7 @@ import type { HandlerKind } from "../../../src/scheduler/handler-kind.js";
 import type { Task } from "../../../src/scheduler/task.js";
 import type { FeishuClientPort } from "../../../src/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../../fixtures/fake-feishu-client.js";
-import type { StockStore } from "../../../src/stock/stock-store.js";
+import type { StockStore } from "../../../src/integrations/stock/stock-store.js";
 
 describe("scheduler slash commands", () => {
   it("adds concrete cron, stock, portfolio, and error_target commands to the catalog", () => {

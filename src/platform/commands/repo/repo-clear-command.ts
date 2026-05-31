@@ -1,4 +1,4 @@
-import type { ChatBindingStore } from "../../../repositories/chat-binding-store.js";
+import type { ChatBindingStore } from "../../../resources/repositories/chat-binding-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

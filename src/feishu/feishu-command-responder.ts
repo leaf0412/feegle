@@ -11,8 +11,8 @@ import {
 import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "../platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
-import type { ChatBindingStore } from "../repositories/chat-binding-store.js";
-import type { RepositoryStore } from "../repositories/repository-store.js";
+import type { ChatBindingStore } from "../resources/repositories/chat-binding-store.js";
+import type { RepositoryStore } from "../resources/repositories/repository-store.js";
 import { bindRepositoryToScope, formatBoundRepoLines } from "../platform/commands/repo/repo-binding.js";
 import {
   buildBindPromptSupersededCard,

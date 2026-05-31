@@ -2,7 +2,7 @@ import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
 import { buildSlashCommandRegistry } from "../../platform/build-slash-command-registry.js";
-import { InMemoryRepositoryRegistry } from "../../repositories/repository-registry.js";
+import { InMemoryRepositoryRegistry } from "../../resources/repositories/repository-registry.js";
 import type { TaskScheduler } from "../../scheduler/task-scheduler.js";
 
 export interface CommandsPhaseDeps {
@@ -34,7 +34,10 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         "chatHistory",
         "aliasStore",
         "controlActionProcessor",
-        "workflowRuntime"
+        "workflowRuntime",
+        "memoryService",
+        "runtimeInspectionService",
+        "recoveryService"
       );
       const registry = buildSlashCommandRegistry({
         feegleHome: deps.feegleHome,
@@ -57,6 +60,9 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         aliasStore: cap.aliasStore,
         controlActionProcessor: cap.controlActionProcessor,
         workflowRuntime: cap.workflowRuntime,
+        memoryService: cap.memoryService,
+        runtimeInspectionService: cap.runtimeInspectionService,
+        recoveryService: cap.recoveryService,
         modules: deps.contributions.slashCommands,
         defaults: false
       });

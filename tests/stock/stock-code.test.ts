@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InvalidStockCodeError, normalizeStockCode } from "../../src/stock/stock-code.js";
+import { InvalidStockCodeError, normalizeStockCode } from "../../src/integrations/stock/stock-code.js";
 
 describe("normalizeStockCode", () => {
   it.each([

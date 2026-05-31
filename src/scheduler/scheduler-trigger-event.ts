@@ -6,6 +6,7 @@ export function taskToTriggerEvent(input: {
   taskId: string;
   taskName: string;
   kind: string;
+  recoveryMetadata?: Record<string, unknown>;
 }): TriggerEvent {
   return {
     triggerEventId: input.triggerEventId,
@@ -18,7 +19,8 @@ export function taskToTriggerEvent(input: {
     external: {
       taskId: input.taskId,
       taskName: input.taskName,
-      kind: input.kind
+      kind: input.kind,
+      ...(input.recoveryMetadata ? { recoveryMetadata: input.recoveryMetadata } : {})
     },
     actorHint: { kind: "scheduler" },
     payloadSummary: {

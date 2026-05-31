@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gitlabEventToTriggerEvent } from "../../src/gitlab/gitlab-trigger-event-adapter.js";
+import { gitlabEventToTriggerEvent } from "../../src/integrations/gitlab/gitlab-trigger-event-adapter.js";
 
 describe("gitlab trigger event adapter", () => {
   it("converts an issue event to a TriggerEvent", () => {

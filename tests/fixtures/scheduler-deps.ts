@@ -4,8 +4,8 @@ import type { ConfigStorePort } from "../../src/app/config-store.js";
 import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
 import type { TaskRegistry } from "../../src/scheduler/task-registry.js";
 import type { TaskScheduler } from "../../src/scheduler/task-scheduler.js";
-import type { QuoteClient } from "../../src/stock/stock-quote-port.js";
-import type { StockStore } from "../../src/stock/stock-store.js";
+import type { QuoteClient } from "../../src/integrations/stock/stock-quote-port.js";
+import type { StockStore } from "../../src/integrations/stock/stock-store.js";
 import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-module.js";
 
 /**

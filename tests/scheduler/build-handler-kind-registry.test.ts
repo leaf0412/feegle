@@ -4,7 +4,7 @@ import { BootContext } from "../../src/boot/boot-context.js";
 import { buildHandlerKindRegistry } from "../../src/scheduler/build-handler-kind-registry.js";
 import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
 import { TaskRegistry } from "../../src/scheduler/task-registry.js";
-import type { StockStore } from "../../src/stock/stock-store.js";
+import type { StockStore } from "../../src/integrations/stock/stock-store.js";
 
 function contextWithCoreCaps(): BootContext {
   const ctx = new BootContext();

@@ -4,7 +4,7 @@ import {
   stockMonitorKindModule,
   stockPortfolioSnapshotKindModule
 } from "../../scheduler/default-handler-kind-modules.js";
-import { defaultQuoteClientModules } from "../../stock/default-quote-client-modules.js";
+import { defaultQuoteClientModules } from "../../integrations/stock/default-quote-client-modules.js";
 
 export const stockPlugin: FeeglePlugin = {
   id: "stock",

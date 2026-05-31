@@ -17,8 +17,19 @@ import type { Task, TaskLastRun, TaskRunStatus } from "./task.js";
 import type { Clock, DailyDedupStore, HostInfoProvider, Logger } from "./task-context.js";
 import type { TaskMutationObserver, TaskRegistry } from "./task-registry.js";
 
+const RUNTIME_NATIVE_KINDS = new Set(["heartbeat", "agent_prompt"]);
+
 interface ConfigStorePort {
   get(): Readonly<FeegleConfig>;
+}
+
+export interface SchedulerWorkflowRunner {
+  startScheduledTask(input: {
+    taskId: string;
+    kind: string;
+    payload: Record<string, unknown>;
+    now: string;
+  }): Promise<{ status: "succeeded" | "failed" }>;
 }
 
 export interface TaskSchedulerDeps {
@@ -36,6 +47,7 @@ export interface TaskSchedulerDeps {
   hooks?: HookManager;
   runtimeObserver?: Pick<SchedulerRuntimeObserver, "beforeTaskRun">;
   runtimeWorkspaceId?: string;
+  workflowRunner?: SchedulerWorkflowRunner;
   recovery?: {
     createDiagnosticBundle(input: {
       artifactId: string;
@@ -158,6 +170,27 @@ export class TaskScheduler implements TaskMutationObserver {
 
     const startedAt = Date.now();
     try {
+      // Route supported kinds through the workflow runner
+      if (this.deps.workflowRunner && RUNTIME_NATIVE_KINDS.has(task.kind)) {
+        const result = await this.deps.workflowRunner.startScheduledTask({
+          taskId: task.id,
+          kind: task.kind,
+          payload: task.params,
+          now: now.toISOString(),
+        });
+        const durationMs = Date.now() - startedAt;
+        if (result.status === "succeeded") {
+          const lastRun = await this.applySuccess(task, "ok", durationMs, undefined, now);
+          this.hooks?.emit({
+            event: "task.completed",
+            content: "workflow-succeeded",
+            extra: { taskId: task.id, taskName: task.name, kind: task.kind, durationMs }
+          });
+          return lastRun;
+        }
+        throw new Error("Scheduler workflow runner returned failed");
+      }
+
       const kind = this.deps.kinds.get(task.kind);
       if (!kind) {
         throw new Error(`Unknown kind: ${task.kind}`);

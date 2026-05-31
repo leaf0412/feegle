@@ -6,6 +6,7 @@ import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runt
 import { corePlugin } from "../plugins/core/core-plugin.js";
 import { stockPlugin } from "../plugins/stock/stock-plugin.js";
 import { gitlabFollowPlugin } from "../plugins/gitlab-follow/gitlab-follow-plugin.js";
+import { webhookPlugin } from "../plugins/webhook/webhook-plugin.js";
 import { createFeishuPlugin } from "../plugins/feishu/feishu-plugin.js";
 
 export interface DefaultPluginDeps {
@@ -18,6 +19,7 @@ export interface DefaultPluginDeps {
 export function defaultPlugins(deps: DefaultPluginDeps): FeeglePlugin[] {
   return [
     corePlugin,
+    webhookPlugin,
     stockPlugin,
     gitlabFollowPlugin,
     createFeishuPlugin({

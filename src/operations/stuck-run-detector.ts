@@ -13,12 +13,10 @@ export class StuckRunDetector {
   ) {}
 
   detect(nowIso: string): StuckRun[] {
-    const interrupted = this.store.markRunningAttemptsInterrupted(nowIso);
-    // Returns count of interrupted attempts; actual attempt IDs aren't returned
-    // In production, extend RuntimeStore to return more detail
-    if (interrupted > 0) {
-      return [{ attemptId: "multiple", workflowInstanceId: "multiple", status: "interrupted" }];
-    }
-    return [];
+    return this.store.listRunningAttemptsOlderThan(nowIso, this.maxRunningMs).map((row) => ({
+      attemptId: row.id,
+      workflowInstanceId: row.workflowInstanceId,
+      status: row.status
+    }));
   }
 }

@@ -11,8 +11,8 @@ import type { FeishuCommandHandler } from "../feishu/feishu-long-connection-runt
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
 import type { Task } from "../scheduler/task.js";
-import { defaultQuoteClientId } from "../stock/default-quote-client-modules.js";
-import type { QuoteClientModule } from "../stock/quote-client-module.js";
+import { defaultQuoteClientId } from "../integrations/stock/default-quote-client-modules.js";
+import type { QuoteClientModule } from "../integrations/stock/quote-client-module.js";
 import type { ConfigStorePort, ConfigStoreProviderWriter } from "./config-store.js";
 import type { HookManager } from "./hooks.js";
 import type { NotificationBroker } from "./notification-broker.js";

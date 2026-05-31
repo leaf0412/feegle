@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { GlsumCommandHandler } from "../../../../src/platform/commands/glsum/glsum-command-handler.js";
 import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
-import type { GitLabClient } from "../../../../src/gitlab/gitlab-client.js";
+import type { GitLabClient } from "../../../../src/integrations/gitlab/gitlab-client.js";
 import type { AgentCli } from "../../../../src/agent/agent-cli.js";
 import type { PipelineHooks } from "../../../../src/platform/pipeline-hooks.js";
 

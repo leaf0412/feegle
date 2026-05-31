@@ -4,10 +4,10 @@ import type { Contributions } from "../feegle-plugin.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
 import { buildNotificationBroker } from "../../app/build-notification-broker.js";
 import { GitService } from "../../git/git-service.js";
-import { GitLabClient } from "../../gitlab/gitlab-client.js";
-import { GitLabFollowStore } from "../../gitlab/gitlab-follow-store.js";
+import { GitLabClient } from "../../integrations/gitlab/gitlab-client.js";
+import { GitLabFollowStore } from "../../integrations/gitlab/gitlab-follow-store.js";
 import type { FeishuClientPort } from "../../feishu/feishu-client.js";
-import { buildQuoteClientRegistry } from "../../stock/build-quote-client-registry.js";
+import { buildQuoteClientRegistry } from "../../integrations/stock/build-quote-client-registry.js";
 
 export interface ProvidersPhaseDeps {
   feishuClient: FeishuClientPort;

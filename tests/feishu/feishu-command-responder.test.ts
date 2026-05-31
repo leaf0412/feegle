@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
 import { migrate } from "../../src/app/runtime-db.js";
-import { RepositoryStore } from "../../src/repositories/repository-store.js";
-import { ChatBindingStore } from "../../src/repositories/chat-binding-store.js";
+import { RepositoryStore } from "../../src/resources/repositories/repository-store.js";
+import { ChatBindingStore } from "../../src/resources/repositories/chat-binding-store.js";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
@@ -743,8 +743,8 @@ function trackingClient(): {
 
 function fakeBindingStore(
   bindings: Record<string, { repositoryIds: string[] }>
-): import("../../src/repositories/chat-binding-store.js").ChatBindingStore {
-  return { get: (id: string) => bindings[id] } as unknown as import("../../src/repositories/chat-binding-store.js").ChatBindingStore;
+): import("../../src/resources/repositories/chat-binding-store.js").ChatBindingStore {
+  return { get: (id: string) => bindings[id] } as unknown as import("../../src/resources/repositories/chat-binding-store.js").ChatBindingStore;
 }
 
 function testRegistry(repositories: RepositoryRecord[] = []): SlashCommandRegistry {

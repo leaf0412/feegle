@@ -1,5 +1,6 @@
 import type { RuntimeStore } from "../runtime/runtime-store.js";
 import type { RuntimeDb } from "../app/runtime-db.js";
+import type { StuckRunDetector } from "./stuck-run-detector.js";
 
 export type HealthStatus = "pass" | "warn" | "fail";
 
@@ -17,7 +18,8 @@ export interface HealthReport {
 export class RuntimeHealthService {
   constructor(
     private readonly store: RuntimeStore,
-    private readonly db: RuntimeDb
+    private readonly db: RuntimeDb,
+    private readonly stuckDetector: StuckRunDetector
   ) {}
 
   async check(): Promise<HealthReport> {
@@ -31,11 +33,16 @@ export class RuntimeHealthService {
       checks.push({ name: "db_available", status: "fail", detail: "SQLite unresponsive" });
     }
 
-    // Check stuck running attempts
+    // Check stuck running attempts (read-only, no mutation)
     try {
-      const interrupted = this.store.markRunningAttemptsInterrupted(new Date().toISOString());
-      if (interrupted > 0) {
-        checks.push({ name: "stuck_attempts", status: "warn", detail: `${interrupted} running attempts marked interrupted` });
+      const nowIso = new Date().toISOString();
+      const stuck = this.stuckDetector.detect(nowIso);
+      if (stuck.length > 0) {
+        checks.push({
+          name: "stuck_attempts",
+          status: "warn",
+          detail: `${stuck.length} running attempts appear stuck: ${stuck.map((s) => s.attemptId).join(", ")}`
+        });
       } else {
         checks.push({ name: "stuck_attempts", status: "pass", detail: "no stuck attempts" });
       }

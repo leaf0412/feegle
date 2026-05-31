@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { migrate, type RuntimeDb } from "../../src/app/runtime-db.js";
 import { migrateLegacyChatBindingsJson } from "../../src/boot/phases/stores-phase.js";
-import { ChatBindingStore } from "../../src/repositories/chat-binding-store.js";
+import { ChatBindingStore } from "../../src/resources/repositories/chat-binding-store.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

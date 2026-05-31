@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { matchThresholds, pnlForEntry, riskLevel } from "../../src/stock/stock-domain.js";
-import type { PortfolioEntry } from "../../src/stock/stock-store-types.js";
-import type { Quote } from "../../src/stock/stock-quote-port.js";
+import { matchThresholds, pnlForEntry, riskLevel } from "../../src/integrations/stock/stock-domain.js";
+import type { PortfolioEntry } from "../../src/integrations/stock/stock-store-types.js";
+import type { Quote } from "../../src/integrations/stock/stock-quote-port.js";
 
 const quote: Quote = {
   stockCode: "sh600519",

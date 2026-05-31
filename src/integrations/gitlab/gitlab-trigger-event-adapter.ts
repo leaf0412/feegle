@@ -1,4 +1,4 @@
-import type { TriggerEvent } from "../ingress/trigger-event.js";
+import type { TriggerEvent } from "../../ingress/trigger-event.js";
 
 export function gitlabEventToTriggerEvent(input: {
   triggerEventId: string;

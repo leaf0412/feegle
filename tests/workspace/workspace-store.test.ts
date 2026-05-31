@@ -7,8 +7,8 @@ import {
   workspaceRoles,
   type ConversationBindingRecord,
   type WorkspaceRecord
-} from "../../src/workspace/workspace-models.js";
-import { WorkspaceStore } from "../../src/workspace/workspace-store.js";
+} from "../../src/resources/workspace/workspace-models.js";
+import { WorkspaceStore } from "../../src/resources/workspace/workspace-store.js";
 
 describe("workspace models", () => {
   it("defines workspace roles so permission code has a stable enum source", () => {

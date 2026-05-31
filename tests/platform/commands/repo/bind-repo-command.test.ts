@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate, type RuntimeDb } from "../../../../src/app/runtime-db.js";
-import { RepositoryStore } from "../../../../src/repositories/repository-store.js";
-import { ChatBindingStore } from "../../../../src/repositories/chat-binding-store.js";
+import { RepositoryStore } from "../../../../src/resources/repositories/repository-store.js";
+import { ChatBindingStore } from "../../../../src/resources/repositories/chat-binding-store.js";
 import { BindRepoCommandHandler } from "../../../../src/platform/commands/repo/bind-repo-command.js";
 import type { SlashCommandContext } from "../../../../src/platform/slash-command-handler.js";
 

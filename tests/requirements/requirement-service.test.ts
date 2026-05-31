@@ -1,8 +1,8 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { InMemoryRepositoryRegistry } from "../../src/repositories/repository-registry.js";
+import { InMemoryRepositoryRegistry } from "../../src/resources/repositories/repository-registry.js";
 import { RequirementService } from "../../src/requirements/requirement-service.js";
-import { WorkspaceManager } from "../../src/workspace/workspace-manager.js";
+import { WorkspaceManager } from "../../src/resources/workspace/workspace-manager.js";
 
 describe("RequirementService", () => {
   it("starts one active requirement per chat and selects multiple repositories", () => {

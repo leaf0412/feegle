@@ -17,11 +17,14 @@ import { IntentResolverRegistry } from "../../ingress/intent-resolver-registry.j
 import { PermissionPolicy } from "../../ingress/permission-policy.js";
 import { WorkflowSelector } from "../../ingress/workflow-selector.js";
 import { WorkspaceResolver } from "../../ingress/workspace-resolver.js";
-import { WorkspaceStore } from "../../workspace/workspace-store.js";
+import { WorkspaceStore } from "../../resources/workspace/workspace-store.js";
+import { MemoryService } from "../../memory/memory-service.js";
 import { MemoryStore } from "../../memory/memory-store.js";
+import { RuntimeInspectionService } from "../../operations/runtime-inspection-service.js";
+import { RecoveryService } from "../../recovery/recovery-service.js";
 import { AliasStore } from "../../platform/commands/alias-store.js";
-import { ChatBindingStore } from "../../repositories/chat-binding-store.js";
-import { RepositoryRecordSchema, RepositoryStore } from "../../repositories/repository-store.js";
+import { ChatBindingStore } from "../../resources/repositories/chat-binding-store.js";
+import { RepositoryRecordSchema, RepositoryStore } from "../../resources/repositories/repository-store.js";
 import { EffectHandlerRegistry } from "../../runtime/effect-handler-registry.js";
 import { RuntimeEffectExecutor } from "../../runtime/runtime-effect-executor.js";
 import { RuntimeStore } from "../../runtime/runtime-store.js";
@@ -32,7 +35,7 @@ import { RunsLog } from "../../scheduler/runs-log.js";
 import { TaskRegistry } from "../../scheduler/task-registry.js";
 import { TaskStore } from "../../scheduler/task-store.js";
 import type { Task } from "../../scheduler/task.js";
-import { StockStore } from "../../stock/stock-store.js";
+import { StockStore } from "../../integrations/stock/stock-store.js";
 
 import type { PluginProvision } from "../feegle-plugin.js";
 
@@ -69,7 +72,16 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("workflowRuntime", new WorkflowRuntime(runtimeStore, workflowRegistry, effectExecutor));
       ctx.provide("artifactStore", artifactStore);
       ctx.provide("artifactService", new ArtifactService(artifactStore, join(deps.feegleHome, "artifacts")));
-      ctx.provide("memoryStore", new MemoryStore(runtimeDb));
+      const memoryStore = new MemoryStore(runtimeDb);
+      ctx.provide("memoryStore", memoryStore);
+      ctx.provide("memoryService", new MemoryService(memoryStore));
+      ctx.provide("runtimeInspectionService", new RuntimeInspectionService(runtimeStore));
+      ctx.provide("recoveryService", new RecoveryService(
+        ctx.require("artifactService"),
+        runtimeStore,
+        artifactStore,
+        memoryStore
+      ));
       const controlActionStore = new ControlActionStore(runtimeDb);
       ctx.provide("controlActionStore", controlActionStore);
       ctx.provide(

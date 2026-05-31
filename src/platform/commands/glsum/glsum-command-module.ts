@@ -1,6 +1,6 @@
 import type { SlashCommandModule } from "../../slash-command-module.js";
 import { defineSlashCommand } from "../../slash-command-catalog.js";
-import { GitLabClient } from "../../../gitlab/gitlab-client.js";
+import { GitLabClient } from "../../../integrations/gitlab/gitlab-client.js";
 import { consolePipelineHooks } from "../../pipeline-hooks.js";
 import { GlsumCommandHandler } from "./glsum-command-handler.js";
 

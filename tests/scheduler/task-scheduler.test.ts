@@ -140,6 +140,111 @@ describe("TaskScheduler", () => {
 
     expect(calls).toEqual(["runtime", "handler"]);
   });
+
+  it("routes supported kind through workflow runner and skips legacy handler", async () => {
+    const task = makeTask("task-runtime");
+    const registry = new TaskRegistry(memoryStore([task], []));
+    const calls: string[] = [];
+    const kind: HandlerKind<Record<string, never>> = {
+      id: "heartbeat",
+      title: "Heartbeat",
+      description: "test",
+      parseParams: () => ({}),
+      describeParams: () => "none",
+      run: async () => {
+        calls.push("legacy-handler");
+        return { outcome: "sent" };
+      }
+    };
+    const scheduler = new TaskScheduler({
+      registry,
+      kinds: new HandlerKindRegistry().register(kind),
+      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
+      dedup: { checkAndMark: async () => true },
+      runsLog: { append: async () => {} },
+      notify: { sendText: async () => {}, sendCard: async () => {} },
+      agents: new AgentProviderRegistry(),
+      host: { read: async () => ({ hostname: "local", pid: 1 }) },
+      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
+      logger: silentLogger,
+      workflowRunner: {
+        startScheduledTask: async () => {
+          calls.push("workflow-runner");
+          return { status: "succeeded" };
+        }
+      }
+    });
+
+    await scheduler.runOnce("task-runtime");
+
+    expect(calls).toEqual(["workflow-runner"]);
+  });
+
+  it("routes unsupported kind through legacy handler and skips workflow runner", async () => {
+    const task = makeTask("task-legacy", { kind: "stock-monitor" });
+    const registry = new TaskRegistry(memoryStore([task], []));
+    const calls: string[] = [];
+    const kind: HandlerKind<Record<string, never>> = {
+      id: "stock-monitor",
+      title: "Stock Monitor",
+      description: "test",
+      parseParams: () => ({}),
+      describeParams: () => "none",
+      run: async () => {
+        calls.push("legacy-handler");
+        return { outcome: "sent" };
+      }
+    };
+    const scheduler = new TaskScheduler({
+      registry,
+      kinds: new HandlerKindRegistry().register(kind),
+      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
+      dedup: { checkAndMark: async () => true },
+      runsLog: { append: async () => {} },
+      notify: { sendText: async () => {}, sendCard: async () => {} },
+      agents: new AgentProviderRegistry(),
+      host: { read: async () => ({ hostname: "local", pid: 1 }) },
+      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
+      logger: silentLogger,
+      workflowRunner: {
+        startScheduledTask: async () => {
+          calls.push("workflow-runner");
+          return { status: "succeeded" };
+        }
+      }
+    });
+
+    await scheduler.runOnce("task-legacy");
+
+    expect(calls).toEqual(["legacy-handler"]);
+  });
+
+  it("handles workflow runner failure through normal failure path", async () => {
+    const task = makeTask("task-runtime-fail");
+    const written: Task[] = [];
+    const registry = new TaskRegistry(memoryStore([task], written));
+    const scheduler = new TaskScheduler({
+      registry,
+      kinds: new HandlerKindRegistry(),
+      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
+      dedup: { checkAndMark: async () => true },
+      runsLog: { append: async () => {} },
+      notify: { sendText: async () => {}, sendCard: async () => {} },
+      agents: new AgentProviderRegistry(),
+      host: { read: async () => ({ hostname: "local", pid: 1 }) },
+      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
+      logger: silentLogger,
+      workflowRunner: {
+        startScheduledTask: async () => {
+          return { status: "failed" };
+        }
+      }
+    });
+
+    await expect(scheduler.runOnce("task-runtime-fail")).rejects.toThrow("Scheduler workflow runner returned failed");
+    expect(written.at(-1)?.lastRun?.status).toBe("failed");
+    expect(written.at(-1)?.consecutiveFailures).toBe(1);
+  });
 });
 
 const silentLogger = {

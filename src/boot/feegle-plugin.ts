@@ -3,7 +3,7 @@ import type { NotificationAdapterModule } from "../app/notification-adapter-modu
 import type { SlashCommandModule } from "../platform/slash-command-module.js";
 import type { RuntimeContributionContext } from "../runtime/runtime-contribution-context.js";
 import type { HandlerKindModule } from "../scheduler/handler-kind-module.js";
-import type { QuoteClientModule } from "../stock/quote-client-module.js";
+import type { QuoteClientModule } from "../integrations/stock/quote-client-module.js";
 import type { BootContext, CapabilityContext } from "./boot-context.js";
 import type { BootPhaseName } from "./boot-phase.js";
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { WebhookSourceStore } from "../../src/webhook/webhook-source-store.js";
+import { WebhookSourceStore } from "../../src/integrations/webhook/webhook-source-store.js";
 
 describe("WebhookSourceStore", () => {
   let tempDir: string;

@@ -26,6 +26,43 @@ export interface EffectExecutionView {
   outputSummary: unknown;
 }
 
+export interface WorkflowSummaryRow {
+  id: string;
+  status: string;
+  currentStepId: string | null;
+  definitionId: string | null;
+}
+
+export interface RunAttemptSummaryRow {
+  id: string;
+  status: string;
+  workflowInstanceId: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface StepSummaryRow {
+  id: string;
+  stepId: string;
+  status: string;
+  runAttemptId: string;
+}
+
+export interface EffectSummaryRow {
+  id: string;
+  pluginId: string;
+  effectType: string;
+  status: string;
+  runAttemptId: string;
+}
+
+export interface RunningAttemptRow {
+  id: string;
+  workflowInstanceId: string;
+  status: string;
+  createdAt: string;
+}
+
 export function encodeJson(value: unknown): string | null {
   return value === undefined || value === null ? null : JSON.stringify(value);
 }
@@ -426,5 +463,122 @@ export class RuntimeStore {
     return row
       ? { id: row.id, status: row.status, outputSummary: decodeJson(row.output_summary_json) }
       : undefined;
+  }
+
+  // ---- Read-only projection queries ----
+
+  listWorkflowSummaries(workspaceId: string): WorkflowSummaryRow[] {
+    const rows = this.db
+      .prepare(
+        `select id, status, current_step_id, definition_id
+         from workflow_instances
+         where workspace_id = ?
+         order by created_at desc`
+      )
+      .all(workspaceId) as Array<{
+        id: string;
+        status: string;
+        current_step_id: string | null;
+        definition_id: string | null;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      currentStepId: row.current_step_id,
+      definitionId: row.definition_id
+    }));
+  }
+
+  listRunAttempts(workflowInstanceId: string): RunAttemptSummaryRow[] {
+    const rows = this.db
+      .prepare(
+        `select id, status, workflow_instance_id, created_at, finished_at
+         from run_attempts
+         where workflow_instance_id = ?
+         order by created_at asc`
+      )
+      .all(workflowInstanceId) as Array<{
+        id: string;
+        status: string;
+        workflow_instance_id: string;
+        created_at: string;
+        finished_at: string | null;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      workflowInstanceId: row.workflow_instance_id,
+      createdAt: row.created_at,
+      finishedAt: row.finished_at
+    }));
+  }
+
+  listStepSummaries(workflowInstanceId: string): StepSummaryRow[] {
+    const rows = this.db
+      .prepare(
+        `select id, step_id, status, run_attempt_id
+         from step_states
+         where workflow_instance_id = ?
+         order by created_at asc`
+      )
+      .all(workflowInstanceId) as Array<{
+        id: string;
+        step_id: string;
+        status: string;
+        run_attempt_id: string;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      stepId: row.step_id,
+      status: row.status,
+      runAttemptId: row.run_attempt_id
+    }));
+  }
+
+  listEffectSummaries(runAttemptId: string): EffectSummaryRow[] {
+    const rows = this.db
+      .prepare(
+        `select id, plugin_id, effect_type, status, run_attempt_id
+         from effect_executions
+         where run_attempt_id = ?
+         order by created_at asc`
+      )
+      .all(runAttemptId) as Array<{
+        id: string;
+        plugin_id: string;
+        effect_type: string;
+        status: string;
+        run_attempt_id: string;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      pluginId: row.plugin_id,
+      effectType: row.effect_type,
+      status: row.status,
+      runAttemptId: row.run_attempt_id
+    }));
+  }
+
+  listRunningAttemptsOlderThan(now: string, maxAgeMs: number): RunningAttemptRow[] {
+    const cutoff = new Date(new Date(now).getTime() - maxAgeMs).toISOString();
+    const rows = this.db
+      .prepare(
+        `select id, workflow_instance_id, status, created_at
+         from run_attempts
+         where status = 'running' and created_at < ?
+         order by created_at asc`
+      )
+      .all(cutoff) as Array<{
+        id: string;
+        workflow_instance_id: string;
+        status: string;
+        created_at: string;
+      }>;
+    return rows.map((row) => ({
+      id: row.id,
+      workflowInstanceId: row.workflow_instance_id,
+      status: row.status,
+      createdAt: row.created_at
+    }));
   }
 }

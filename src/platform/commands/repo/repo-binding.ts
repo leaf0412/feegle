@@ -1,6 +1,6 @@
 import type { RepositoryRecord } from "../../../domain/models.js";
-import type { ChatBinding, ChatBindingStore } from "../../../repositories/chat-binding-store.js";
-import type { RepositoryStore } from "../../../repositories/repository-store.js";
+import type { ChatBinding, ChatBindingStore } from "../../../resources/repositories/chat-binding-store.js";
+import type { RepositoryStore } from "../../../resources/repositories/repository-store.js";
 import { deriveRepositoryName } from "./repo-url.js";
 
 export interface RepoBindingStores {

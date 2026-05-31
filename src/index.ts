@@ -45,8 +45,8 @@ export type { NotificationPort, NotificationTarget } from "./app/notification-po
 export { ConfigStore } from "./app/config-store.js";
 export { TaskScheduler } from "./scheduler/task-scheduler.js";
 export type { Task } from "./scheduler/task.js";
-export { StockStore } from "./stock/stock-store.js";
-export type { Quote, QuoteClient } from "./stock/stock-quote-port.js";
+export { StockStore } from "./integrations/stock/stock-store.js";
+export type { Quote, QuoteClient } from "./integrations/stock/stock-quote-port.js";
 export {
   FeishuLongConnectionRuntime,
   type FeishuCommandHandler,

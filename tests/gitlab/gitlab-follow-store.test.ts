@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { GitLabFollowStore } from "../../src/gitlab/gitlab-follow-store.js";
+import { GitLabFollowStore } from "../../src/integrations/gitlab/gitlab-follow-store.js";
 
 describe("GitLabFollowStore", () => {
   let home: string;

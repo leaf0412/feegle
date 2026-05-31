@@ -17,14 +17,13 @@ export interface RuntimeInspection {
 export class RuntimeInspectionService {
   constructor(private readonly store: RuntimeStore) {}
 
-  // RuntimeStore doesn't have a listAllWorkflows method, so this is a placeholder
-  // In production, add listWorkflows() to RuntimeStore
   async inspect(workspaceId: string): Promise<RuntimeInspection> {
+    const workflows = this.store.listWorkflowSummaries(workspaceId);
     return {
-      workflows: [],
-      totalWorkflows: 0,
-      waitingCount: 0,
-      failedCount: 0
+      workflows,
+      totalWorkflows: workflows.length,
+      waitingCount: workflows.filter((w) => w.status === "waiting").length,
+      failedCount: workflows.filter((w) => w.status === "failed").length
     };
   }
 }

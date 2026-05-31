@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildQuoteClientRegistry } from "../../src/stock/build-quote-client-registry.js";
-import type { QuoteClient } from "../../src/stock/stock-quote-port.js";
+import { buildQuoteClientRegistry } from "../../src/integrations/stock/build-quote-client-registry.js";
+import type { QuoteClient } from "../../src/integrations/stock/stock-quote-port.js";
 
 describe("buildQuoteClientRegistry", () => {
   it("lets external modules register quote clients without editing the app entry", () => {

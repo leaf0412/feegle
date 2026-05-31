@@ -3,8 +3,8 @@ import type { HandlerKindRegistry } from "../../scheduler/handler-kind-registry.
 import type { RunsLog } from "../../scheduler/runs-log.js";
 import type { TaskScheduler } from "../../scheduler/task-scheduler.js";
 import type { TaskRegistry } from "../../scheduler/task-registry.js";
-import type { QuoteClient } from "../../stock/stock-quote-port.js";
-import type { StockStore } from "../../stock/stock-store.js";
+import type { QuoteClient } from "../../integrations/stock/stock-quote-port.js";
+import type { StockStore } from "../../integrations/stock/stock-store.js";
 
 export interface SchedulerCommandDeps {
   ownerEmails: ReadonlySet<string>;

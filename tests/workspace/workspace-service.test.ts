@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { WorkspaceService } from "../../src/workspace/workspace-service.js";
-import { WorkspaceStore } from "../../src/workspace/workspace-store.js";
+import { WorkspaceService } from "../../src/resources/workspace/workspace-service.js";
+import { WorkspaceStore } from "../../src/resources/workspace/workspace-store.js";
 
 describe("WorkspaceService", () => {
   let tempDir: string;

@@ -2,10 +2,10 @@ import { z } from "zod";
 import { localDateString } from "../active-hours.js";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";
 import type { TaskContext } from "../task-context.js";
-import type { QuoteClient } from "../../stock/stock-quote-port.js";
-import type { StockCode } from "../../stock/stock-code.js";
-import type { PortfolioEntry, Subscription } from "../../stock/stock-store-types.js";
-import { matchThresholds } from "../../stock/stock-domain.js";
+import type { QuoteClient } from "../../integrations/stock/stock-quote-port.js";
+import type { StockCode } from "../../integrations/stock/stock-code.js";
+import type { PortfolioEntry, Subscription } from "../../integrations/stock/stock-store-types.js";
+import { matchThresholds } from "../../integrations/stock/stock-domain.js";
 import { buildMonitorCard } from "./build-monitor-card.js";
 
 const ParamsSchema = z

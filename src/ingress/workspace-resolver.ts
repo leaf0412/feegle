@@ -1,4 +1,4 @@
-import type { WorkspaceStore } from "../workspace/workspace-store.js";
+import type { WorkspaceStore } from "../resources/workspace/workspace-store.js";
 
 export type ResolvedWorkspace =
   | { status: "resolved"; workspaceId: string; projectId: string | null; conversationKey: string }

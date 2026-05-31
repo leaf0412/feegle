@@ -1,5 +1,5 @@
 import { execa } from "execa";
-import type { RepositoryStore } from "../../../repositories/repository-store.js";
+import type { RepositoryStore } from "../../../resources/repositories/repository-store.js";
 import { isOwner } from "../../owner-access.js";
 import type {
   SlashCommandContext,

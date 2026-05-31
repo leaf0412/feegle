@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { RepositoryStore } from "../../src/repositories/repository-store.js";
+import { RepositoryStore } from "../../src/resources/repositories/repository-store.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");
