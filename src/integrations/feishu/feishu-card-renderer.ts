@@ -1,4 +1,4 @@
-import type { PlatformCard, PlatformCardButton } from "../platform/platform-card.js";
+import type { PlatformCard, PlatformCardButton } from "../../platform/platform-card.js";
 
 export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Record<string, unknown> {
   const result: Record<string, unknown> = {

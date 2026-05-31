@@ -5,7 +5,7 @@ import {
   detectFeishuFileType,
   detectMimeType,
   predictMsgType
-} from "../../src/feishu/feishu-mime.js";
+} from "../../src/integrations/feishu/feishu-mime.js";
 
 describe("detectMimeType", () => {
   it("sniffs PNG / JPEG / GIF / WEBP magic bytes", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFeishuCardActionValue, parseFeishuCommand } from "../../src/feishu/feishu-gateway.js";
+import { parseFeishuCardActionValue, parseFeishuCommand } from "../../src/integrations/feishu/feishu-gateway.js";
 
 describe("parseFeishuCommand", () => {
   it("parses repo selection with multiple repository ids", () => {

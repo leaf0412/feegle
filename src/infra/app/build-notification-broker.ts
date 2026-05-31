@@ -1,4 +1,4 @@
-import { FeishuNotificationAdapter } from "../../feishu/feishu-notification-adapter.js";
+import { FeishuNotificationAdapter } from "../../integrations/feishu/feishu-notification-adapter.js";
 import { NotificationBroker } from "./notification-broker.js";
 import type { NotificationAdapterDeps, NotificationAdapterModule } from "./notification-adapter-module.js";
 

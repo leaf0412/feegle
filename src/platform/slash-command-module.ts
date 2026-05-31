@@ -1,4 +1,4 @@
-import type { FeishuUserDirectory } from "../feishu/feishu-user-directory.js";
+import type { FeishuUserDirectory } from "../integrations/feishu/feishu-user-directory.js";
 import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "../agent/chat-history-store.js";
 import type { ProviderStorePort } from "../agent/provider-store.js";

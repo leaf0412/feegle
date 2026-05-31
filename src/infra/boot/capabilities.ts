@@ -15,7 +15,7 @@ import type { RecoveryService } from "../../core/recovery/recovery-service.js";
 import type { GitService } from "../git/git-service.js";
 import type { GitLabClient } from "../../integrations/gitlab/gitlab-client.js";
 import type { GitLabFollowStore } from "../../integrations/gitlab/gitlab-follow-store.js";
-import type { FeishuUserDirectory } from "../../feishu/feishu-user-directory.js";
+import type { FeishuUserDirectory } from "../../integrations/feishu/feishu-user-directory.js";
 import type { IdentityResolverPort } from "../../ingress/identity-resolver.js";
 import type { IntentResolverRegistry } from "../../ingress/intent-resolver-registry.js";
 import type { PermissionPolicyPort } from "../../ingress/permission-policy.js";

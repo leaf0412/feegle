@@ -7,7 +7,7 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
-    "start:feishu": "npm run build && node dist/src/feishu/feishu-long-connection-entry.js"
+    "start:feishu": "npm run build && node dist/src/integrations/feishu/feishu-long-connection-entry.js"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.64.0",

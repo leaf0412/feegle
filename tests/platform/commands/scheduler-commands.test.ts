@@ -3,13 +3,13 @@ import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registr
 import type { ProviderStore } from "../../../src/agent/provider-store.js";
 import { ConfigStore } from "../../../src/infra/app/config-store.js";
 import { buildSlashCommandRegistry } from "../../../src/platform/build-slash-command-registry.js";
-import { FeishuCommandResponder } from "../../../src/feishu/feishu-command-responder.js";
+import { FeishuCommandResponder } from "../../../src/integrations/feishu/feishu-command-responder.js";
 import { HandlerKindRegistry } from "../../../src/features/scheduler/handler-kind-registry.js";
 import { TaskRegistry } from "../../../src/features/scheduler/task-registry.js";
 import { TaskScheduler } from "../../../src/features/scheduler/task-scheduler.js";
 import type { HandlerKind } from "../../../src/features/scheduler/handler-kind.js";
 import type { Task } from "../../../src/features/scheduler/task.js";
-import type { FeishuClientPort } from "../../../src/feishu/feishu-client.js";
+import type { FeishuClientPort } from "../../../src/integrations/feishu/feishu-client.js";
 import { makeFakeFeishuClient } from "../../fixtures/fake-feishu-client.js";
 import type { StockStore } from "../../../src/integrations/stock/stock-store.js";
 

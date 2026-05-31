@@ -3,7 +3,7 @@ import {
   FeishuRecallTracker,
   isMessageWithdrawnCode,
   isMessageWithdrawnError
-} from "../../src/feishu/feishu-recall-tracker.js";
+} from "../../src/integrations/feishu/feishu-recall-tracker.js";
 
 describe("isMessageWithdrawnCode", () => {
   it("recognises Feishu code 230011 directly", () => {

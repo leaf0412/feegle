@@ -12,7 +12,7 @@ import {
   buildRepoBoundCard,
   buildRepoBindCancelledCard,
   buildBindPromptSupersededCard
-} from "../../src/feishu/feishu-workbench-cards.js";
+} from "../../src/integrations/feishu/feishu-workbench-cards.js";
 
 describe("workbench cards", () => {
   it("renders a compact plan review card with approval actions", () => {

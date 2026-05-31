@@ -8,7 +8,7 @@ import {
   richStepBody,
   richStepDisplayName,
   splitMarkdownByByteBudget
-} from "../../src/feishu/feishu-rich-card.js";
+} from "../../src/integrations/feishu/feishu-rich-card.js";
 import type { PlatformProgressToolStep } from "../../src/platform/progress.js";
 
 const toolStep = (overrides: Partial<PlatformProgressToolStep> = {}): PlatformProgressToolStep => ({

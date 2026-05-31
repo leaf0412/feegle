@@ -2,9 +2,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ulid } from "ulid";
 import type { AgentCli } from "../../agent/agent-cli.js";
-import type { FeishuCloudDocClientPort } from "../../feishu/feishu-cloud-doc-client.js";
-import type { FeishuClientPort } from "../../feishu/feishu-client.js";
-import { buildPlanReviewCard, type PlanReviewSummary } from "../../feishu/feishu-workbench-cards.js";
+import type { FeishuCloudDocClientPort } from "../../integrations/feishu/feishu-cloud-doc-client.js";
+import type { FeishuClientPort } from "../../integrations/feishu/feishu-client.js";
+import { buildPlanReviewCard, type PlanReviewSummary } from "../../integrations/feishu/feishu-workbench-cards.js";
 import type { PlanArtifact, PlanArtifactStore } from "./plan-artifact-store.js";
 
 export interface PlanArtifactServiceDeps {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FeishuPreviewSession } from "../../src/feishu/feishu-preview-session.js";
+import { FeishuPreviewSession } from "../../src/integrations/feishu/feishu-preview-session.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("FeishuPreviewSession", () => {

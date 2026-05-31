@@ -15,19 +15,19 @@ export {
   parseFeishuCardActionValue,
   parseFeishuCommand,
   type FeishuCommand
-} from "./feishu/feishu-gateway.js";
+} from "./integrations/feishu/feishu-gateway.js";
 export {
   extractCardActionCommand,
   extractTextMessageCommand,
   type FeishuCardActionTriggerEvent,
   type FeishuCommandEnvelope,
   type FeishuMessageReceiveEvent
-} from "./feishu/feishu-event-adapter.js";
+} from "./integrations/feishu/feishu-event-adapter.js";
 export {
   LarkFeishuClient,
   type FeishuClientPort,
   type FeishuOpenApiClient
-} from "./feishu/feishu-client.js";
+} from "./integrations/feishu/feishu-client.js";
 export {
   buildRequirementStatusCard,
   buildWorkflowProgressCard,
@@ -36,10 +36,10 @@ export {
   type RequirementStatusCardRepository,
   type WorkflowProgressCardInput,
   type WorkflowProgressStep
-} from "./feishu/feishu-card-builder.js";
-export { renderFeishuCard } from "./feishu/feishu-card-renderer.js";
-export { renderFeishuProgressCard } from "./feishu/feishu-progress-card.js";
-export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
+} from "./integrations/feishu/feishu-card-builder.js";
+export { renderFeishuCard } from "./integrations/feishu/feishu-card-renderer.js";
+export { renderFeishuProgressCard } from "./integrations/feishu/feishu-progress-card.js";
+export { FeishuCommandResponder } from "./integrations/feishu/feishu-command-responder.js";
 export { FeegleApp } from "./infra/app/feegle-app.js";
 export type { NotificationPort, NotificationTarget } from "./infra/app/notification-port.js";
 export { ConfigStore } from "./infra/app/config-store.js";
@@ -52,18 +52,18 @@ export {
   type FeishuCommandHandler,
   type FeishuLongConnectionConfig,
   type FeishuLongConnectionSdk
-} from "./feishu/feishu-long-connection-runtime.js";
+} from "./integrations/feishu/feishu-long-connection-runtime.js";
 export {
   parseFeishuPlatformConfig,
   type FeishuPlatformConfig,
   type FeishuPlatformConfigInput,
   type FeishuProgressStyle
-} from "./feishu/feishu-platform-config.js";
-export { FeishuMessageDedup, isAllowedByList, isOldMessage } from "./feishu/feishu-dedup.js";
+} from "./integrations/feishu/feishu-platform-config.js";
+export { FeishuMessageDedup, isAllowedByList, isOldMessage } from "./integrations/feishu/feishu-dedup.js";
 export {
   normalizeFeishuTextMessage,
   type FeishuMessageExtractOptions
-} from "./feishu/feishu-message-normalizer.js";
+} from "./integrations/feishu/feishu-message-normalizer.js";
 export {
   createPlatformCard,
   type PlatformCard,

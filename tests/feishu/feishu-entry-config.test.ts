@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildFeishuEntryConfig, resolveFeishuEntryConfig } from "../../src/feishu/feishu-entry-config.js";
-import type { FeishuPlatformConfigInput } from "../../src/feishu/feishu-platform-config.js";
+import { buildFeishuEntryConfig, resolveFeishuEntryConfig } from "../../src/integrations/feishu/feishu-entry-config.js";
+import type { FeishuPlatformConfigInput } from "../../src/integrations/feishu/feishu-platform-config.js";
 
 function fullInput(overrides: Partial<FeishuPlatformConfigInput> = {}): FeishuPlatformConfigInput {
   return {

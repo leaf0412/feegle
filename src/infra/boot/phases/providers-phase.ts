@@ -6,7 +6,7 @@ import { buildNotificationBroker } from "../../app/build-notification-broker.js"
 import { GitService } from "../../git/git-service.js";
 import { GitLabClient } from "../../../integrations/gitlab/gitlab-client.js";
 import { GitLabFollowStore } from "../../../integrations/gitlab/gitlab-follow-store.js";
-import type { FeishuClientPort } from "../../../feishu/feishu-client.js";
+import type { FeishuClientPort } from "../../../integrations/feishu/feishu-client.js";
 import { buildQuoteClientRegistry } from "../../../integrations/stock/build-quote-client-registry.js";
 
 export interface ProvidersPhaseDeps {

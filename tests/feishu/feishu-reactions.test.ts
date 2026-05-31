@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { addDoneReaction, startTyping } from "../../src/feishu/feishu-reactions.js";
+import { addDoneReaction, startTyping } from "../../src/integrations/feishu/feishu-reactions.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("startTyping", () => {

@@ -1,4 +1,4 @@
-import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
 
 export function makeFakeFeishuClient(overrides: Partial<FeishuClientPort> = {}): FeishuClientPort {
   const fallback = async () => undefined;

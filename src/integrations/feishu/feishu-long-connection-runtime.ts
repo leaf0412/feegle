@@ -12,7 +12,7 @@ import {
 } from "./feishu-event-adapter.js";
 import { FeishuMessageDedup } from "./feishu-dedup.js";
 import { FeishuRecallTracker } from "./feishu-recall-tracker.js";
-import type { TriggerEvent } from "../ingress/trigger-event.js";
+import type { TriggerEvent } from "../../ingress/trigger-event.js";
 
 export interface FeishuLongConnectionConfig extends FeishuPlatformConfig {}
 

@@ -3,7 +3,7 @@ import {
   FeishuUserDirectory,
   isValidFeishuLookupID,
   resolveMentionsInContent
-} from "../../src/feishu/feishu-user-directory.js";
+} from "../../src/integrations/feishu/feishu-user-directory.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("isValidFeishuLookupID", () => {

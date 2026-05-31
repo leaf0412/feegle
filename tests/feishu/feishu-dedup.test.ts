@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FeishuMessageDedup, isAllowedByList, isOldMessage } from "../../src/feishu/feishu-dedup.js";
+import { FeishuMessageDedup, isAllowedByList, isOldMessage } from "../../src/integrations/feishu/feishu-dedup.js";
 
 describe("FeishuMessageDedup", () => {
   it("marks duplicate message ids so handlers stay idempotent", () => {

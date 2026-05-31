@@ -7,8 +7,8 @@ import { FeegleApp, type FeegleAppDeps } from "../../src/infra/app/feegle-app.js
 import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
 import { BootContext } from "../../src/infra/boot/boot-context.js";
 import { runtimePhase } from "../../src/infra/boot/phases/runtime-phase.js";
-import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
-import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import type { FeishuCloudDocClientPort } from "../../src/integrations/feishu/feishu-cloud-doc-client.js";
+import type { FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
 import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
 import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderFeishuCard } from "../../src/feishu/feishu-card-renderer.js";
+import { renderFeishuCard } from "../../src/integrations/feishu/feishu-card-renderer.js";
 import { createPlatformCard } from "../../src/platform/platform-card.js";
 
 describe("renderFeishuCard", () => {

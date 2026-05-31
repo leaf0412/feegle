@@ -2,20 +2,20 @@ import type { CapabilityContext } from "../../infra/boot/boot-context.js";
 import type { FeeglePlugin } from "../../infra/boot/feegle-plugin.js";
 import type { Startable } from "../../infra/app/feegle-app.js";
 import { GitService } from "../../infra/git/git-service.js";
-import type { FeishuClientPort } from "../../feishu/feishu-client.js";
-import type { FeishuCloudDocClientPort } from "../../feishu/feishu-cloud-doc-client.js";
-import type { FeishuCommandHandler } from "../../feishu/feishu-long-connection-runtime.js";
-import { FeishuChatHandler } from "../../feishu/feishu-chat-handler.js";
+import type { FeishuClientPort } from "../../integrations/feishu/feishu-client.js";
+import type { FeishuCloudDocClientPort } from "../../integrations/feishu/feishu-cloud-doc-client.js";
+import type { FeishuCommandHandler } from "../../integrations/feishu/feishu-long-connection-runtime.js";
+import { FeishuChatHandler } from "../../integrations/feishu/feishu-chat-handler.js";
 import {
   FeishuCommandResponder,
   logFeishuCommandTrace,
   type FeishuWorkbenchHandler
-} from "../../feishu/feishu-command-responder.js";
-import { FeishuUserDirectory } from "../../feishu/feishu-user-directory.js";
+} from "../../integrations/feishu/feishu-command-responder.js";
+import { FeishuUserDirectory } from "../../integrations/feishu/feishu-user-directory.js";
 import {
   buildPlanExecutionRevisionCard,
   buildPlanRevisionRequestCard
-} from "../../feishu/feishu-workbench-cards.js";
+} from "../../integrations/feishu/feishu-workbench-cards.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
 import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";

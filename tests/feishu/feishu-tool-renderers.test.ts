@@ -8,7 +8,7 @@ import {
   isTodoWriteToolName,
   progressNoOutputText,
   progressResultDot
-} from "../../src/feishu/feishu-tool-renderers.js";
+} from "../../src/integrations/feishu/feishu-tool-renderers.js";
 
 describe("inlineCodeText", () => {
   it("trims and replaces backticks with apostrophes to avoid breaking inline code", () => {

@@ -5,7 +5,7 @@ import {
   normalizeFeishuTextMessage,
   type FeishuMessageExtractOptions
 } from "./feishu-message-normalizer.js";
-import type { PlatformIncomingMessage } from "../platform/platform-message.js";
+import type { PlatformIncomingMessage } from "../../platform/platform-message.js";
 
 export type { FeishuMessageExtractOptions } from "./feishu-message-normalizer.js";
 

@@ -3,12 +3,12 @@ import type {
   AgentCli,
   AgentProgressUpdate,
   AgentRunOptions
-} from "../agent/agent-cli.js";
-import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js";
-import { AgentLoadBalancer } from "../agent/agent-load-balancer.js";
-import type { AgentProviderDefinition } from "../agent/agent-provider-registry.js";
-import type { ChatHistoryStore } from "../agent/chat-history-store.js";
-import type { SessionStore } from "../agent/session-store.js";
+} from "../../agent/agent-cli.js";
+import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
+import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";
+import type { AgentProviderDefinition } from "../../agent/agent-provider-registry.js";
+import type { ChatHistoryStore } from "../../agent/chat-history-store.js";
+import type { SessionStore } from "../../agent/session-store.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import { FeishuPreviewSession } from "./feishu-preview-session.js";
 import {
@@ -17,7 +17,7 @@ import {
   buildRichCards,
   type FeishuRichCardStatus
 } from "./feishu-rich-card.js";
-import type { PlatformProgressToolStep } from "../platform/progress.js";
+import type { PlatformProgressToolStep } from "../../platform/progress.js";
 
 export interface FeishuChatHandlerDeps {
   client: FeishuClientPort;

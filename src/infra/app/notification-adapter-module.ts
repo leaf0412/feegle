@@ -1,4 +1,4 @@
-import type { FeishuClientPort } from "../../feishu/feishu-client.js";
+import type { FeishuClientPort } from "../../integrations/feishu/feishu-client.js";
 import type { NotificationBroker } from "./notification-broker.js";
 
 export interface NotificationAdapterDeps {

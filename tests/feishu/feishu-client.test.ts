@@ -3,7 +3,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { LarkFeishuClient, type FeishuClientPort } from "../../src/feishu/feishu-client.js";
+import { LarkFeishuClient, type FeishuClientPort } from "../../src/integrations/feishu/feishu-client.js";
 
 describe("LarkFeishuClient", () => {
   it("sends text messages to chat ids", async () => {
