@@ -219,4 +219,44 @@ describe("Feishu requirement render effects", () => {
     expect(cardJson).not.toContain('"tag":"button"');
     expect(cardJson).toContain("🎉 需求已验收");
   });
+
+  // Regression: Feishu card schema 2.0 rejects the standalone `tag:"action"`
+  // block (ErrCode 200861 "unsupported tag action"), which silently kills the
+  // whole card send. Every interactive button must therefore be a form_submit
+  // button inside a form. These assertions fail if anyone reintroduces tag:action.
+  it.each([
+    {
+      name: "plan_review",
+      effect: "feishu:requirement.plan_review.render",
+      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1, markdown: "# Plan", summary: "X" }
+    },
+    {
+      name: "plan_approved",
+      effect: "feishu:requirement.plan_approved.render",
+      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1 }
+    },
+    {
+      name: "execution_progress",
+      effect: "feishu:requirement.execution_progress.render",
+      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "done" } }
+    },
+    {
+      name: "verification_result (passed)",
+      effect: "feishu:requirement.verification_result.render",
+      input: { chatId: "oc_1", requirementId: "reqwf_1", result: { status: "passed" }, report: "ok" }
+    }
+  ])("$name card uses schema-2.0 form_submit buttons, never tag:action", async ({ effect, input }) => {
+    const { handlers, registry } = makeRegistry();
+    const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om") };
+    const cloudDoc = makeCloudDoc();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, cloudDoc as never);
+
+    await handlers[effect].execute({ input });
+
+    const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).not.toContain('"tag":"action"');
+    expect(cardJson).toContain('"action_type":"form_submit"');
+    expect(cardJson).toContain('"tag":"form"');
+  });
 });

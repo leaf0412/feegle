@@ -10,26 +10,20 @@ type RequirementRenderInput = {
 
 type MinimalCardElement =
   | { tag: "markdown"; content: string }
-  | { tag: "action"; actions: MinimalButtonElement[] }
   | { tag: "form"; name: string; elements: MinimalFormElement[] };
 
-type MinimalButtonElement = {
+type MinimalFormSubmitButton = {
   tag: "button";
   text: { tag: "plain_text"; content: string };
   type: "default" | "primary" | "danger";
-  value?: Record<string, string>;
+  action_type: "form_submit";
+  name: string;
+  value: Record<string, string>;
 };
 
 type MinimalFormElement =
-  | { tag: "input"; name: string; placeholder: { tag: "plain_text"; content: string }; input_type?: "multiline" }
-  | {
-      tag: "button";
-      text: { tag: "plain_text"; content: string };
-      type: "default" | "primary" | "danger";
-      action_type: "form_submit";
-      name: string;
-      value: Record<string, string>;
-    };
+  | { tag: "input"; name: string; placeholder: { tag: "plain_text"; content: string } }
+  | MinimalFormSubmitButton;
 
 interface MinimalFeishuCard {
   schema: "2.0";
@@ -61,18 +55,29 @@ function validateRequiredFields(input: RequirementRenderInput): { chatId: string
   return { chatId: input.chatId, requirementId: input.requirementId };
 }
 
-function buildActionButton(
-  text: string,
-  type: "primary" | "danger" | "default",
-  requirementId: string,
-  action: string,
-  planVersion?: number
-): MinimalButtonElement {
+function actionValue(requirementId: string, action: string, planVersion?: number): Record<string, string> {
   const value: Record<string, string> = { action, requirement_id: requirementId };
   if (planVersion !== undefined) {
     value.plan_version = String(planVersion);
   }
-  return { tag: "button", text: plainText(text), type, value };
+  return value;
+}
+
+// schema 2.0 dropped the standalone `tag: "action"` block, so every interactive
+// button must live inside a form as a form_submit button (matching the workbench
+// bind-repo card). A single-button form carries no inputs; the button value
+// arrives at the action top level, exactly what parseFeishuCardActionValue reads.
+function formSubmitButton(
+  text: string,
+  type: "primary" | "danger" | "default",
+  name: string,
+  value: Record<string, string>
+): MinimalFormSubmitButton {
+  return { tag: "button", text: plainText(text), type, action_type: "form_submit", name, value };
+}
+
+function singleButtonForm(formName: string, button: MinimalFormSubmitButton): MinimalCardElement {
+  return { tag: "form", name: formName, elements: [button] };
 }
 
 function buildPlanReviewLinkCard(
@@ -89,42 +94,36 @@ function buildPlanReviewLinkCard(
     summaryLine + `[查看完整计划文档（云文档）](${docUrl})`
   ].join("\n");
 
-  const approveButton = buildActionButton(
-    "确认计划",
-    "primary",
-    requirementId,
-    "act:/requirement plan approve",
-    planVersion
-  );
-  const cancelButton = buildActionButton(
-    "取消",
-    "danger",
-    requirementId,
-    "act:/requirement plan cancel"
-  );
-
-  const reviseForm: MinimalCardElement = {
+  // approve / revise / cancel all live in one form (schema 2.0 has no standalone
+  // action block). revision_note is optional, so approve & cancel submit cleanly
+  // without tripping input validation — same trick as the workbench bind-repo card.
+  const actionsForm: MinimalCardElement = {
     tag: "form",
-    name: "requirement_plan_revision",
+    name: "requirement_plan_actions",
     elements: [
       {
         tag: "input",
         name: "revision_note",
-        placeholder: plainText("请输入修改意见，例如：补充验收标准；拆解步骤粒度"),
-        input_type: "multiline"
+        placeholder: plainText("（可选）要求修改时填写：补充验收标准；拆解步骤粒度")
       },
-      {
-        tag: "button",
-        text: plainText("要求修改"),
-        type: "default",
-        action_type: "form_submit",
-        name: "submit_requirement_revision",
-        value: {
-          action: "act:/requirement plan revise submit",
-          requirement_id: requirementId,
-          plan_version: String(planVersion)
-        }
-      }
+      formSubmitButton(
+        "确认计划",
+        "primary",
+        "submit_requirement_plan_approve",
+        actionValue(requirementId, "act:/requirement plan approve", planVersion)
+      ),
+      formSubmitButton(
+        "要求修改",
+        "default",
+        "submit_requirement_plan_revise",
+        actionValue(requirementId, "act:/requirement plan revise submit", planVersion)
+      ),
+      formSubmitButton(
+        "取消",
+        "danger",
+        "submit_requirement_plan_cancel",
+        actionValue(requirementId, "act:/requirement plan cancel")
+      )
     ]
   };
 
@@ -133,11 +132,7 @@ function buildPlanReviewLinkCard(
     config: { wide_screen_mode: true, update_multi: true },
     header: { template: "blue", title: plainText(`需求计划待确认 · ${requirementId}`) },
     body: {
-      elements: [
-        { tag: "markdown", content: bodyContent },
-        { tag: "action", actions: [approveButton, cancelButton] },
-        reviseForm
-      ]
+      elements: [{ tag: "markdown", content: bodyContent }, actionsForm]
     }
   };
 }
@@ -145,12 +140,11 @@ function buildPlanReviewLinkCard(
 function buildPlanApprovedCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
   const planVersion = typeof input.planVersion === "number" ? input.planVersion : 1;
   const bodyContent = [`**需求 ID**：${requirementId}`, `**计划版本**：v${planVersion}`].join("\n");
-  const executeButton = buildActionButton(
+  const executeButton = formSubmitButton(
     "执行开发",
     "primary",
-    requirementId,
-    "act:/requirement execute",
-    planVersion
+    "submit_requirement_execute",
+    actionValue(requirementId, "act:/requirement execute", planVersion)
   );
   return {
     schema: "2.0",
@@ -159,7 +153,7 @@ function buildPlanApprovedCard(requirementId: string, input: RequirementRenderIn
     body: {
       elements: [
         { tag: "markdown", content: bodyContent },
-        { tag: "action", actions: [executeButton] }
+        singleButtonForm("requirement_execute_action", executeButton)
       ]
     }
   };
@@ -169,7 +163,12 @@ function buildExecutionProgressCard(requirementId: string, input: RequirementRen
   const result = input.result as Record<string, unknown> | undefined;
   const status = result && typeof result.status === "string" ? result.status : "unknown";
   const bodyContent = [`**需求 ID**：${requirementId}`, `**状态**：${status}`].join("\n");
-  const verifyButton = buildActionButton("验证", "primary", requirementId, "act:/requirement verify");
+  const verifyButton = formSubmitButton(
+    "验证",
+    "primary",
+    "submit_requirement_verify",
+    actionValue(requirementId, "act:/requirement verify")
+  );
   return {
     schema: "2.0",
     config: { wide_screen_mode: true, update_multi: true },
@@ -177,7 +176,7 @@ function buildExecutionProgressCard(requirementId: string, input: RequirementRen
     body: {
       elements: [
         { tag: "markdown", content: bodyContent },
-        { tag: "action", actions: [verifyButton] }
+        singleButtonForm("requirement_verify_action", verifyButton)
       ]
     }
   };
@@ -190,8 +189,13 @@ function buildVerificationResultCard(requirementId: string, input: RequirementRe
   const passed = result && result.status === "passed";
   const elements: MinimalCardElement[] = [{ tag: "markdown", content: bodyContent }];
   if (passed) {
-    const acceptButton = buildActionButton("验收", "primary", requirementId, "act:/requirement accept");
-    elements.push({ tag: "action", actions: [acceptButton] });
+    const acceptButton = formSubmitButton(
+      "验收",
+      "primary",
+      "submit_requirement_accept",
+      actionValue(requirementId, "act:/requirement accept")
+    );
+    elements.push(singleButtonForm("requirement_accept_action", acceptButton));
   }
   return {
     schema: "2.0",
