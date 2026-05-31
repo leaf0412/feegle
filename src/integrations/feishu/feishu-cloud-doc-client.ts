@@ -23,6 +23,18 @@ interface ConvertResponseData {
   first_level_block_ids: string[];
 }
 
+type DocBlock = Record<string, unknown> & { block_id: string };
+
+interface DescendantBatch {
+  children_id: string[];
+  descendants: DocBlock[];
+  index: number;
+}
+
+// Feishu's create-descendant API accepts at most 50 blocks per call. Larger plans
+// (tables, long step lists) must be written across several calls or the API 400s.
+const MAX_DESCENDANTS_PER_CALL = 50;
+
 export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   private readonly docBaseUrl: string;
 
@@ -60,16 +72,19 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
       return;
     }
 
-    const writeResponse = await this.requester.request({
-      url: `/open-apis/docx/v1/documents/${input.documentId}/blocks/${input.documentId}/descendant`,
-      method: "POST",
-      data: {
-        children_id: firstLevel,
-        descendants: blocks,
-        index: 0
-      }
-    });
-    expectSuccess("writeBlocks", writeResponse);
+    const batches = splitIntoDescendantBatches(blocks, firstLevel, MAX_DESCENDANTS_PER_CALL);
+    for (const batch of batches) {
+      const writeResponse = await this.requester.request({
+        url: `/open-apis/docx/v1/documents/${input.documentId}/blocks/${input.documentId}/descendant`,
+        method: "POST",
+        data: {
+          children_id: batch.children_id,
+          descendants: batch.descendants,
+          index: batch.index
+        }
+      });
+      expectSuccess("writeBlocks", writeResponse);
+    }
   }
 
   async deleteDoc(input: { documentId: string }): Promise<void> {
@@ -84,6 +99,67 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   buildDocUrl(documentId: string): string {
     return `${this.docBaseUrl}/docx/${documentId}`;
   }
+}
+
+// Walk one first-level block plus its full subtree (children referenced by id).
+// The descendant call must carry a parent together with every block it links to,
+// otherwise Feishu rejects the dangling child reference.
+function collectClosure(rootId: string, byId: Map<string, DocBlock>): DocBlock[] {
+  const closure: DocBlock[] = [];
+  const seen = new Set<string>();
+  const stack = [rootId];
+  while (stack.length > 0) {
+    const id = stack.pop() as string;
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    const block = byId.get(id);
+    if (!block) {
+      continue;
+    }
+    closure.push(block);
+    const children = Array.isArray(block.children) ? (block.children as string[]) : [];
+    // push in reverse so the stack pops children back in document order (pre-order)
+    for (let i = children.length - 1; i >= 0; i -= 1) {
+      stack.push(children[i]);
+    }
+  }
+  return closure;
+}
+
+// Pack first-level blocks (each with its subtree) into descendant batches of at
+// most `max` blocks, preserving order. A parent and its children always stay in
+// one batch; `index` tracks how many first-level blocks were already inserted so
+// later batches append after earlier ones. A single subtree larger than `max` is
+// sent alone — the API will surface that loudly rather than us silently dropping.
+function splitIntoDescendantBatches(blocks: DocBlock[], firstLevel: string[], max: number): DescendantBatch[] {
+  const byId = new Map(blocks.map((block) => [block.block_id, block]));
+  const batches: DescendantBatch[] = [];
+  let children: string[] = [];
+  let descendants: DocBlock[] = [];
+  let writtenFirstLevel = 0;
+
+  const flush = (): void => {
+    if (children.length === 0) {
+      return;
+    }
+    batches.push({ children_id: children, descendants, index: writtenFirstLevel });
+    writtenFirstLevel += children.length;
+    children = [];
+    descendants = [];
+  };
+
+  for (const rootId of firstLevel) {
+    const closure = collectClosure(rootId, byId);
+    if (children.length > 0 && descendants.length + closure.length > max) {
+      flush();
+    }
+    children.push(rootId);
+    descendants.push(...closure);
+  }
+  flush();
+  return batches;
 }
 
 function expectSuccess(operation: string, response: unknown): Record<string, unknown> {
