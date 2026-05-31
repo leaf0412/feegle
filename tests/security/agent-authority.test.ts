@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultAgentAuthority } from "../../src/security/agent-authority.js";
+import { defaultAgentAuthority } from "../../src/core/security/agent-authority.js";
 
 describe("agent authority", () => {
   it("agents cannot approve memory", () => {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { ControlActionStore } from "../../src/control/control-action-store.js";
+import { ControlActionStore } from "../../src/core/control/control-action-store.js";
 
 describe("ControlActionStore", () => {
   let tempDir: string;

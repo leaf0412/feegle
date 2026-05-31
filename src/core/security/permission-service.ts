@@ -1,5 +1,5 @@
-import type { WorkspaceStore } from "../resources/workspace/workspace-store.js";
-import type { WorkspaceRole } from "../resources/workspace/workspace-models.js";
+import type { WorkspaceStore } from "../../resources/workspace/workspace-store.js";
+import type { WorkspaceRole } from "../../resources/workspace/workspace-models.js";
 
 export interface PermissionCheck {
   allowed: boolean;

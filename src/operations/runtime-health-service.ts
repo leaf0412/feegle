@@ -1,4 +1,4 @@
-import type { RuntimeStore } from "../runtime/runtime-store.js";
+import type { RuntimeStore } from "../core/runtime/runtime-store.js";
 import type { RuntimeDb } from "../app/runtime-db.js";
 import type { StuckRunDetector } from "./stuck-run-detector.js";
 

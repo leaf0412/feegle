@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { ArtifactService } from "../../src/artifacts/artifact-service.js";
-import { ArtifactStore } from "../../src/artifacts/artifact-store.js";
-import { MemoryStore } from "../../src/memory/memory-store.js";
-import { RuntimeStore } from "../../src/runtime/runtime-store.js";
-import { RecoveryService } from "../../src/recovery/recovery-service.js";
+import { ArtifactService } from "../../src/core/artifacts/artifact-service.js";
+import { ArtifactStore } from "../../src/core/artifacts/artifact-store.js";
+import { MemoryStore } from "../../src/core/memory/memory-store.js";
+import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
+import { RecoveryService } from "../../src/core/recovery/recovery-service.js";
 
 describe("RecoveryService", () => {
   let tempDir: string;

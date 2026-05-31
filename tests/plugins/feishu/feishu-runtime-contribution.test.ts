@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { IntentResolverRegistry } from "../../../src/ingress/intent-resolver-registry.js";
 import { WorkflowSelector } from "../../../src/ingress/workflow-selector.js";
 import { feishuRuntimeContribution } from "../../../src/plugins/feishu/feishu-runtime-contribution.js";
-import { EffectHandlerRegistry } from "../../../src/runtime/effect-handler-registry.js";
-import { RuntimeContributionContext } from "../../../src/runtime/runtime-contribution-context.js";
-import { WorkflowRegistry } from "../../../src/runtime/workflow-registry.js";
+import { EffectHandlerRegistry } from "../../../src/core/runtime/effect-handler-registry.js";
+import { RuntimeContributionContext } from "../../../src/core/runtime/runtime-contribution-context.js";
+import { WorkflowRegistry } from "../../../src/core/runtime/workflow-registry.js";
 
 describe("feishuRuntimeContribution", () => {
   it("registers Feishu chat workflow, selector, resolver, and reply effect", async () => {

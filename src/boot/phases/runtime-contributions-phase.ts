@@ -1,4 +1,4 @@
-import { RuntimeContributionContext } from "../../runtime/runtime-contribution-context.js";
+import { RuntimeContributionContext } from "../../core/runtime/runtime-contribution-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
 

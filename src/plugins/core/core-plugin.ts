@@ -1,12 +1,12 @@
 import { join } from "node:path";
 import type { BootPhaseName } from "../../boot/boot-phase.js";
 import type { FeeglePlugin } from "../../boot/feegle-plugin.js";
-import { ArtifactService } from "../../artifacts/artifact-service.js";
-import { ArtifactStore } from "../../artifacts/artifact-store.js";
-import { ControlActionStore } from "../../control/control-action-store.js";
-import { MemoryStore } from "../../memory/memory-store.js";
-import { RecoveryService } from "../../recovery/recovery-service.js";
-import { createRecoveryWorkflow } from "../../recovery/recovery-workflow.js";
+import { ArtifactService } from "../../core/artifacts/artifact-service.js";
+import { ArtifactStore } from "../../core/artifacts/artifact-store.js";
+import { ControlActionStore } from "../../core/control/control-action-store.js";
+import { MemoryStore } from "../../core/memory/memory-store.js";
+import { RecoveryService } from "../../core/recovery/recovery-service.js";
+import { createRecoveryWorkflow } from "../../core/recovery/recovery-workflow.js";
 import { defaultSlashCommandModules } from "../../platform/commands/default-slash-command-modules.js";
 import { agentPromptKindModule, heartbeatKindModule } from "../../scheduler/default-handler-kind-modules.js";
 import { schedulerWorkflowContribution } from "../../scheduler/scheduler-workflow-contribution.js";

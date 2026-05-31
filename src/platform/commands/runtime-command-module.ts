@@ -1,10 +1,10 @@
 import type { SlashCommandContext, SlashCommandHandler, SlashCommandReply } from "../slash-command-handler.js";
 import type { SlashCommandModule } from "../slash-command-module.js";
 import { defineSlashCommand } from "../slash-command-catalog.js";
-import type { ControlActionProcessor } from "../../control/control-action-processor.js";
-import type { ControlActionStore } from "../../control/control-action-store.js";
-import type { WorkflowRuntime } from "../../runtime/workflow-runtime.js";
-import type { MemoryService } from "../../memory/memory-service.js";
+import type { ControlActionProcessor } from "../../core/control/control-action-processor.js";
+import type { ControlActionStore } from "../../core/control/control-action-store.js";
+import type { WorkflowRuntime } from "../../core/runtime/workflow-runtime.js";
+import type { MemoryService } from "../../core/memory/memory-service.js";
 import type { RuntimeInspectionService } from "../../operations/runtime-inspection-service.js";
 
 const listDefinition = defineSlashCommand(

@@ -1,4 +1,4 @@
-import type { RuntimeStore } from "../runtime/runtime-store.js";
+import type { RuntimeStore } from "../core/runtime/runtime-store.js";
 
 export interface WorkflowSummary {
   id: string;

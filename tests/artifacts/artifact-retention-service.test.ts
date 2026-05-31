@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { ArtifactRetentionService } from "../../src/artifacts/artifact-retention-service.js";
-import { ArtifactStore } from "../../src/artifacts/artifact-store.js";
+import { ArtifactRetentionService } from "../../src/core/artifacts/artifact-retention-service.js";
+import { ArtifactStore } from "../../src/core/artifacts/artifact-store.js";
 
 describe("ArtifactRetentionService", () => {
   let tempDir: string;

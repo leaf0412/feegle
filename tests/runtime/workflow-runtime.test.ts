@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { EffectHandlerRegistry } from "../../src/runtime/effect-handler-registry.js";
-import { RuntimeEffectExecutor } from "../../src/runtime/runtime-effect-executor.js";
-import { RuntimeStore } from "../../src/runtime/runtime-store.js";
-import { WorkflowRegistry } from "../../src/runtime/workflow-registry.js";
-import { WorkflowRuntime } from "../../src/runtime/workflow-runtime.js";
+import { EffectHandlerRegistry } from "../../src/core/runtime/effect-handler-registry.js";
+import { RuntimeEffectExecutor } from "../../src/core/runtime/runtime-effect-executor.js";
+import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
+import { WorkflowRegistry } from "../../src/core/runtime/workflow-registry.js";
+import { WorkflowRuntime } from "../../src/core/runtime/workflow-runtime.js";
 
 describe("WorkflowRuntime", () => {
   let tempDir: string;

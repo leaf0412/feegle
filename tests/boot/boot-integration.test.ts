@@ -9,7 +9,7 @@ import { BootContext } from "../../src/boot/boot-context.js";
 import { runtimePhase } from "../../src/boot/phases/runtime-phase.js";
 import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
-import { RuntimeStore } from "../../src/runtime/runtime-store.js";
+import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
 import { fakeConfigStore } from "../fixtures/fake-config-store.js";
 
 function fakeCloudDoc(): FeishuCloudDocClientPort {

@@ -1,4 +1,4 @@
-import type { RuntimeDb } from "../app/runtime-db.js";
+import type { RuntimeDb } from "../../app/runtime-db.js";
 import type { ArtifactRecord } from "./artifact-models.js";
 
 export class ArtifactStore {

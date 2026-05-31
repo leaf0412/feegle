@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { MemoryStore } from "../../src/memory/memory-store.js";
+import { MemoryStore } from "../../src/core/memory/memory-store.js";
 
 describe("MemoryStore", () => {
   let tempDir: string;

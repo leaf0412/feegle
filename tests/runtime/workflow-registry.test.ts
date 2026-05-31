@@ -4,7 +4,7 @@ import {
   stepStatuses,
   type StepResult,
   type WorkflowDefinition
-} from "../../src/runtime/runtime-models.js";
+} from "../../src/core/runtime/runtime-models.js";
 
 describe("runtime models", () => {
   it("defines statuses needed for durable recovery and waiting workflows", () => {

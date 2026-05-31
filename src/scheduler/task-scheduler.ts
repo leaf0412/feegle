@@ -3,7 +3,7 @@ import type { AgentProviderRegistry } from "../agent/agent-provider-registry.js"
 import type { FeegleConfig } from "../app/config-store.js";
 import type { HookManager } from "../app/hooks.js";
 import type { NotificationPort } from "../app/notification-port.js";
-import type { RuntimeError } from "../runtime/runtime-models.js";
+import type { RuntimeError } from "../core/runtime/runtime-models.js";
 import { buildFailureCard } from "./build-failure-card.js";
 import { buildRecoveryCard } from "./build-recovery-card.js";
 import { decideShouldNotifyFailure } from "./failure-policy.js";

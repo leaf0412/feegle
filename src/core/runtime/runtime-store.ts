@@ -1,4 +1,4 @@
-import type { RuntimeDb } from "../app/runtime-db.js";
+import type { RuntimeDb } from "../../app/runtime-db.js";
 import type {
   ConcurrencyPolicy,
   EffectStatus,

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { PermissionService } from "../../src/security/permission-service.js";
+import { PermissionService } from "../../src/core/security/permission-service.js";
 import { WorkspaceStore } from "../../src/resources/workspace/workspace-store.js";
 
 describe("PermissionService", () => {
