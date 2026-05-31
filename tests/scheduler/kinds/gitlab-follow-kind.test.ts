@@ -2,10 +2,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../../src/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
 import { GitLabFollowStore, type FollowEntry, type FollowStatus } from "../../../src/integrations/gitlab/gitlab-follow-store.js";
-import { GitLabFollowKind } from "../../../src/scheduler/kinds/gitlab-follow-kind.js";
-import type { TaskContext } from "../../../src/scheduler/task-context.js";
+import { GitLabFollowKind } from "../../../src/features/scheduler/kinds/gitlab-follow-kind.js";
+import type { TaskContext } from "../../../src/features/scheduler/task-context.js";
 
 const ISSUE_URL = "https://gitlab.example.com/group/proj/-/issues/42";
 

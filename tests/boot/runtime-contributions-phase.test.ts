@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BootContext } from "../../src/boot/boot-context.js";
-import { runtimeContributionsPhase } from "../../src/boot/phases/runtime-contributions-phase.js";
+import { BootContext } from "../../src/infra/boot/boot-context.js";
+import { runtimeContributionsPhase } from "../../src/infra/boot/phases/runtime-contributions-phase.js";
 import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
 import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
 import { EffectHandlerRegistry } from "../../src/core/runtime/effect-handler-registry.js";

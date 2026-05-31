@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
-import { TaskRegistry } from "../../src/scheduler/task-registry.js";
-import { TaskScheduler } from "../../src/scheduler/task-scheduler.js";
-import { UndeliveredFailureCounter } from "../../src/scheduler/undelivered-counter.js";
-import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
-import type { Task } from "../../src/scheduler/task.js";
+import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
+import { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
+import { TaskScheduler } from "../../src/features/scheduler/task-scheduler.js";
+import { UndeliveredFailureCounter } from "../../src/features/scheduler/undelivered-counter.js";
+import type { HandlerKind } from "../../src/features/scheduler/handler-kind.js";
+import type { Task } from "../../src/features/scheduler/task.js";
 
 describe("TaskScheduler failure policy", () => {
   it("throttles on-change failures and sends one recovery card", async () => {

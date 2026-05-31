@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { HeartbeatKind } from "../../../src/scheduler/kinds/heartbeat-kind.js";
-import type { Task } from "../../../src/scheduler/task.js";
+import { HeartbeatKind } from "../../../src/features/scheduler/kinds/heartbeat-kind.js";
+import type { Task } from "../../../src/features/scheduler/task.js";
 import { createTaskContext } from "./kind-test-helpers.js";
 
 describe("HeartbeatKind", () => {

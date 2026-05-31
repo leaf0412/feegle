@@ -1,7 +1,7 @@
 import os from "node:os";
 import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { RunsLog } from "../../../scheduler/runs-log.js";
-import type { TaskRegistry } from "../../../scheduler/task-registry.js";
+import type { RunsLog } from "../../../features/scheduler/runs-log.js";
+import type { TaskRegistry } from "../../../features/scheduler/task-registry.js";
 import type {
   SlashCommandHandler,
   SlashCommandReply

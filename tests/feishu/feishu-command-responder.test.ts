@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
-import { migrate } from "../../src/app/runtime-db.js";
+import { migrate } from "../../src/infra/app/runtime-db.js";
 import { RepositoryStore } from "../../src/resources/repositories/repository-store.js";
 import { ChatBindingStore } from "../../src/resources/repositories/chat-binding-store.js";
 import { FeishuCommandResponder } from "../../src/feishu/feishu-command-responder.js";

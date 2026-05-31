@@ -1,4 +1,4 @@
-import type { FeeglePlugin, RuntimeContributionModule } from "../../boot/feegle-plugin.js";
+import type { FeeglePlugin, RuntimeContributionModule } from "../../infra/boot/feegle-plugin.js";
 
 export function webhookRuntimeContribution(): RuntimeContributionModule {
   return {

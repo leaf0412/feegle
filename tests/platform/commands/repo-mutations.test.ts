@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
+import { migrate, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
 import { RepositoryStore } from "../../../src/resources/repositories/repository-store.js";
 import { ChatBindingStore } from "../../../src/resources/repositories/chat-binding-store.js";
 import { RepoRemoveCommandHandler } from "../../../src/platform/commands/repo/repo-remove-command.js";

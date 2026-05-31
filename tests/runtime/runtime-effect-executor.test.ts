@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
 import { EffectHandlerRegistry } from "../../src/core/runtime/effect-handler-registry.js";
 import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
 import { RuntimeEffectExecutor } from "../../src/core/runtime/runtime-effect-executor.js";

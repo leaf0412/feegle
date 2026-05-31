@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
 import { ArtifactService } from "../../src/core/artifacts/artifact-service.js";
 import { ArtifactStore } from "../../src/core/artifacts/artifact-store.js";
 import { ControlActionStore } from "../../src/core/control/control-action-store.js";

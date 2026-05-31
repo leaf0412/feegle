@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteOrphanWorkspacesJson } from "../../src/boot/phases/stores-phase.js";
+import { deleteOrphanWorkspacesJson } from "../../src/infra/boot/phases/stores-phase.js";
 
 describe("deleteOrphanWorkspacesJson", () => {
   let home: string;

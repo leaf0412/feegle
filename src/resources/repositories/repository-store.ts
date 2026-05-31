@@ -1,6 +1,6 @@
 import type { Statement } from "better-sqlite3";
 import { z } from "zod";
-import type { RuntimeDb } from "../../app/runtime-db.js";
+import type { RuntimeDb } from "../../infra/app/runtime-db.js";
 import type { RepositoryRecord } from "../../domain/models.js";
 
 /**

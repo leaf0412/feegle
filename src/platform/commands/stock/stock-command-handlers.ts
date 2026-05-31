@@ -1,5 +1,5 @@
 import { createPlatformCard } from "../../../platform/platform-card.js";
-import type { Task } from "../../../scheduler/task.js";
+import type { Task } from "../../../features/scheduler/task.js";
 import { normalizeStockCode, type StockCode } from "../../../integrations/stock/stock-code.js";
 import { pnlForEntry } from "../../../integrations/stock/stock-domain.js";
 import type { PortfolioPatch, Threshold } from "../../../integrations/stock/stock-store-types.js";

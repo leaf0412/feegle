@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
-import { TaskRegistry } from "../../src/scheduler/task-registry.js";
-import { TaskScheduler } from "../../src/scheduler/task-scheduler.js";
-import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
-import type { TaskStorePort } from "../../src/scheduler/task-registry.js";
-import type { Task } from "../../src/scheduler/task.js";
-import type { RunsLogEntry } from "../../src/scheduler/runs-log.js";
+import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
+import { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
+import { TaskScheduler } from "../../src/features/scheduler/task-scheduler.js";
+import type { HandlerKind } from "../../src/features/scheduler/handler-kind.js";
+import type { TaskStorePort } from "../../src/features/scheduler/task-registry.js";
+import type { Task } from "../../src/features/scheduler/task.js";
+import type { RunsLogEntry } from "../../src/features/scheduler/runs-log.js";
 
 function makeTask(id: string, patch: Partial<Task> = {}): Task {
   return {

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigStore } from "../../src/app/config-store.js";
+import { ConfigStore } from "../../src/infra/app/config-store.js";
 
 async function withHome(jsonc: string, fn: (home: string) => Promise<void>) {
   const home = await mkdtemp(join(tmpdir(), "feegle-cfg-"));

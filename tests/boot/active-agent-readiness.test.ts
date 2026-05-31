@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { checkAgentReadiness } from "../../src/boot/warn-startup-gaps.js";
+import { checkAgentReadiness } from "../../src/infra/boot/warn-startup-gaps.js";
 import type { AgentCli } from "../../src/agent/agent-cli.js";
 
 function ok(): AgentCli {

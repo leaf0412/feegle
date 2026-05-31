@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StockPortfolioSnapshotKind } from "../../../src/scheduler/kinds/stock-portfolio-snapshot-kind.js";
+import { StockPortfolioSnapshotKind } from "../../../src/features/scheduler/kinds/stock-portfolio-snapshot-kind.js";
 import { createTaskContext, makeTask, quote } from "./kind-test-helpers.js";
 
 describe("StockPortfolioSnapshotKind", () => {

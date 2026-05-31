@@ -9,8 +9,8 @@ export type {
 } from "./domain/models.js";
 
 export type { RequirementStatus } from "./domain/status.js";
-export { PrototypeGenerator } from "./prototype/prototype-generator.js";
-export type { WritePrototypeSourceInput } from "./prototype/prototype-generator.js";
+export { PrototypeGenerator } from "./features/prototype/prototype-generator.js";
+export type { WritePrototypeSourceInput } from "./features/prototype/prototype-generator.js";
 export {
   parseFeishuCardActionValue,
   parseFeishuCommand,
@@ -40,11 +40,11 @@ export {
 export { renderFeishuCard } from "./feishu/feishu-card-renderer.js";
 export { renderFeishuProgressCard } from "./feishu/feishu-progress-card.js";
 export { FeishuCommandResponder } from "./feishu/feishu-command-responder.js";
-export { FeegleApp } from "./app/feegle-app.js";
-export type { NotificationPort, NotificationTarget } from "./app/notification-port.js";
-export { ConfigStore } from "./app/config-store.js";
-export { TaskScheduler } from "./scheduler/task-scheduler.js";
-export type { Task } from "./scheduler/task.js";
+export { FeegleApp } from "./infra/app/feegle-app.js";
+export type { NotificationPort, NotificationTarget } from "./infra/app/notification-port.js";
+export { ConfigStore } from "./infra/app/config-store.js";
+export { TaskScheduler } from "./features/scheduler/task-scheduler.js";
+export type { Task } from "./features/scheduler/task.js";
 export { StockStore } from "./integrations/stock/stock-store.js";
 export type { Quote, QuoteClient } from "./integrations/stock/stock-quote-port.js";
 export {
@@ -135,5 +135,5 @@ export type {
   UsageReporter,
   UsageWindow
 } from "./agent/agent-capabilities.js";
-export { HookManager, HOOK_EVENTS } from "./app/hooks.js";
-export type { HookConfig, HookEventPayload, HookEventType, HookHandlerType } from "./app/hooks.js";
+export { HookManager, HOOK_EVENTS } from "./infra/app/hooks.js";
+export type { HookConfig, HookEventPayload, HookEventType, HookHandlerType } from "./infra/app/hooks.js";

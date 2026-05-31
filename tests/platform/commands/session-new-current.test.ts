@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
-import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
+import { migrate, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
 import { CurrentCommandHandler } from "../../../src/platform/commands/session/current-command.js";
 import { NewCommandHandler } from "../../../src/platform/commands/session/new-command.js";
 import type { SlashCommandContext } from "../../../src/platform/slash-command-handler.js";

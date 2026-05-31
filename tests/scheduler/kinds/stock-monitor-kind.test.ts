@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StockMonitorKind } from "../../../src/scheduler/kinds/stock-monitor-kind.js";
+import { StockMonitorKind } from "../../../src/features/scheduler/kinds/stock-monitor-kind.js";
 import { QuoteFetchError } from "../../../src/integrations/stock/stock-quote-port.js";
 import { createTaskContext, makeTask, quote } from "./kind-test-helpers.js";
 

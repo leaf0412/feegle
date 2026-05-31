@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { taskToTriggerEvent } from "../../src/scheduler/scheduler-trigger-event.js";
+import { taskToTriggerEvent } from "../../src/features/scheduler/scheduler-trigger-event.js";
 
 describe("taskToTriggerEvent", () => {
   it("converts a scheduler task run into a runtime trigger event", () => {

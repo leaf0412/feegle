@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GitService, type CommandRunner } from "../../src/git/git-service.js";
+import { GitService, type CommandRunner } from "../../src/infra/git/git-service.js";
 
 describe("GitService", () => {
   it("clones a repository into the requested path", async () => {

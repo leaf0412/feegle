@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NotificationBroker } from "../../src/app/notification-broker.js";
-import type { NotificationPort, NotificationTarget } from "../../src/app/notification-port.js";
+import { NotificationBroker } from "../../src/infra/app/notification-broker.js";
+import type { NotificationPort, NotificationTarget } from "../../src/infra/app/notification-port.js";
 
 describe("NotificationBroker", () => {
   it("routes messages by platform so scheduled jobs stay platform-neutral", async () => {

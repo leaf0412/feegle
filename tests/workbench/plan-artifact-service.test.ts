@@ -2,11 +2,11 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb, type RuntimeDb } from "../../src/app/runtime-db.js";
+import { openRuntimeDb, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
 import type { FeishuCloudDocClientPort } from "../../src/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
-import { PlanArtifactService } from "../../src/workbench/plan-artifact-service.js";
-import { PlanArtifactStore } from "../../src/workbench/plan-artifact-store.js";
+import { PlanArtifactService } from "../../src/features/workbench/plan-artifact-service.js";
+import { PlanArtifactStore } from "../../src/features/workbench/plan-artifact-store.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 
 describe("PlanArtifactService", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
-import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
+import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
+import type { HandlerKind } from "../../src/features/scheduler/handler-kind.js";
 
 const kind: HandlerKind<Record<string, never>> = {
   id: "heartbeat",

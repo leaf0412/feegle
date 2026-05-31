@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileAutomation } from "../../src/automation/automation-compiler.js";
+import { compileAutomation } from "../../src/features/automation/automation-compiler.js";
 
 describe("automation compiler", () => {
   it("compiles a recovery automation into a workflow definition", () => {

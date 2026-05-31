@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
 import { SessionStore } from "../../../src/agent/session-store.js";
-import { migrate, type RuntimeDb } from "../../../src/app/runtime-db.js";
+import { migrate, type RuntimeDb } from "../../../src/infra/app/runtime-db.js";
 import { HistoryCommandHandler } from "../../../src/platform/commands/session/history-command.js";
 import { NameCommandHandler } from "../../../src/platform/commands/session/name-command.js";
 import { SearchCommandHandler } from "../../../src/platform/commands/session/search-command.js";

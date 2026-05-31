@@ -1,5 +1,5 @@
 import type { RuntimeStore } from "../core/runtime/runtime-store.js";
-import type { RuntimeDb } from "../app/runtime-db.js";
+import type { RuntimeDb } from "../infra/app/runtime-db.js";
 import type { StuckRunDetector } from "./stuck-run-detector.js";
 
 export type HealthStatus = "pass" | "warn" | "fail";

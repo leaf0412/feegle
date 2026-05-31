@@ -2,7 +2,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveWorkspaceDir } from "../../src/app/workspace-dir.js";
+import { resolveWorkspaceDir } from "../../src/infra/app/workspace-dir.js";
 
 describe("resolveWorkspaceDir", () => {
   it("defaults to <home>/workspace and creates it so chats always have a cwd", async () => {

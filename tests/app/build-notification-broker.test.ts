@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildNotificationBroker } from "../../src/app/build-notification-broker.js";
-import type { NotificationPort } from "../../src/app/notification-port.js";
+import { buildNotificationBroker } from "../../src/infra/app/build-notification-broker.js";
+import type { NotificationPort } from "../../src/infra/app/notification-port.js";
 import type { FeishuClientPort } from "../../src/feishu/feishu-client.js";
 
 describe("buildNotificationBroker", () => {

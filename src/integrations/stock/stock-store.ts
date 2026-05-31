@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createDefaultJsonFile, writeJsonAtomically } from "../../app/json-file.js";
+import { createDefaultJsonFile, writeJsonAtomically } from "../../infra/app/json-file.js";
 import type { StockCode } from "./stock-code.js";
 import {
   StockStoreSchema,

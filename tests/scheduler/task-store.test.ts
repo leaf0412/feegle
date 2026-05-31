@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { migrate, type RuntimeDb } from "../../src/app/runtime-db.js";
-import { TaskStore } from "../../src/scheduler/task-store.js";
-import type { Task } from "../../src/scheduler/task.js";
+import { migrate, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
+import { TaskStore } from "../../src/features/scheduler/task-store.js";
+import type { Task } from "../../src/features/scheduler/task.js";
 
 function makeDb(): RuntimeDb {
   const db = new Database(":memory:");

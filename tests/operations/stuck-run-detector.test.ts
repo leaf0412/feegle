@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openRuntimeDb } from "../../src/app/runtime-db.js";
+import { openRuntimeDb } from "../../src/infra/app/runtime-db.js";
 import { RuntimeStore } from "../../src/core/runtime/runtime-store.js";
 import { StuckRunDetector } from "../../src/operations/stuck-run-detector.js";
 

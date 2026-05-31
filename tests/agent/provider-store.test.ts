@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ProviderStore } from "../../src/agent/provider-store.js";
-import { ConfigStore } from "../../src/app/config-store.js";
+import { ConfigStore } from "../../src/infra/app/config-store.js";
 
 async function seedConfig(home: string, jsonc = `{
   "schemaVersion": 1,

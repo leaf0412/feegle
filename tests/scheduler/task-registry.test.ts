@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { TaskRegistry } from "../../src/scheduler/task-registry.js";
-import type { TaskStorePort } from "../../src/scheduler/task-registry.js";
-import type { Task } from "../../src/scheduler/task.js";
+import { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
+import type { TaskStorePort } from "../../src/features/scheduler/task-registry.js";
+import type { Task } from "../../src/features/scheduler/task.js";
 
 function makeTask(id: string): Task {
   return {

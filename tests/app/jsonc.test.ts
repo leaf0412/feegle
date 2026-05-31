@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseJsonc, setJsoncValue, unsetJsoncValue } from "../../src/app/jsonc.js";
+import { parseJsonc, setJsoncValue, unsetJsoncValue } from "../../src/infra/app/jsonc.js";
 
 describe("setJsoncValue", () => {
   it("preserves comments and sibling fields when setting a nested value", () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import { BootContext } from "../../src/boot/boot-context.js";
-import { buildHandlerKindRegistry } from "../../src/scheduler/build-handler-kind-registry.js";
-import type { HandlerKind } from "../../src/scheduler/handler-kind.js";
-import { TaskRegistry } from "../../src/scheduler/task-registry.js";
+import { BootContext } from "../../src/infra/boot/boot-context.js";
+import { buildHandlerKindRegistry } from "../../src/features/scheduler/build-handler-kind-registry.js";
+import type { HandlerKind } from "../../src/features/scheduler/handler-kind.js";
+import { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
 import type { StockStore } from "../../src/integrations/stock/stock-store.js";
 
 function contextWithCoreCaps(): BootContext {

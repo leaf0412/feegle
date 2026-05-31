@@ -1,9 +1,9 @@
-import type { FeeglePlugin } from "../../boot/feegle-plugin.js";
+import type { FeeglePlugin } from "../../infra/boot/feegle-plugin.js";
 import {
   stockAdvisorKindModule,
   stockMonitorKindModule,
   stockPortfolioSnapshotKindModule
-} from "../../scheduler/default-handler-kind-modules.js";
+} from "../../features/scheduler/default-handler-kind-modules.js";
 import { defaultQuoteClientModules } from "../../integrations/stock/default-quote-client-modules.js";
 
 export const stockPlugin: FeeglePlugin = {

@@ -1,9 +1,9 @@
 import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
 import type { ProviderStore } from "../../src/agent/provider-store.js";
-import type { ConfigStorePort } from "../../src/app/config-store.js";
-import { HandlerKindRegistry } from "../../src/scheduler/handler-kind-registry.js";
-import type { TaskRegistry } from "../../src/scheduler/task-registry.js";
-import type { TaskScheduler } from "../../src/scheduler/task-scheduler.js";
+import type { ConfigStorePort } from "../../src/infra/app/config-store.js";
+import { HandlerKindRegistry } from "../../src/features/scheduler/handler-kind-registry.js";
+import type { TaskRegistry } from "../../src/features/scheduler/task-registry.js";
+import type { TaskScheduler } from "../../src/features/scheduler/task-scheduler.js";
 import type { QuoteClient } from "../../src/integrations/stock/stock-quote-port.js";
 import type { StockStore } from "../../src/integrations/stock/stock-store.js";
 import type { SlashCommandRegistryDeps } from "../../src/platform/slash-command-module.js";

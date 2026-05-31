@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { acquireFeegleLock } from "../../src/app/feegle-lock.js";
+import { acquireFeegleLock } from "../../src/infra/app/feegle-lock.js";
 
 describe("acquireFeegleLock", () => {
   it("prevents two app instances from sharing the same state directory", async () => {

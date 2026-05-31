@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { withinActiveHours } from "../../src/scheduler/active-hours.js";
-import type { Task } from "../../src/scheduler/task.js";
+import { withinActiveHours } from "../../src/features/scheduler/active-hours.js";
+import type { Task } from "../../src/features/scheduler/task.js";
 
 const task: Task = {
   id: "01",

@@ -1,7 +1,7 @@
-import type { CapabilityContext } from "../../boot/boot-context.js";
-import type { FeeglePlugin } from "../../boot/feegle-plugin.js";
-import type { Startable } from "../../app/feegle-app.js";
-import { GitService } from "../../git/git-service.js";
+import type { CapabilityContext } from "../../infra/boot/boot-context.js";
+import type { FeeglePlugin } from "../../infra/boot/feegle-plugin.js";
+import type { Startable } from "../../infra/app/feegle-app.js";
+import { GitService } from "../../infra/git/git-service.js";
 import type { FeishuClientPort } from "../../feishu/feishu-client.js";
 import type { FeishuCloudDocClientPort } from "../../feishu/feishu-cloud-doc-client.js";
 import type { FeishuCommandHandler } from "../../feishu/feishu-long-connection-runtime.js";
@@ -19,10 +19,10 @@ import {
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
 import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
 import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";
-import { resolveWorkspaceDir } from "../../app/workspace-dir.js";
-import { PlanArtifactService } from "../../workbench/plan-artifact-service.js";
-import type { PlanArtifactStore } from "../../workbench/plan-artifact-store.js";
-import { PlanExecutionService } from "../../workbench/plan-execution-service.js";
+import { resolveWorkspaceDir } from "../../infra/app/workspace-dir.js";
+import { PlanArtifactService } from "../../features/workbench/plan-artifact-service.js";
+import type { PlanArtifactStore } from "../../features/workbench/plan-artifact-store.js";
+import { PlanExecutionService } from "../../features/workbench/plan-execution-service.js";
 
 export interface FeishuPluginDeps {
   feegleHome: string;

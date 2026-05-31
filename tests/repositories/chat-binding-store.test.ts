@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { migrate, type RuntimeDb } from "../../src/app/runtime-db.js";
+import { migrate, type RuntimeDb } from "../../src/infra/app/runtime-db.js";
 import { ChatBindingStore } from "../../src/resources/repositories/chat-binding-store.js";
 
 function makeDb(): RuntimeDb {

@@ -8,7 +8,7 @@ import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
 import Database from "better-sqlite3";
 import { AgentLoadBalancer } from "../../src/agent/agent-load-balancer.js";
 import { SessionStore } from "../../src/agent/session-store.js";
-import { migrate } from "../../src/app/runtime-db.js";
+import { migrate } from "../../src/infra/app/runtime-db.js";
 
 describe("FeishuChatHandler", () => {
   afterEach(() => {
