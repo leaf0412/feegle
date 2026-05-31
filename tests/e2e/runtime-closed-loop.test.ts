@@ -787,4 +787,99 @@ describe("runtime closed-loop e2e", () => {
       await harness.close();
     }
   });
+
+  it("scheduler non-heartbeat kind (stock-monitor): task trigger -> runtime -> stock_monitor effect", async () => {
+    const harness = await createRuntimeClosedLoopHarness();
+    try {
+      // Register stock monitor effect handler
+      harness.effectHandlerRegistry.register({
+        pluginId: "core",
+        effectType: "stock_monitor",
+        execute(effect) {
+          harness.effectCalls.push({
+            pluginId: effect.pluginId,
+            effectType: effect.effectType,
+            input: effect.input
+          });
+          return { monitored: true, stocks: (effect.input as Record<string, unknown>).stocks };
+        }
+      });
+
+      // Intent resolver for scheduler tasks
+      harness.intentResolvers.register({
+        id: "scheduler-stock-monitor",
+        canResolve(event) {
+          return event.source.pluginId === "core" && event.source.triggerType === "scheduled_workflow";
+        },
+        resolve(event) {
+          return {
+            intentId: `intent_${event.triggerEventId}`,
+            kind: "scheduled_workflow" as const,
+            workspaceId: "ws_e2e",
+            projectId: null,
+            actor: { kind: "scheduler" as const },
+            payload: {
+              taskId: (event.external as Record<string, unknown>).taskId,
+              kind: (event.external as Record<string, unknown>).kind,
+              stocks: ["000001", "600519"],
+              tolerancePrice: 0.03
+            }
+          };
+        }
+      });
+
+      harness.workflowSelector.register({
+        id: "scheduler-stock-rule",
+        matches(intent) { return intent.kind === "scheduled_workflow"; },
+        definitionId: "scheduler.stock_monitor.workflow"
+      });
+
+      harness.workflowRegistry.register({
+        definitionId: "scheduler.stock_monitor.workflow",
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "monitor",
+            async run(ctx) {
+              const payload = ctx.input as Record<string, unknown>;
+              await ctx.executeEffect({
+                pluginId: "core",
+                effectType: "stock_monitor",
+                input: {
+                  stocks: payload.stocks,
+                  tolerancePrice: payload.tolerancePrice
+                }
+              });
+              return { kind: "complete" as const, output: { monitored: true } };
+            }
+          }
+        ]
+      });
+
+      // Create scheduler trigger event for stock-monitor kind
+      const { taskToTriggerEvent } = await import("@features/scheduler/scheduler-trigger-event.js");
+      const trigger = taskToTriggerEvent({
+        triggerEventId: "trg_scheduler_stock",
+        receivedAt: "2026-05-31T00:00:00.000Z",
+        taskId: "task_stock_e2e",
+        taskName: "E2E stock monitor",
+        kind: "stock-monitor"
+      });
+
+      const result = await harness.dispatcher.dispatch(trigger);
+      const wfiId = `wfi_e2e_${harness.wfiCounter}`;
+
+      expect(result.status).toBe("succeeded");
+      const events = harness.runtimeEvents(wfiId);
+      expect(events).toContain("attempt.completed");
+
+      // Verify stock monitor effect was called
+      expect(harness.effectCalls).toContainEqual(
+        expect.objectContaining({ pluginId: "core", effectType: "stock_monitor" })
+      );
+    } finally {
+      await harness.close();
+    }
+  });
 });

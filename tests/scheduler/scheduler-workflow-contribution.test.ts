@@ -50,4 +50,91 @@ describe("schedulerWorkflowContribution", () => {
     });
     expect(result).toEqual({ executed: true, prompt: "hello" });
   });
+
+  it("registers stock monitor workflow and effect handler", async () => {
+    const workflows = new WorkflowRegistry();
+    const effectHandlers = new EffectHandlerRegistry();
+    const ctx = new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers,
+    });
+
+    await schedulerWorkflowContribution().register(ctx);
+
+    const def = workflows.require("scheduler.stock_monitor.workflow");
+    expect(def.definitionId).toBe("scheduler.stock_monitor.workflow");
+    expect(def.steps).toHaveLength(1);
+    expect(def.steps[0].stepId).toBe("monitor");
+
+    expect(effectHandlers.has("core", "stock_monitor")).toBe(true);
+    const execResult = await effectHandlers.execute({
+      effectId: "eff_stock",
+      pluginId: "core",
+      effectType: "stock_monitor",
+      input: { stocks: ["000001"], tolerancePrice: 0.02 }
+    });
+    expect(execResult).toEqual({ monitored: true, stocks: ["000001"] });
+  });
+
+  it("registers stock portfolio snapshot workflow and effect handler", async () => {
+    const workflows = new WorkflowRegistry();
+    const effectHandlers = new EffectHandlerRegistry();
+    const ctx = new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers,
+    });
+
+    await schedulerWorkflowContribution().register(ctx);
+
+    const def = workflows.require("scheduler.stock_portfolio_snapshot.workflow");
+    expect(def.definitionId).toBe("scheduler.stock_portfolio_snapshot.workflow");
+    expect(def.steps).toHaveLength(1);
+    expect(def.steps[0].stepId).toBe("snapshot");
+
+    expect(effectHandlers.has("core", "stock_portfolio_snapshot")).toBe(true);
+  });
+
+  it("registers stock advisor workflow and effect handler", async () => {
+    const workflows = new WorkflowRegistry();
+    const effectHandlers = new EffectHandlerRegistry();
+    const ctx = new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers,
+    });
+
+    await schedulerWorkflowContribution().register(ctx);
+
+    const def = workflows.require("scheduler.stock_advisor.workflow");
+    expect(def.definitionId).toBe("scheduler.stock_advisor.workflow");
+    expect(def.steps).toHaveLength(1);
+    expect(def.steps[0].stepId).toBe("advise");
+
+    expect(effectHandlers.has("core", "stock_advisor")).toBe(true);
+  });
+
+  it("registers gitlab follow workflow and effect handler", async () => {
+    const workflows = new WorkflowRegistry();
+    const effectHandlers = new EffectHandlerRegistry();
+    const ctx = new RuntimeContributionContext({
+      workflows,
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers,
+    });
+
+    await schedulerWorkflowContribution().register(ctx);
+
+    const def = workflows.require("scheduler.gitlab_follow.workflow");
+    expect(def.definitionId).toBe("scheduler.gitlab_follow.workflow");
+    expect(def.steps).toHaveLength(1);
+    expect(def.steps[0].stepId).toBe("follow");
+
+    expect(effectHandlers.has("core", "gitlab_follow")).toBe(true);
+  });
 });

@@ -17,8 +17,6 @@ import type { Task, TaskLastRun, TaskRunStatus } from "./task.js";
 import type { Clock, DailyDedupStore, HostInfoProvider, Logger } from "./task-context.js";
 import type { TaskMutationObserver, TaskRegistry } from "./task-registry.js";
 
-const RUNTIME_NATIVE_KINDS = new Set(["heartbeat", "agent_prompt"]);
-
 interface ConfigStorePort {
   get(): Readonly<FeegleConfig>;
 }
@@ -170,8 +168,8 @@ export class TaskScheduler implements TaskMutationObserver {
 
     const startedAt = Date.now();
     try {
-      // Route supported kinds through the workflow runner
-      if (this.deps.workflowRunner && RUNTIME_NATIVE_KINDS.has(task.kind)) {
+      // Route all tasks through the workflow runner when available
+      if (this.deps.workflowRunner) {
         const result = await this.deps.workflowRunner.startScheduledTask({
           taskId: task.id,
           kind: task.kind,

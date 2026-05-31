@@ -180,8 +180,8 @@ describe("TaskScheduler", () => {
     expect(calls).toEqual(["workflow-runner"]);
   });
 
-  it("routes unsupported kind through legacy handler and skips workflow runner", async () => {
-    const task = makeTask("task-legacy", { kind: "stock-monitor" });
+  it("routes every kind through workflow runner when available, skipping legacy handler", async () => {
+    const task = makeTask("task-workflow-all", { kind: "stock-monitor" });
     const registry = new TaskRegistry(memoryStore([task], []));
     const calls: string[] = [];
     const kind: HandlerKind<Record<string, never>> = {
@@ -212,6 +212,39 @@ describe("TaskScheduler", () => {
           return { status: "succeeded" };
         }
       }
+    });
+
+    await scheduler.runOnce("task-workflow-all");
+
+    expect(calls).toEqual(["workflow-runner"]);
+  });
+
+  it("falls back to legacy handler when workflow runner is not available", async () => {
+    const task = makeTask("task-legacy", { kind: "stock-monitor" });
+    const registry = new TaskRegistry(memoryStore([task], []));
+    const calls: string[] = [];
+    const kind: HandlerKind<Record<string, never>> = {
+      id: "stock-monitor",
+      title: "Stock Monitor",
+      description: "test",
+      parseParams: () => ({}),
+      describeParams: () => "none",
+      run: async () => {
+        calls.push("legacy-handler");
+        return { outcome: "sent" };
+      }
+    };
+    const scheduler = new TaskScheduler({
+      registry,
+      kinds: new HandlerKindRegistry().register(kind),
+      configStore: { get: () => ({ schemaVersion: 1, failureTarget: null }) },
+      dedup: { checkAndMark: async () => true },
+      runsLog: { append: async () => {} },
+      notify: { sendText: async () => {}, sendCard: async () => {} },
+      agents: new AgentProviderRegistry(),
+      host: { read: async () => ({ hostname: "local", pid: 1 }) },
+      clock: { now: () => new Date("2026-05-18T01:00:00.000Z") },
+      logger: silentLogger
     });
 
     await scheduler.runOnce("task-legacy");
