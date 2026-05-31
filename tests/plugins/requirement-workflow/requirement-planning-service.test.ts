@@ -41,6 +41,16 @@ describe("RequirementPlanStore", () => {
     expect(second.version).toBe(2);
     expect(store.latest("reqwf_1")).toEqual(second);
     expect(store.listVersions("reqwf_1").map((item) => item.version)).toEqual([1, 2]);
+
+    const other = store.createVersion({
+      requirementId: "reqwf_2",
+      authorUserId: "agent",
+      summary: "Other req",
+      markdown: "# Other",
+      source: "generated"
+    });
+    expect(other.version).toBe(1);
+    expect(store.listVersions("reqwf_1")).toHaveLength(2);
   });
 
   it("rejects empty markdown and returns undefined for unknown requirement", () => {

@@ -65,45 +65,49 @@ export class RequirementPlanStore {
       throw new Error("Plan markdown is required");
     }
 
-    const nextVersionRow = this.db
-      .prepare(
-        `select coalesce(max(version), 0) + 1 as next_version
-         from requirement_plan_versions
-         where requirement_id = ?`
-      )
-      .get(input.requirementId) as { next_version: number };
+    const insert = this.db.transaction((): RequirementPlanVersion => {
+      const nextVersionRow = this.db
+        .prepare(
+          `select coalesce(max(version), 0) + 1 as next_version
+           from requirement_plan_versions
+           where requirement_id = ?`
+        )
+        .get(input.requirementId) as { next_version: number };
 
-    const record: RequirementPlanVersion = {
-      planId: generatePlanId(),
-      requirementId: input.requirementId,
-      version: nextVersionRow.next_version,
-      authorUserId: input.authorUserId,
-      summary: input.summary,
-      markdown: input.markdown,
-      source: input.source,
-      feedback: input.feedback,
-      createdAt: new Date().toISOString()
-    };
+      const record: RequirementPlanVersion = {
+        planId: generatePlanId(),
+        requirementId: input.requirementId,
+        version: nextVersionRow.next_version,
+        authorUserId: input.authorUserId,
+        summary: input.summary,
+        markdown: input.markdown,
+        source: input.source,
+        feedback: input.feedback,
+        createdAt: new Date().toISOString()
+      };
 
-    this.db
-      .prepare(
-        `insert into requirement_plan_versions
-           (plan_id, requirement_id, version, author_user_id, summary, markdown, source, feedback, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        record.planId,
-        record.requirementId,
-        record.version,
-        record.authorUserId,
-        record.summary,
-        record.markdown,
-        record.source,
-        record.feedback ?? null,
-        record.createdAt
-      );
+      this.db
+        .prepare(
+          `insert into requirement_plan_versions
+             (plan_id, requirement_id, version, author_user_id, summary, markdown, source, feedback, created_at)
+           values (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          record.planId,
+          record.requirementId,
+          record.version,
+          record.authorUserId,
+          record.summary,
+          record.markdown,
+          record.source,
+          record.feedback ?? null,
+          record.createdAt
+        );
 
-    return record;
+      return record;
+    });
+
+    return insert();
   }
 
   latest(requirementId: string): RequirementPlanVersion | undefined {
