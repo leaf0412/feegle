@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createSanitizingLogger,
+  installFeishuConsoleLogger,
   sanitizeLogArgs,
   sanitizeLogString,
   shouldSuppressDebug
@@ -58,5 +59,41 @@ describe("createSanitizingLogger", () => {
     expect(inner.info).toHaveBeenCalledWith("connect device_id=***");
     expect(inner.warn).toHaveBeenCalledWith("retry");
     expect(inner.error).toHaveBeenCalledWith(new Error("boom"));
+  });
+});
+
+describe("installFeishuConsoleLogger", () => {
+  it("installs sanitizing behavior into console once", () => {
+    const original = {
+      debug: console.debug,
+      info: console.info,
+      warn: console.warn,
+      error: console.error
+    };
+    const calls: unknown[][] = [];
+    console.debug = (...args: unknown[]) => calls.push(["debug", ...args]);
+    console.info = (...args: unknown[]) => calls.push(["info", ...args]);
+    console.warn = (...args: unknown[]) => calls.push(["warn", ...args]);
+    console.error = (...args: unknown[]) => calls.push(["error", ...args]);
+
+    try {
+      installFeishuConsoleLogger();
+      installFeishuConsoleLogger();
+
+      console.debug("ping success");
+      console.info("connect token=secret");
+      console.warn("retry device_id=abcd");
+
+      expect(calls).toEqual([
+        ["info", "connect token=***"],
+        ["warn", "retry device_id=***"]
+      ]);
+    } finally {
+      delete (console as unknown as Record<symbol, boolean>)[Symbol.for("feegle.feishu.sanitizing-console.installed")];
+      console.debug = original.debug;
+      console.info = original.info;
+      console.warn = original.warn;
+      console.error = original.error;
+    }
   });
 });

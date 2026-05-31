@@ -8,8 +8,10 @@ import { ConfigStore } from "@infra/app/config-store.js";
 import { resolveFeegleHome } from "@infra/app/feegle-home.js";
 import { normalizeOwnerEmails } from "@infra/app/owner-emails.js";
 import { installConsoleTimestamps } from "@infra/app/console-timestamps.js";
+import { installFeishuConsoleLogger } from "./feishu-logger.js";
 
 installConsoleTimestamps();
+installFeishuConsoleLogger();
 
 const feegleHome = resolveFeegleHome(process.env);
 const configStore = await ConfigStore.load(feegleHome);

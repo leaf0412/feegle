@@ -10,6 +10,7 @@ const SENSITIVE_PARAMS = [
 ];
 
 const HEARTBEAT_NEEDLES = ["ping success", "receive pong"];
+const INSTALLED_FLAG = Symbol.for("feegle.feishu.sanitizing-console.installed");
 
 export function sanitizeLogString(value: string): string {
   let result = value;
@@ -66,4 +67,25 @@ export function createSanitizingLogger(inner: LeveledLogger): Required<LeveledLo
     warn: (...args: unknown[]) => inner.warn(...sanitizeLogArgs(args)),
     error: (...args: unknown[]) => inner.error(...sanitizeLogArgs(args))
   };
+}
+
+export function installFeishuConsoleLogger(): void {
+  const store = console as unknown as Record<symbol, boolean>;
+  if (store[INSTALLED_FLAG]) {
+    return;
+  }
+  store[INSTALLED_FLAG] = true;
+
+  const inner: Required<LeveledLogger> = {
+    debug: console.debug.bind(console),
+    info: console.info.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console)
+  };
+  const logger = createSanitizingLogger(inner);
+
+  console.debug = (...args: unknown[]): void => logger.debug(...args);
+  console.info = (...args: unknown[]): void => logger.info(...args);
+  console.warn = (...args: unknown[]): void => logger.warn(...args);
+  console.error = (...args: unknown[]): void => logger.error(...args);
 }
