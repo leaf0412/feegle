@@ -4,6 +4,7 @@ import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
+import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
 
 function intentKindFromEvent(event: TriggerEvent): IntentKind {
   const commandType = event.external.commandType;
@@ -57,6 +58,10 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
     id: "feishu-runtime",
     register: (ctx) => {
       // --- Intent resolvers ---
+
+      // Requirement message events: claim before feishu-message so requirement
+      // texts are routed to requirement_intake rather than agent chat.
+      registerFeishuRequirementIntentResolvers(ctx.intentResolvers);
 
       // Message events: route chat vs slash_command based on commandType
       ctx.intentResolvers.register({

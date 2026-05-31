@@ -5,6 +5,39 @@ export function requirementWorkflowRuntimeContribution(): RuntimeContributionMod
     id: "requirement-workflow-runtime",
     register(ctx) {
       ctx.workflowSelector.register({
+        id: "requirement-intake",
+        matches: (intent) => intent.kind === "requirement_intake",
+        definitionId: "requirement.intake.workflow"
+      });
+
+      ctx.workflows.register({
+        definitionId: "requirement.intake.workflow",
+        version: 1,
+        concurrencyPolicy: "reject_if_running",
+        steps: [
+          {
+            stepId: "run_intake",
+            async run(stepCtx) {
+              const input = stepCtx.input as { requirementId?: string; sourcePlugin?: string; [k: string]: unknown };
+              const output = await stepCtx.executeEffect({
+                pluginId: "requirement-workflow",
+                effectType: "plan.generate",
+                input
+              });
+              if (typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0) {
+                await stepCtx.executeEffect({
+                  pluginId: input.sourcePlugin,
+                  effectType: "requirement.plan_review.render",
+                  input: { ...input, ...(output as Record<string, unknown>) }
+                });
+              }
+              return { kind: "complete", output };
+            }
+          }
+        ]
+      });
+
+      ctx.workflowSelector.register({
         id: "requirement-plan-generate",
         matches: (intent) => intent.kind === "requirement_plan_generate",
         definitionId: "requirement.plan.generate.workflow"

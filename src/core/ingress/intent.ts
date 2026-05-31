@@ -10,7 +10,8 @@ export const intentKinds = [
   "requirement_plan_approve",
   "requirement_execute",
   "requirement_verify",
-  "requirement_accept"
+  "requirement_accept",
+  "requirement_intake"
 ] as const;
 
 export type IntentKind = (typeof intentKinds)[number];
