@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { StatusCommandHandler } from "@platform/commands/system/status-command.js";
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { RunsLogEntry } from "@features/scheduler/runs-log.js";
 import type { TaskRegistry } from "@features/scheduler/task-registry.js";
 import type { Task } from "@features/scheduler/task.js";

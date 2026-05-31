@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ChatHistoryStore } from "../../src/agent/chat-history-store.js";
+import { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
 
 describe("ChatHistoryStore", () => {
   it("returns an empty history for unknown sessions", () => {

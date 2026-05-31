@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { intentKinds } from "../../src/ingress/intent.js";
-import type { Intent } from "../../src/ingress/intent.js";
-import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
-import { triggerEventModelVersion } from "../../src/ingress/trigger-event.js";
-import type { TriggerEvent } from "../../src/ingress/trigger-event.js";
+import { intentKinds } from "@core/ingress/intent.js";
+import type { Intent } from "@core/ingress/intent.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import { triggerEventModelVersion } from "@core/ingress/trigger-event.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
 describe("ingress models", () => {
   it("exports runtime markers so missing model modules are caught by tests", () => {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DoctorCommandHandler } from "@platform/commands/system/doctor-command.js";
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { ConfigStorePort, FeegleConfig } from "@infra/app/config-store.js";
 
 function stubConfig(config: FeegleConfig): ConfigStorePort {

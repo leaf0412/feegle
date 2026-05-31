@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { IngressDispatcher } from "../../src/ingress/ingress-dispatcher.js";
-import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
-import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
+import { IngressDispatcher } from "@core/ingress/ingress-dispatcher.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 
 function stubResolvers() {
   return {

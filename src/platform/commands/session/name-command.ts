@@ -1,4 +1,4 @@
-import type { SessionStore } from "../../../agent/session-store.js";
+import type { SessionStore } from "@integrations/agent/session-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

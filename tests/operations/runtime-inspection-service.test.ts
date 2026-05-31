@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb } from "@infra/app/runtime-db.js";
 import { RuntimeStore } from "@core/runtime/runtime-store.js";
-import { RuntimeInspectionService } from "../../src/operations/runtime-inspection-service.js";
+import { RuntimeInspectionService } from "@core/operations/runtime-inspection-service.js";
 
 describe("RuntimeInspectionService", () => {
   let tempDir: string;

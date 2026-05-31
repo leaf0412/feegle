@@ -1,6 +1,6 @@
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { ChatHistoryStore } from "../../../agent/chat-history-store.js";
-import type { SessionStore } from "../../../agent/session-store.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
+import type { SessionStore } from "@integrations/agent/session-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

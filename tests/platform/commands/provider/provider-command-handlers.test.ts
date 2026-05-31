@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../../../src/agent/agent-provider-registry.js";
-import { ProviderStore } from "../../../../src/agent/provider-store.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { ProviderStore } from "@integrations/agent/provider-store.js";
 import { ConfigStore } from "@infra/app/config-store.js";
 import {
   ProviderListCommandHandler,

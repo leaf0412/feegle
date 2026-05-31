@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PromptAgentAdapter } from "../../src/agent/prompt-agent-adapter.js";
+import { PromptAgentAdapter } from "@integrations/agent/prompt-agent-adapter.js";
 
 describe("PromptAgentAdapter.chat", () => {
   it("wraps a single user message with process update guidance", async () => {

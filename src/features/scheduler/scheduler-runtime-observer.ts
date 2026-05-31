@@ -1,4 +1,4 @@
-import type { TriggerEvent } from "../../ingress/trigger-event.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import { taskToTriggerEvent } from "./scheduler-trigger-event.js";
 
 export interface SchedulerIngress {

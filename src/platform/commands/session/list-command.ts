@@ -1,5 +1,5 @@
-import type { ChatHistoryStore } from "../../../agent/chat-history-store.js";
-import type { SessionStore, SessionRecord } from "../../../agent/session-store.js";
+import type { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
+import type { SessionStore, SessionRecord } from "@integrations/agent/session-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ChatHistoryStore } from "../../../src/agent/chat-history-store.js";
-import { SessionStore } from "../../../src/agent/session-store.js";
+import { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
+import { SessionStore } from "@integrations/agent/session-store.js";
 import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { DeleteCommandHandler } from "@platform/commands/session/delete-command.js";
 import { defineSlashCommand } from "@platform/slash-command-catalog.js";

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
-import { SessionStore } from "../../src/agent/session-store.js";
+import { SessionStore } from "@integrations/agent/session-store.js";
 
 let db: RuntimeDb;
 let clock: { current: Date };

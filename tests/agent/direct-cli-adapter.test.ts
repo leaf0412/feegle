@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DirectCliAdapter } from "../../src/agent/direct-cli-adapter.js";
+import { DirectCliAdapter } from "@integrations/agent/direct-cli-adapter.js";
 
 // Fake CLI: reads the whole prompt from stdin, writes a run-log line to stderr
 // (which the adapter must ignore), and echoes the prompt back on stdout prefixed

@@ -38,6 +38,9 @@ Feegle uses directory boundaries as architecture boundaries.
 | `src/prototype` | `src/features/prototype` |
 | `src/workspace` | `src/resources/workspace` |
 | `src/repositories` | `src/resources/repositories` |
+| `src/agent` | `src/integrations/agent` |
+| `src/ingress` | `src/core/ingress` |
+| `src/operations` | `src/core/operations` |
 
 ## Rule
 

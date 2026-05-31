@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SessionStore } from "../../src/agent/session-store.js";
+import { SessionStore } from "@integrations/agent/session-store.js";
 import { migrate, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { migrateLegacySessionsJson } from "@infra/boot/phases/stores-phase.js";
 

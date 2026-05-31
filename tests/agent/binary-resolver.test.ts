@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveBinary } from "../../src/agent/binary-resolver.js";
+import { resolveBinary } from "@integrations/agent/binary-resolver.js";
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

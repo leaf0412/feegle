@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { simpleTextCard } from "../util/simple-text-card.js";
 import { AgentRunError, UnknownProviderError } from "../handler-errors.js";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";

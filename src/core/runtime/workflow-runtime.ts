@@ -63,7 +63,24 @@ export class WorkflowRuntime {
       const stepInput: WorkflowRuntimeStartInput = { ...input, input: currentInput };
       const stateId = this.startStep(stepInput, step, eventId);
       const ctx = this.buildContext(stepInput, stateId);
-      const result = await step.run(ctx);
+      let result: Awaited<ReturnType<WorkflowStep["run"]>>;
+      try {
+        result = await step.run(ctx);
+      } catch (err: unknown) {
+        const normalized: RuntimeError =
+          err && typeof err === "object" && "code" in err && "category" in err && "message" in err
+            ? (err as RuntimeError)
+            : {
+                code: "STEP_EXECUTION_ERROR",
+                category: "unknown",
+                message: err instanceof Error ? err.message : String(err),
+                retryable: false,
+                recoverable: true
+              };
+        this.failStep(stepInput, step, stateId, normalized, eventId);
+        this.finish(stepInput, "failed", step.stepId, normalized, eventId);
+        return { status: "failed" };
+      }
 
       if (result.kind === "wait") {
         this.waitStep(stepInput, step, stateId, result.output, result.waitFor, eventId);

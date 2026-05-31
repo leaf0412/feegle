@@ -1,8 +1,8 @@
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import {
   hasCapability,
   type ContextCompressor
-} from "../../../agent/agent-capabilities.js";
+} from "@integrations/agent/agent-capabilities.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

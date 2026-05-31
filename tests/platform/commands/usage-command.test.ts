@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { UsageCommandHandler } from "@platform/commands/system/usage-command.js";
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
-import type { UsageReport } from "../../../src/agent/agent-capabilities.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { UsageReport } from "@integrations/agent/agent-capabilities.js";
 
 describe("UsageCommandHandler", () => {
   it("tells users to activate a provider when none is active", async () => {

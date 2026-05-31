@@ -1,5 +1,5 @@
 import os from "node:os";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { RunsLog } from "@features/scheduler/runs-log.js";
 import type { TaskRegistry } from "@features/scheduler/task-registry.js";
 import type {

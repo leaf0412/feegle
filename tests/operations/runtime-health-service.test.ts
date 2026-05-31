@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb } from "@infra/app/runtime-db.js";
 import { RuntimeStore } from "@core/runtime/runtime-store.js";
-import { RuntimeHealthService } from "../../src/operations/runtime-health-service.js";
-import { StuckRunDetector } from "../../src/operations/stuck-run-detector.js";
+import { RuntimeHealthService } from "@core/operations/runtime-health-service.js";
+import { StuckRunDetector } from "@core/operations/stuck-run-detector.js";
 
 describe("RuntimeHealthService", () => {
   let tempDir: string;

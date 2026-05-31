@@ -1,5 +1,5 @@
-import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import type { ProviderStore } from "../../src/agent/provider-store.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { ProviderStore } from "@integrations/agent/provider-store.js";
 import type { ConfigStorePort } from "@infra/app/config-store.js";
 import { HandlerKindRegistry } from "@features/scheduler/handler-kind-registry.js";
 import type { TaskRegistry } from "@features/scheduler/task-registry.js";

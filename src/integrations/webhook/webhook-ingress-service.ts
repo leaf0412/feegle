@@ -1,6 +1,6 @@
 import type { WebhookSourceRecord } from "./webhook-source-store.js";
 import { webhookPayloadToTriggerEvent } from "./webhook-trigger-event-adapter.js";
-import type { TriggerEvent } from "../../core/ingress/trigger-event.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
 export interface WebhookSecretResolver {
   resolve(secretRef: string): string | null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { IntentResolverRegistry } from "../../../src/ingress/intent-resolver-registry.js";
-import { WorkflowSelector } from "../../../src/ingress/workflow-selector.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import { feishuRuntimeContribution } from "@plugins/feishu/feishu-runtime-contribution.js";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";

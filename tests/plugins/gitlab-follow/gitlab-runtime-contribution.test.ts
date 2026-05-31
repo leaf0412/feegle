@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
-import { IntentResolverRegistry } from "../../../src/ingress/intent-resolver-registry.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
-import { WorkflowSelector } from "../../../src/ingress/workflow-selector.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import { gitlabRuntimeContribution } from "@plugins/gitlab-follow/gitlab-runtime-contribution.js";
 
 describe("gitlab runtime contribution", () => {

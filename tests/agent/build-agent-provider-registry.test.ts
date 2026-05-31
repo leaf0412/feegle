@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildAgentProviderRegistry } from "../../src/agent/build-agent-provider-registry.js";
-import type { ProvidersFile } from "../../src/agent/provider-store.js";
+import { buildAgentProviderRegistry } from "@integrations/agent/build-agent-provider-registry.js";
+import type { ProvidersFile } from "@integrations/agent/provider-store.js";
 
 function fakeStore(file: ProvidersFile): {
   snapshot: () => ProvidersFile;

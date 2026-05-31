@@ -1,4 +1,4 @@
-import type { ChatHistoryStore } from "../../../agent/chat-history-store.js";
+import type { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

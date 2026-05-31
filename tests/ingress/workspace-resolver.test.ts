@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { WorkspaceStore } from "@resources/workspace/workspace-store.js";
-import { WorkspaceResolver } from "../../src/ingress/workspace-resolver.js";
+import { WorkspaceResolver } from "@core/ingress/workspace-resolver.js";
 
 describe("WorkspaceResolver", () => {
   let tempDir: string;

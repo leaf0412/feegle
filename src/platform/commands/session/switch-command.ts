@@ -1,4 +1,4 @@
-import type { SessionStore, SessionRecord } from "../../../agent/session-store.js";
+import type { SessionStore, SessionRecord } from "@integrations/agent/session-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

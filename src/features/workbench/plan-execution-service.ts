@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type { AgentCli } from "../../agent/agent-cli.js";
+import type { AgentCli } from "@integrations/agent/agent-cli.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import {
   buildBaseBranchPromptCard,

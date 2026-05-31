@@ -17,16 +17,16 @@ import { ControlActionProcessor, type ControlActionHandlers } from "@core/contro
 import { RecoveryService } from "@core/recovery/recovery-service.js";
 import { WorkspaceStore } from "@resources/workspace/workspace-store.js";
 
-import { IngressDispatcher, type IngressEventSink, type IngressWorkflowRuntime } from "../../src/ingress/ingress-dispatcher.js";
-import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
-import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
-import type { IdentityResolverPort } from "../../src/ingress/identity-resolver.js";
-import type { WorkspaceResolverPort } from "../../src/ingress/workspace-resolver.js";
-import type { PermissionPolicyPort } from "../../src/ingress/permission-policy.js";
+import { IngressDispatcher, type IngressEventSink, type IngressWorkflowRuntime } from "@core/ingress/ingress-dispatcher.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
+import type { IdentityResolverPort } from "@core/ingress/identity-resolver.js";
+import type { WorkspaceResolverPort } from "@core/ingress/workspace-resolver.js";
+import type { PermissionPolicyPort } from "@core/ingress/permission-policy.js";
 
-import { RuntimeInspectionService } from "../../src/operations/runtime-inspection-service.js";
-import { RuntimeHealthService } from "../../src/operations/runtime-health-service.js";
-import { StuckRunDetector } from "../../src/operations/stuck-run-detector.js";
+import { RuntimeInspectionService } from "@core/operations/runtime-inspection-service.js";
+import { RuntimeHealthService } from "@core/operations/runtime-health-service.js";
+import { StuckRunDetector } from "@core/operations/stuck-run-detector.js";
 
 export interface RecordedEffectCall {
   pluginId: string;

@@ -1,5 +1,5 @@
 import { Cron } from "croner";
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { FeegleConfig } from "@infra/app/config-store.js";
 import type { HookManager } from "@infra/app/hooks.js";
 import type { NotificationPort } from "@infra/app/notification-port.js";

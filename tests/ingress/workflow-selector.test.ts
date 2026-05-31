@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 
 describe("WorkflowSelector", () => {
   it("selects a workflow definition from a resolved intent", () => {

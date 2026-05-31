@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildProviderAdapter,
   defaultProviderDisplayName
-} from "../../src/agent/provider-adapter-factory.js";
-import { DirectCliAdapter } from "../../src/agent/direct-cli-adapter.js";
+} from "@integrations/agent/provider-adapter-factory.js";
+import { DirectCliAdapter } from "@integrations/agent/direct-cli-adapter.js";
 
 describe("provider-adapter-factory", () => {
   it("builds a DirectCliAdapter for codex records", () => {

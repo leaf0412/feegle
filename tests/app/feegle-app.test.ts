@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { FeegleApp } from "@infra/app/feegle-app.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";

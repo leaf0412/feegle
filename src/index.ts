@@ -109,9 +109,9 @@ export {
   type PlatformActionContext,
   type PlatformActionHandler
 } from "./platform/action-router.js";
-export { createAgent, listAgentKinds, registerAgent, agentDisplayName } from "./agent/agent-registry.js";
-export type { AgentFactory } from "./agent/agent-registry.js";
-export { hasCapability } from "./agent/agent-capabilities.js";
+export { createAgent, listAgentKinds, registerAgent, agentDisplayName } from "@integrations/agent/agent-registry.js";
+export type { AgentFactory } from "@integrations/agent/agent-registry.js";
+export { hasCapability } from "@integrations/agent/agent-capabilities.js";
 export type {
   AgentDoctorInfo,
   CommandProvider,
@@ -134,6 +134,6 @@ export type {
   UsageReport,
   UsageReporter,
   UsageWindow
-} from "./agent/agent-capabilities.js";
+} from "@integrations/agent/agent-capabilities.js";
 export { HookManager, HOOK_EVENTS } from "./infra/app/hooks.js";
 export type { HookConfig, HookEventPayload, HookEventType, HookHandlerType } from "./infra/app/hooks.js";

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { CommandsCommandHandler } from "@platform/commands/workspace/commands-command.js";
 import { CompressCommandHandler } from "@platform/commands/workspace/compress-command.js";
 import { ShowCommandHandler } from "@platform/commands/workspace/show-command.js";

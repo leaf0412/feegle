@@ -1,4 +1,4 @@
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { ConfigStorePort } from "@infra/app/config-store.js";
 import type {
   SlashCommandHandler,

@@ -1,4 +1,4 @@
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { NotificationPort } from "@infra/app/notification-port.js";
 import type { Task } from "./task.js";
 

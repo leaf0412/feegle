@@ -1,5 +1,5 @@
-import type { IntentResolverRegistry } from "../../ingress/intent-resolver-registry.js";
-import type { WorkflowSelector } from "../../ingress/workflow-selector.js";
+import type { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import type { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import type { EffectHandlerRegistry } from "./effect-handler-registry.js";
 import type { WorkflowRegistry } from "./workflow-registry.js";
 

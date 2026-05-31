@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
-import type { AgentCli } from "../../src/agent/agent-cli.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { AgentCli } from "@integrations/agent/agent-cli.js";
 
 function stubAgent(): AgentCli {
   return {

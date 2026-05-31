@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentLoadBalancer } from "../../src/agent/agent-load-balancer.js";
+import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
 
 describe("AgentLoadBalancer", () => {
   it("picks the candidate with the fewest in-flight turns so load actually spreads", () => {

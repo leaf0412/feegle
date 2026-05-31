@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { HandlerKindRegistry } from "@features/scheduler/handler-kind-registry.js";
 import { TaskRegistry } from "@features/scheduler/task-registry.js";
 import { TaskScheduler } from "@features/scheduler/task-scheduler.js";

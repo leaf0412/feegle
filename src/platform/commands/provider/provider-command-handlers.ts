@@ -1,14 +1,14 @@
 import { stat } from "node:fs/promises";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import {
   buildProviderAdapter,
   defaultProviderDisplayName
-} from "../../../agent/provider-adapter-factory.js";
+} from "@integrations/agent/provider-adapter-factory.js";
 import {
   ProviderRecordSchema,
   type ProviderRecord,
   type ProviderStorePort
-} from "../../../agent/provider-store.js";
+} from "@integrations/agent/provider-store.js";
 import type {
   SlashCommandContext,
   SlashCommandHandler,

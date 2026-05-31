@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
 import type { PortfolioPosition } from "@integrations/stock/stock-store-types.js";
 import { riskLevel } from "@integrations/stock/stock-domain.js";

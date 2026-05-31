@@ -1,7 +1,7 @@
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { buildNotificationBroker } from "../../app/build-notification-broker.js";
 import { GitService } from "../../git/git-service.js";
 import { GitLabClient } from "@integrations/gitlab/gitlab-client.js";

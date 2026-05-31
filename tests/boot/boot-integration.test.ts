@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { FeegleApp, type FeegleAppDeps } from "@infra/app/feegle-app.js";
 import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { BootContext } from "@infra/boot/boot-context.js";

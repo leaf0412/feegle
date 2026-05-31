@@ -1,4 +1,4 @@
-import type { TriggerEvent } from "../../ingress/trigger-event.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
 export function feishuMessageEnvelopeToTriggerEvent(input: {
   triggerEventId: string;

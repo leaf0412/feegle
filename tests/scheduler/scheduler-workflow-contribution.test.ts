@@ -3,8 +3,8 @@ import { schedulerWorkflowContribution } from "@features/scheduler/scheduler-wor
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
-import { IntentResolverRegistry } from "../../src/ingress/intent-resolver-registry.js";
-import { WorkflowSelector } from "../../src/ingress/workflow-selector.js";
+import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
+import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 
 describe("schedulerWorkflowContribution", () => {
   it("registers heartbeat and agent_prompt workflows with correct metadata, and an agent_prompt effect handler", async () => {

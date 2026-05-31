@@ -5,7 +5,7 @@ import type { ControlActionProcessor } from "@core/control/control-action-proces
 import type { ControlActionStore } from "@core/control/control-action-store.js";
 import type { WorkflowRuntime } from "@core/runtime/workflow-runtime.js";
 import type { MemoryService } from "@core/memory/memory-service.js";
-import type { RuntimeInspectionService } from "../../operations/runtime-inspection-service.js";
+import type { RuntimeInspectionService } from "@core/operations/runtime-inspection-service.js";
 
 const listDefinition = defineSlashCommand(
   "runtime_list",

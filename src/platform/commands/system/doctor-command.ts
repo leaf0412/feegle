@@ -1,11 +1,11 @@
 import { access, constants } from "node:fs/promises";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import {
   hasCapability,
   type DoctorCheckResult,
   type DoctorChecker,
   type DoctorStatus
-} from "../../../agent/agent-capabilities.js";
+} from "@integrations/agent/agent-capabilities.js";
 import type { ConfigStorePort } from "@infra/app/config-store.js";
 import type {
   SlashCommandHandler,

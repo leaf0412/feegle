@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
-import { IdentityResolver } from "../../src/ingress/identity-resolver.js";
+import { IdentityResolver } from "@core/ingress/identity-resolver.js";
 import { WorkspaceStore } from "@resources/workspace/workspace-store.js";
 
 describe("IdentityResolver", () => {

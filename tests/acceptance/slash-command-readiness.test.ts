@@ -21,24 +21,26 @@ describe("slash command readiness", () => {
           interruptedCount: 0,
           workflows: []
         })
-      },
+      } as any,
       controlActionProcessor: {
         process: async (_id: string, _now: string) => ({ status: "completed" as const })
-      },
+      } as any,
       controlActionStore: {
-        create: () => {},
+        create: () => ({} as any),
         getById: () => undefined,
         listPending: () => []
-      },
+      } as any,
       workflowRuntime: {
         start: async () => ({ status: "succeeded" as const }),
         resume: async () => ({ status: "succeeded" as const })
-      },
+      } as any,
       memoryService: {
         approve: () => {},
         reject: () => {},
-        listActive: () => [],
         search: () => []
+      } as any,
+      repositories: {
+        list: () => []
       }
     });
 

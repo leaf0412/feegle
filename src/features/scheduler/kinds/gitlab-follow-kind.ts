@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { AgentCli } from "../../../agent/agent-cli.js";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
+import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 import type { FollowEntry, GitLabFollowStore } from "@integrations/gitlab/gitlab-follow-store.js";
 import type { GitLabIssueSearchResult } from "@integrations/gitlab/gitlab-types.js";

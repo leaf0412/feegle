@@ -3,12 +3,12 @@ import type {
   AgentCli,
   AgentProgressUpdate,
   AgentRunOptions
-} from "../../agent/agent-cli.js";
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";
-import type { AgentProviderDefinition } from "../../agent/agent-provider-registry.js";
-import type { ChatHistoryStore } from "../../agent/chat-history-store.js";
-import type { SessionStore } from "../../agent/session-store.js";
+} from "@integrations/agent/agent-cli.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
+import type { AgentProviderDefinition } from "@integrations/agent/agent-provider-registry.js";
+import type { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
+import type { SessionStore } from "@integrations/agent/session-store.js";
 import type { FeishuClientPort } from "./feishu-client.js";
 import { FeishuPreviewSession } from "./feishu-preview-session.js";
 import {

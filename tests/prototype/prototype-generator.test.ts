@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { WritePrototypeSourceInput } from "../../src/index.js";
+import type { WritePrototypeSourceInput } from "@features/prototype/prototype-generator.js";
 import { PrototypeGenerator } from "@features/prototype/prototype-generator.js";
 
 describe("PrototypeGenerator", () => {

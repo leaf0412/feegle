@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GlsumCommandHandler } from "@platform/commands/glsum/glsum-command-handler.js";
 import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
-import type { AgentCli } from "../../../../src/agent/agent-cli.js";
+import type { AgentCli } from "@integrations/agent/agent-cli.js";
 import type { PipelineHooks } from "@platform/pipeline-hooks.js";
 
 function makeContext(args: string): SlashCommandContext {

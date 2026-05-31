@@ -1,6 +1,6 @@
 import { execa } from "execa";
-import type { AgentProviderRegistry } from "../../../agent/agent-provider-registry.js";
-import type { ProviderStorePort } from "../../../agent/provider-store.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { ProviderStorePort } from "@integrations/agent/provider-store.js";
 import { isOwner } from "../../owner-access.js";
 import type {
   SlashCommandContext,

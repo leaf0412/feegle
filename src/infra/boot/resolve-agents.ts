@@ -1,6 +1,6 @@
 import type { BootContext } from "./boot-context.js";
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import { buildAgentProviderRegistry } from "../../agent/build-agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { buildAgentProviderRegistry } from "@integrations/agent/build-agent-provider-registry.js";
 import type { ConfigStorePort } from "../app/config-store.js";
 
 export function requireAgentConfig(

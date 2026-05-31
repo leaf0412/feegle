@@ -1,5 +1,5 @@
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
-import type { AgentCli } from "../../../src/agent/agent-cli.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import type { AgentCli } from "@integrations/agent/agent-cli.js";
 import type { NotificationPort } from "@infra/app/notification-port.js";
 import type { Quote } from "@integrations/stock/stock-quote-port.js";
 import type { Task } from "@features/scheduler/task.js";

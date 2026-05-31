@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentProviderRegistry } from "../../../src/agent/agent-provider-registry.js";
+import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { StockAdvisorKind } from "@features/scheduler/kinds/stock-advisor-kind.js";
 import { createTaskContext, makeAgent, makeTask, quote } from "./kind-test-helpers.js";
 

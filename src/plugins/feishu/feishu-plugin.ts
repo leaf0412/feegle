@@ -17,8 +17,8 @@ import {
   buildPlanRevisionRequestCard
 } from "@integrations/feishu/feishu-workbench-cards.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
-import { AgentLoadBalancer } from "../../agent/agent-load-balancer.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
 import { resolveWorkspaceDir } from "@infra/app/workspace-dir.js";
 import { PlanArtifactService } from "@features/workbench/plan-artifact-service.js";
 import type { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";

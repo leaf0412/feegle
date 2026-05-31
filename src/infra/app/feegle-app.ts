@@ -1,4 +1,4 @@
-import type { AgentProviderRegistry } from "../../agent/agent-provider-registry.js";
+import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { BootContext } from "../boot/boot-context.js";
 import type { BootReport } from "../boot/boot-phase.js";
 import { buildBootPhases } from "../boot/build-boot-phases.js";
