@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { VerificationRunner } from "@plugins/requirement-workflow/verification/verification-runner.js";
+import { VerificationReportStore } from "@plugins/requirement-workflow/verification/verification-report-store.js";
 
 describe("VerificationRunner", () => {
   it("runs configured checks and returns a failed report when one check fails", async () => {
@@ -79,5 +80,32 @@ describe("VerificationRunner", () => {
       requirementId: "reqwf_1", worktreePath: "/tmp/w",
       checks: [{ id: "a", command: "c", args: [] }]
     })).rejects.toThrow("spawn ENOENT");
+  });
+});
+
+describe("VerificationReportStore", () => {
+  it("stores latest report per requirement", () => {
+    const store = new VerificationReportStore();
+    store.save({
+      requirementId: "reqwf_1",
+      status: "passed",
+      checks: [],
+      startedAt: "2026-05-31T00:00:00.000Z",
+      finishedAt: "2026-05-31T00:00:01.000Z"
+    });
+
+    expect(store.latest("reqwf_1")?.status).toBe("passed");
+  });
+
+  it("returns undefined for an unknown requirement", () => {
+    const store = new VerificationReportStore();
+    expect(store.latest("nope")).toBeUndefined();
+  });
+
+  it("keeps only the latest report per requirement", () => {
+    const store = new VerificationReportStore();
+    store.save({ requirementId: "reqwf_1", status: "failed", checks: [], startedAt: "2026-05-31T00:00:00.000Z", finishedAt: "2026-05-31T00:00:01.000Z" });
+    store.save({ requirementId: "reqwf_1", status: "passed", checks: [], startedAt: "2026-05-31T00:00:02.000Z", finishedAt: "2026-05-31T00:00:03.000Z" });
+    expect(store.latest("reqwf_1")?.status).toBe("passed");
   });
 });
