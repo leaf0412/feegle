@@ -14,4 +14,17 @@ describe("default plugins", () => {
     expect(ids).toContain("requirement-workflow");
     expect(ids.indexOf("requirement-workflow")).toBeLessThan(ids.indexOf("feishu"));
   });
+
+  it("registers the requirement workflow stores-phase provision", () => {
+    const plugins = defaultPlugins({
+      feegleHome: "/tmp/feegle",
+      feishuClient: {} as never,
+      cloudDoc: {} as never,
+      runtimeFactory: (() => ({ start: async () => {}, stop: async () => {} })) as never
+    });
+
+    const requirementPlugin = plugins.find((plugin) => plugin.id === "requirement-workflow");
+    expect(requirementPlugin).toBeDefined();
+    expect(requirementPlugin?.provides?.some((provision) => provision.phase === "stores")).toBe(true);
+  });
 });
