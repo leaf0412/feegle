@@ -55,11 +55,23 @@ describe("platform acceptance matrix", () => {
     expect(pkg.scripts["verify:platform"]).toContain("verify-platform-readiness.mjs");
   });
 
-  it("all 62 plans have corresponding plan files", () => {
-    const planFiles = readdirSync(plansDir);
+  it("all 62 plans are tracked in committed roadmap or status docs", () => {
+    // Per project policy, step-by-step plan files under _docs/plans are not committed,
+    // so plan accountability is verified against the durable committed artifacts:
+    // the roadmap (plans 01-08 capability baseline + 09-50 follow-up list) and the
+    // status doc table (plans 09-62).
+    const roadmapPath = join(plansDir, "2026-05-31-roadmap-runtime-platform-next.md");
+    expect(existsSync(roadmapPath)).toBe(true);
+    expect(existsSync(statusDocPath)).toBe(true);
+    const roadmapContent = readFileSync(roadmapPath, "utf8");
+    const statusContent = readFileSync(statusDocPath, "utf8");
+
     for (const id of ALL_PLAN_IDS) {
-      const matchingFile = planFiles.find((f) => f.includes(`-${id}-`));
-      expect(matchingFile, `Plan ${id} has no plan file in ${plansDir}`).toBeDefined();
+      const tracked =
+        statusContent.includes(`| ${id} |`) ||
+        roadmapContent.includes(`${id}. `) ||
+        roadmapContent.includes(`- ${id} `);
+      expect(tracked, `Plan ${id} is not tracked in committed roadmap or status docs`).toBe(true);
     }
   });
 
