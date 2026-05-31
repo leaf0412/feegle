@@ -39,7 +39,12 @@ describe("Feishu requirement render effects", () => {
       schema: "2.0"
     }));
     const [, card] = (client.sendInteractiveCard as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
-    expect(JSON.stringify(card)).toContain("https://feishu.cn/docx/doc_1");
+    const cardJson = JSON.stringify(card);
+    expect(cardJson).toContain("https://feishu.cn/docx/doc_1");
+    expect(cardJson).toContain("act:/requirement plan approve");
+    expect(cardJson).toContain("act:/requirement plan cancel");
+    expect(cardJson).toContain("act:/requirement plan revise submit");
+    expect(cardJson).toContain('"requirement_id":"reqwf_1"');
 
     expect(output).toEqual({ rendered: true, messageId: "om_card", documentId: "doc_1", docUrl: "https://feishu.cn/docx/doc_1" });
   });

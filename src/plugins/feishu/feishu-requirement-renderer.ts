@@ -8,11 +8,34 @@ type RequirementRenderInput = {
   [key: string]: unknown;
 };
 
+type MinimalCardElement =
+  | { tag: "markdown"; content: string }
+  | { tag: "action"; actions: MinimalButtonElement[] }
+  | { tag: "form"; name: string; elements: MinimalFormElement[] };
+
+type MinimalButtonElement = {
+  tag: "button";
+  text: { tag: "plain_text"; content: string };
+  type: "default" | "primary" | "danger";
+  value?: Record<string, string>;
+};
+
+type MinimalFormElement =
+  | { tag: "input"; name: string; placeholder: { tag: "plain_text"; content: string }; input_type?: "multiline" }
+  | {
+      tag: "button";
+      text: { tag: "plain_text"; content: string };
+      type: "default" | "primary" | "danger";
+      action_type: "form_submit";
+      name: string;
+      value: Record<string, string>;
+    };
+
 interface MinimalFeishuCard {
   schema: "2.0";
   config: { wide_screen_mode: true; update_multi: true };
   header: { template: string; title: { tag: "plain_text"; content: string } };
-  body: { elements: Array<{ tag: "markdown" | "action"; content?: string; actions?: unknown[] }> };
+  body: { elements: MinimalCardElement[] };
 }
 
 function plainText(content: string): { tag: "plain_text"; content: string } {
@@ -38,6 +61,20 @@ function validateRequiredFields(input: RequirementRenderInput): { chatId: string
   return { chatId: input.chatId, requirementId: input.requirementId };
 }
 
+function buildPlanReviewActionButton(
+  text: string,
+  type: "primary" | "danger" | "default",
+  requirementId: string,
+  action: string,
+  planVersion?: number
+): MinimalButtonElement {
+  const value: Record<string, string> = { action, requirement_id: requirementId };
+  if (planVersion !== undefined) {
+    value.plan_version = String(planVersion);
+  }
+  return { tag: "button", text: plainText(text), type, value };
+}
+
 function buildPlanReviewLinkCard(
   requirementId: string,
   planVersion: number,
@@ -45,14 +82,64 @@ function buildPlanReviewLinkCard(
   docUrl: string
 ): MinimalFeishuCard {
   const summaryLine = summary ? `**摘要**：${summary}\n\n` : "";
-  const body = [
+  const bodyContent = [
     `**需求 ID**：${requirementId}`,
     `**计划版本**：v${planVersion}`,
     "",
     summaryLine + `[查看完整计划文档（云文档）](${docUrl})`
   ].join("\n");
 
-  return buildMinimalCard(`需求计划待确认 · ${requirementId}`, "blue", body);
+  const approveButton = buildPlanReviewActionButton(
+    "确认计划",
+    "primary",
+    requirementId,
+    "act:/requirement plan approve",
+    planVersion
+  );
+  const cancelButton = buildPlanReviewActionButton(
+    "取消",
+    "danger",
+    requirementId,
+    "act:/requirement plan cancel"
+  );
+
+  const reviseForm: MinimalCardElement = {
+    tag: "form",
+    name: "requirement_plan_revision",
+    elements: [
+      {
+        tag: "input",
+        name: "revision_note",
+        placeholder: plainText("请输入修改意见，例如：补充验收标准；拆解步骤粒度"),
+        input_type: "multiline"
+      },
+      {
+        tag: "button",
+        text: plainText("要求修改"),
+        type: "default",
+        action_type: "form_submit",
+        name: "submit_requirement_revision",
+        value: {
+          action: "act:/requirement plan revise submit",
+          requirement_id: requirementId,
+          plan_version: String(planVersion)
+        }
+      }
+    ]
+  };
+
+  return {
+    schema: "2.0",
+    config: { wide_screen_mode: true, update_multi: true },
+    header: { template: "blue", title: plainText(`需求计划待确认 · ${requirementId}`) },
+    body: {
+      elements: [
+        { tag: "markdown", content: bodyContent },
+        { tag: "action", actions: [approveButton, cancelButton] },
+        reviseForm
+      ]
+    }
+  };
 }
 
 function buildExecutionProgressCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {

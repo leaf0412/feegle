@@ -316,4 +316,101 @@ describe("parseFeishuCommand", () => {
       note: "增加错误处理\n第二行"
     });
   });
+
+  it("parses requirement plan approve with requirementId and planVersion", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan approve",
+        requirement_id: "reqwf_1",
+        plan_version: "1"
+      })
+    ).toEqual({ type: "requirement_plan_approve", requirementId: "reqwf_1", planVersion: 1 });
+  });
+
+  it("treats requirement plan approve with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan approve",
+        plan_version: "1"
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("treats requirement plan approve with invalid plan_version as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan approve",
+        requirement_id: "reqwf_1",
+        plan_version: "0"
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("parses requirement plan cancel with requirementId", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan cancel",
+        requirement_id: "reqwf_1"
+      })
+    ).toEqual({ type: "requirement_cancel", requirementId: "reqwf_1" });
+  });
+
+  it("treats requirement plan cancel with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({ action: "act:/requirement plan cancel" })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("parses requirement plan revise submit with feedback from form_value", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan revise submit",
+        requirement_id: "reqwf_1",
+        plan_version: "2",
+        form_value: { revision_note: "补充验收标准\n拆解步骤" }
+      })
+    ).toEqual({
+      type: "requirement_plan_revise",
+      requirementId: "reqwf_1",
+      planVersion: 2,
+      feedback: "补充验收标准\n拆解步骤"
+    });
+  });
+
+  it("parses requirement plan revise submit with feedback directly in value", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan revise submit",
+        requirement_id: "reqwf_1",
+        plan_version: "1",
+        revision_note: "增加部署风险说明"
+      })
+    ).toEqual({
+      type: "requirement_plan_revise",
+      requirementId: "reqwf_1",
+      planVersion: 1,
+      feedback: "增加部署风险说明"
+    });
+  });
+
+  it("treats requirement plan revise submit with empty feedback as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan revise submit",
+        requirement_id: "reqwf_1",
+        plan_version: "1",
+        form_value: { revision_note: "" }
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
+
+  it("treats requirement plan revise submit with missing requirement_id as unknown", () => {
+    expect(
+      parseFeishuCardActionValue({
+        action: "act:/requirement plan revise submit",
+        plan_version: "1",
+        form_value: { revision_note: "some feedback" }
+      })
+    ).toEqual({ type: "unknown", raw: expect.any(String) });
+  });
 });

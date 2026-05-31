@@ -38,6 +38,9 @@ export type FeishuCommand =
       version: number;
       note: string;
     }
+  | { type: "requirement_plan_approve"; requirementId: string; planVersion: number }
+  | { type: "requirement_plan_revise"; requirementId: string; planVersion: number; feedback: string }
+  | { type: "requirement_cancel"; requirementId: string }
   | {
       type: "bind_repo_submit";
       url: string;
@@ -120,6 +123,40 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       planId,
       version
     };
+  }
+
+  if (value.action === "act:/requirement plan approve") {
+    const requirementId = value.requirement_id;
+    const planVersion = parsePositiveInteger(value.plan_version);
+    if (typeof requirementId !== "string" || requirementId === "" || planVersion === undefined) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return { type: "requirement_plan_approve", requirementId, planVersion };
+  }
+
+  if (value.action === "act:/requirement plan cancel") {
+    const requirementId = value.requirement_id;
+    if (typeof requirementId !== "string" || requirementId === "") {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return { type: "requirement_cancel", requirementId };
+  }
+
+  if (value.action === "act:/requirement plan revise submit") {
+    const requirementId = value.requirement_id;
+    const planVersion = parsePositiveInteger(value.plan_version);
+    const formValue = isRecord(value.form_value) ? value.form_value : value;
+    const feedback = formValue.revision_note;
+    if (
+      typeof requirementId !== "string" ||
+      requirementId === "" ||
+      planVersion === undefined ||
+      typeof feedback !== "string" ||
+      feedback === ""
+    ) {
+      return { type: "unknown", raw: stringifyUnknown(value) };
+    }
+    return { type: "requirement_plan_revise", requirementId, planVersion, feedback };
   }
 
   const simplePlanActions = {
