@@ -43,3 +43,11 @@ Before reporting a behavior bug, verify that the runtime produced evidence for t
 - **Observability (O-01):** `RuntimeInspectionService.getRunDetail()` returns non-null with effects and control actions
 
 If any of these evidence traces are missing, the bug is in the platform runtime layer, not in the product feature.
+
+## Requirement Workflow Smoke
+
+1. Run `npm run verify:platform`.
+2. Start Feishu runtime with `npm run start:feishu`.
+3. Use native-devtools MCP from `/Users/yb/Downloads/native-devtools-mcp` to send one requirement message to the configured test group.
+4. Confirm runtime events include `requirement.plan.generate.workflow`.
+5. Confirm the final verification report is rendered by the Feishu adapter and contains every configured check result.
