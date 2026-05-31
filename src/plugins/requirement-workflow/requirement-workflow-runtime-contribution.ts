@@ -22,6 +22,21 @@ function readSourcePlugin(input: Record<string, unknown>): string | undefined {
   return typeof input.sourcePlugin === "string" && input.sourcePlugin.length > 0 ? input.sourcePlugin : undefined;
 }
 
+// The runtime normalizes effect failures into a {code,message} object (not an
+// Error), so String(error) would print "[object Object]" on the failure card.
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error && typeof error === "object") {
+    const message = (error as Record<string, unknown>).message;
+    if (typeof message === "string" && message.length > 0) {
+      return message;
+    }
+  }
+  return String(error);
+}
+
 // Lock the card a button was clicked on (buttonless, settled state) before the
 // next card is sent. Each interactive card is its own message, so locking the
 // clicked one + appending a new one keeps every click on a distinct messageId —
@@ -192,7 +207,7 @@ export function requirementWorkflowRuntimeContribution(
                   input
                 });
               } catch (error) {
-                await renderDev({ phase: "failed", error: error instanceof Error ? error.message : String(error) });
+                await renderDev({ phase: "failed", error: describeError(error) });
                 throw error;
               }
 
