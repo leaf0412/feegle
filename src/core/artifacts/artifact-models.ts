@@ -27,19 +27,26 @@ export interface ArtifactRecord {
 
 export function defaultRetentionDays(kind: ArtifactKind): number {
   switch (kind) {
-    case "diagnostic_bundle":
-    case "memory_candidate_batch":
-      return 90;
-    case "stderr_stdout":
-    case "agent_transcript":
-    case "uploaded_file":
-      return 30;
-    case "prompt":
-    case "plugin_payload":
-      return 14;
+    // plan: 365 days
+    case "plan_document":
+      return 365;
+    // report: 180 days
     case "diff_patch":
     case "test_report":
-    case "plan_document":
       return 180;
+    // log: 30 days
+    case "stderr_stdout":
+    case "agent_transcript":
+      return 30;
+    // diagnostic: 90 days
+    case "diagnostic_bundle":
+      return 90;
+    // default: 90 days
+    case "prompt":
+    case "plugin_payload":
+    case "uploaded_file":
+    case "memory_candidate_batch":
+    default:
+      return 90;
   }
 }

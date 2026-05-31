@@ -21,6 +21,8 @@ import type { IntentResolverRegistry } from "@core/ingress/intent-resolver-regis
 import type { PermissionPolicyPort } from "@core/ingress/permission-policy.js";
 import type { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import type { WorkspaceResolverPort } from "@core/ingress/workspace-resolver.js";
+import type { PermissionService } from "@core/security/permission-service.js";
+import type { PolicyService } from "@core/security/policy-service.js";
 import type { MemoryStore } from "@core/memory/memory-store.js";
 import type { AliasStore } from "@platform/commands/alias-store.js";
 import type { SlashCommandRegistry } from "@platform/slash-command-handler.js";
@@ -80,6 +82,8 @@ export interface Capabilities {
   recoveryService: RecoveryService;
   artifactStore: ArtifactStore;
   artifactService: ArtifactService;
+  permissionService: PermissionService;
+  policyService: PolicyService;
   memoryStore: MemoryStore;
   memoryService: MemoryService;
   controlActionStore: ControlActionStore;

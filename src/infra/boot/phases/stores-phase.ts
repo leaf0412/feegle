@@ -10,6 +10,8 @@ import type { ConfigStoreProviderWriter } from "../../app/config-store.js";
 import type { RuntimeDb } from "../../app/runtime-db.js";
 import { ArtifactService } from "@core/artifacts/artifact-service.js";
 import { ArtifactStore } from "@core/artifacts/artifact-store.js";
+import { PermissionService } from "@core/security/permission-service.js";
+import { PolicyService } from "@core/security/policy-service.js";
 import { ControlActionProcessor } from "@core/control/control-action-processor.js";
 import { ControlActionStore } from "@core/control/control-action-store.js";
 import { IdentityResolver } from "@core/ingress/identity-resolver.js";
@@ -71,7 +73,18 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
       ctx.provide("effectExecutor", effectExecutor);
       ctx.provide("workflowRuntime", new WorkflowRuntime(runtimeStore, workflowRegistry, effectExecutor));
       ctx.provide("artifactStore", artifactStore);
-      ctx.provide("artifactService", new ArtifactService(artifactStore, join(deps.feegleHome, "artifacts")));
+      const permissionService = new PermissionService(workspaceStore);
+      const policyService = new PolicyService(
+        (wsId, userId) => workspaceStore.getMembership(wsId, userId) !== undefined
+      );
+      ctx.provide("permissionService", permissionService);
+      ctx.provide("policyService", policyService);
+      ctx.provide("artifactService", new ArtifactService(
+        artifactStore,
+        join(deps.feegleHome, "artifacts"),
+        permissionService,
+        policyService
+      ));
       const memoryStore = new MemoryStore(runtimeDb);
       ctx.provide("memoryStore", memoryStore);
       ctx.provide("memoryService", new MemoryService(memoryStore));
