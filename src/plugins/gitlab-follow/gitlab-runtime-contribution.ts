@@ -1,4 +1,5 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
 export function gitlabRuntimeContribution(): RuntimeContributionModule {
   return {
@@ -10,8 +11,8 @@ export function gitlabRuntimeContribution(): RuntimeContributionModule {
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
           kind: "chat",
-          workspaceId: "ws_default",
-          projectId: null,
+          workspaceId: workspaceIdFromEvent(event),
+          projectId: projectIdFromEvent(event),
           actor: { kind: "system" },
           payload: event.external
         })
@@ -62,4 +63,17 @@ export function gitlabRuntimeContribution(): RuntimeContributionModule {
       });
     }
   };
+}
+
+function workspaceIdFromEvent(event: TriggerEvent): string {
+  const workspaceId = event.external.resolvedWorkspaceId;
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    throw new Error("resolved workspaceId missing from trigger event");
+  }
+  return workspaceId;
+}
+
+function projectIdFromEvent(event: TriggerEvent): string | null {
+  const projectId = event.external.resolvedProjectId;
+  return typeof projectId === "string" ? projectId : null;
 }

@@ -218,4 +218,28 @@ describe("platform acceptance matrix", () => {
     const handoff = readFileSync(handoffPath, "utf8");
     expect(handoff).toContain("npm run verify:platform");
   });
+
+  it("production source has no hardcoded default workspace ids", () => {
+    const sourceFiles = readdirRecursive(join(rootDir, "src")).filter((file) => file.endsWith(".ts"));
+    const offenders = sourceFiles.filter((file) => {
+      const content = readFileSync(file, "utf8");
+      return content.includes("ws_default") || content.includes("ws_personal");
+    });
+
+    expect(offenders.map((file) => file.replace(`${rootDir}/`, ""))).toEqual([]);
+  });
 });
+
+function readdirRecursive(dir: string): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...readdirRecursive(path));
+    } else {
+      files.push(path);
+    }
+  }
+  return files;
+}

@@ -55,7 +55,7 @@ describe("webhook runtime contribution", () => {
     const selection = selector.select({
       intentId: "intent:test",
       kind: "workflow_signal",
-      workspaceId: "ws_default",
+      workspaceId: "ws_test",
       projectId: null,
       actor: { kind: "system" },
       payload: {}

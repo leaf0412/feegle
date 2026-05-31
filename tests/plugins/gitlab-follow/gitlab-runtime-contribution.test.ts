@@ -23,4 +23,26 @@ describe("gitlab runtime contribution", () => {
     expect(effectHandlers.has("gitlab", "post_comment")).toBe(true);
     expect(effectHandlers.has("gitlab", "update_status")).toBe(true);
   });
+
+  it("resolves workspace and project from enriched trigger context", async () => {
+    const intentResolvers = new IntentResolverRegistry();
+    gitlabRuntimeContribution().register({
+      workflows: new WorkflowRegistry(),
+      intentResolvers,
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers: new EffectHandlerRegistry()
+    });
+
+    const intent = await intentResolvers.resolve({
+      triggerEventId: "trg_gitlab",
+      source: { pluginId: "gitlab", adapterId: "webhook", triggerType: "issue" },
+      receivedAt: "2026-05-31T00:00:00.000Z",
+      external: { projectId: 42, resolvedWorkspaceId: "ws_test", resolvedProjectId: "project_test" },
+      actorHint: { kind: "system" },
+      payloadSummary: {}
+    });
+
+    expect(intent.workspaceId).toBe("ws_test");
+    expect(intent.projectId).toBe("project_test");
+  });
 });

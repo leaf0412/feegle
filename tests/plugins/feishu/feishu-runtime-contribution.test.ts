@@ -15,20 +15,22 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: new EffectHandlerRegistry()
     });
 
-    await feishuRuntimeContribution({ workspaceId: "ws_default" }).register(ctx);
+    await feishuRuntimeContribution().register(ctx);
 
     expect(ctx.workflows.require("feishu.chat.workflow").definitionId).toBe("feishu.chat.workflow");
     const intent = await ctx.intentResolvers.resolve({
       triggerEventId: "trg_1",
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
       receivedAt: "2026-05-31T00:00:00.000Z",
-      external: { chatId: "oc_1", messageId: "om_1" },
+      external: { chatId: "oc_1", messageId: "om_1", resolvedWorkspaceId: "ws_test", resolvedProjectId: "project_test" },
       actorHint: { provider: "feishu", externalUserId: "ou_1" },
       conversationHint: { conversationKey: "feishu:oc_1" },
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
 
     expect(intent.kind).toBe("chat");
+    expect(intent.workspaceId).toBe("ws_test");
+    expect(intent.projectId).toBe("project_test");
     expect(ctx.workflowSelector.select(intent).definitionId).toBe("feishu.chat.workflow");
   });
 });

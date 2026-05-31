@@ -1,4 +1,5 @@
 import type { FeeglePlugin, RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
 export function webhookRuntimeContribution(): RuntimeContributionModule {
   return {
@@ -10,8 +11,8 @@ export function webhookRuntimeContribution(): RuntimeContributionModule {
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
           kind: "workflow_signal",
-          workspaceId: "ws_default",
-          projectId: null,
+          workspaceId: workspaceIdFromEvent(event),
+          projectId: projectIdFromEvent(event),
           actor: { kind: "system" },
           payload: event.external
         })
@@ -68,3 +69,16 @@ export const webhookPlugin: FeeglePlugin = {
   },
   runtimeContributions: [webhookRuntimeContribution()]
 };
+
+function workspaceIdFromEvent(event: TriggerEvent): string {
+  const workspaceId = event.external.resolvedWorkspaceId;
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    throw new Error("resolved workspaceId missing from trigger event");
+  }
+  return workspaceId;
+}
+
+function projectIdFromEvent(event: TriggerEvent): string | null {
+  const projectId = event.external.resolvedProjectId;
+  return typeof projectId === "string" ? projectId : null;
+}

@@ -141,9 +141,13 @@ export class IngressDispatcher {
       return { status: "failed", reason: "reason" in policy ? policy.reason : undefined };
     }
 
-    // Build enriched context for intent resolvers
     const enrichedEvent: TriggerEvent = {
-      ...event
+      ...event,
+      external: {
+        ...event.external,
+        resolvedWorkspaceId,
+        resolvedProjectId: workspace.status === "resolved" ? workspace.projectId : null
+      }
     };
 
     const intent = await this.deps.intentResolvers.resolve(enrichedEvent);

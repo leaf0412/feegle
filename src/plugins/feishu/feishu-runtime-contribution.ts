@@ -1,6 +1,7 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
+import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
-export function feishuRuntimeContribution(input: { workspaceId: string }): RuntimeContributionModule {
+export function feishuRuntimeContribution(): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
     register: (ctx) => {
@@ -10,8 +11,8 @@ export function feishuRuntimeContribution(input: { workspaceId: string }): Runti
         resolve: (event) => ({
           intentId: `intent:${event.triggerEventId}`,
           kind: "chat",
-          workspaceId: input.workspaceId,
-          projectId: null,
+          workspaceId: workspaceIdFromEvent(event),
+          projectId: projectIdFromEvent(event),
           actor:
             event.actorHint && typeof event.actorHint.externalUserId === "string"
               ? { kind: "user", userId: event.actorHint.externalUserId }
@@ -66,4 +67,17 @@ export function feishuRuntimeContribution(input: { workspaceId: string }): Runti
       });
     }
   };
+}
+
+function workspaceIdFromEvent(event: TriggerEvent): string {
+  const workspaceId = event.external.resolvedWorkspaceId;
+  if (typeof workspaceId !== "string" || workspaceId.length === 0) {
+    throw new Error("resolved workspaceId missing from trigger event");
+  }
+  return workspaceId;
+}
+
+function projectIdFromEvent(event: TriggerEvent): string | null {
+  const projectId = event.external.resolvedProjectId;
+  return typeof projectId === "string" ? projectId : null;
 }
