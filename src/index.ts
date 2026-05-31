@@ -40,6 +40,8 @@ export {
 export { renderFeishuCard } from "./integrations/feishu/feishu-card-renderer.js";
 export { renderFeishuProgressCard } from "./integrations/feishu/feishu-progress-card.js";
 export { FeishuCommandResponder } from "./integrations/feishu/feishu-command-responder.js";
+export { FeishuBindPromptManager } from "./integrations/feishu/feishu-bind-prompt-manager.js";
+export { deliverSlashReply } from "./integrations/feishu/feishu-slash-reply-renderer.js";
 export { FeegleApp } from "./infra/app/feegle-app.js";
 export type { NotificationPort, NotificationTarget } from "./infra/app/notification-port.js";
 export { ConfigStore } from "./infra/app/config-store.js";

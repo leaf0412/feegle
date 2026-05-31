@@ -1,25 +1,15 @@
 import type { FeishuClientPort } from "./feishu-client.js";
 import type { FeishuCommand } from "./feishu-gateway.js";
 import type { FeishuCommandHandler } from "./feishu-long-connection-runtime.js";
-import { renderFeishuCard } from "./feishu-card-renderer.js";
 import {
   extractSlashCommandArgs,
   type SlashCommandHandler,
   type SlashCommandReply,
   type SlashCommandRegistry
 } from "@platform/slash-command-handler.js";
-import type { FeishuChatHandler } from "./feishu-chat-handler.js";
 import { dispatchPlatformCommandAction } from "@platform/platform-action-dispatcher.js";
 import type { FeishuUserDirectory } from "./feishu-user-directory.js";
-import type { ChatBindingStore } from "@resources/repositories/chat-binding-store.js";
-import type { RepositoryStore } from "@resources/repositories/repository-store.js";
-import { bindRepositoryToScope, formatBoundRepoLines } from "@platform/commands/repo/repo-binding.js";
-import {
-  buildBindPromptSupersededCard,
-  buildBindRepoPromptCard,
-  buildRepoBindCancelledCard,
-  buildRepoBoundCard
-} from "./feishu-workbench-cards.js";
+import { deliverSlashReply } from "./feishu-slash-reply-renderer.js";
 
 type FeishuCommandSender = { platform: "feishu"; userId: string; email?: string };
 
@@ -42,74 +32,10 @@ export function logFeishuCommandTrace(event: FeishuCommandTraceEvent): void {
 
 export interface FeishuCommandResponderOptions {
   registry: SlashCommandRegistry;
-  chatHandler?: FeishuChatHandler;
   trace?: FeishuCommandTraceSink;
   configStore?: { get(): { failureTarget: unknown } };
   taskRegistry?: { list(): ReadonlyArray<{ enabled: boolean }> };
   userDirectory?: FeishuUserDirectory;
-  chatBindingStore?: ChatBindingStore;
-  repositoryStore?: RepositoryStore;
-  workbench?: FeishuWorkbenchHandler;
-}
-
-export type FeishuWorkbenchReply =
-  | SlashCommandReply
-  | { kind: "feishu_card"; card: unknown }
-  | { kind: "feishu_card_update"; card: unknown };
-
-export interface FeishuWorkbenchHandler {
-  handlePlanRevise?(input: PlanReviseInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanRevisionSubmit?(input: PlanRevisionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanApprove?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanCancel?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanReject?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanPush?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanCleanup?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanBaseBranchSubmit?(input: PlanBaseBranchSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanReviseExecution?(input: PlanActionInput): Promise<FeishuWorkbenchReply | undefined>;
-  handlePlanReviseExecutionSubmit?(input: PlanReviseExecutionSubmitInput): Promise<FeishuWorkbenchReply | undefined>;
-}
-
-export interface PlanReviseInput {
-  chatId: string;
-  messageId: string;
-  command: Extract<FeishuCommand, { type: "workbench_plan_revise" }>;
-}
-
-export interface PlanRevisionSubmitInput {
-  chatId: string;
-  messageId: string;
-  sender?: FeishuCommandSender;
-  command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>;
-}
-
-export interface PlanActionInput {
-  chatId: string;
-  messageId: string;
-  command: Extract<
-    FeishuCommand,
-    {
-      type:
-        | "workbench_plan_approve"
-        | "workbench_plan_cancel"
-        | "workbench_plan_reject"
-        | "workbench_plan_push"
-        | "workbench_plan_cleanup"
-        | "workbench_plan_revise_execution";
-    }
-  >;
-}
-
-export interface PlanBaseBranchSubmitInput {
-  chatId: string;
-  messageId: string;
-  command: Extract<FeishuCommand, { type: "workbench_plan_base_branch_submit" }>;
-}
-
-export interface PlanReviseExecutionSubmitInput {
-  chatId: string;
-  messageId: string;
-  command: Extract<FeishuCommand, { type: "workbench_plan_revise_execution_submit" }>;
 }
 
 interface DispatchInput {
@@ -122,58 +48,25 @@ interface DispatchInput {
   command: FeishuCommand;
 }
 
+/**
+ * Routes slash commands through the SlashCommandRegistry.
+ *
+ * Chat dispatch (Plan 52) and card/workbench dispatch (Plans 53, 58) have been
+ * removed — the FeishuLongConnectionRuntime now feeds those through the
+ * ingress/runtime instead of this handler.
+ *
+ * Scheduled for deletion once all slash commands are also cut over.
+ */
 export class FeishuCommandResponder implements FeishuCommandHandler {
-  // scopeKey → message ids of the unbound-repo prompt cards still outstanding in
-  // that chat. In-memory only: lost on restart, at which point a stale card is
-  // harmless (re-binding the same url is a DB no-op).
-  private readonly outstandingBindPrompts = new Map<string, Set<string>>();
-
   constructor(
     private readonly client: FeishuClientPort,
     private readonly options: FeishuCommandResponderOptions
   ) {}
 
-  private addBindPrompt(scopeKey: string, messageId: string): void {
-    const ids = this.outstandingBindPrompts.get(scopeKey) ?? new Set<string>();
-    ids.add(messageId);
-    this.outstandingBindPrompts.set(scopeKey, ids);
-  }
-
-  private removeBindPrompt(scopeKey: string, messageId: string): void {
-    const ids = this.outstandingBindPrompts.get(scopeKey);
-    if (!ids) return;
-    ids.delete(messageId);
-    if (ids.size === 0) {
-      this.outstandingBindPrompts.delete(scopeKey);
-    }
-  }
-
-  /**
-   * Once a scope is bound, update every still-outstanding prompt card to an
-   * inert "已失效" state and stop tracking them. `exceptMessageId` is the card
-   * the user acted on — it gets its own success update via the normal reply, so
-   * we skip it here.
-   */
-  private async sweepBindPrompts(scopeKey: string, exceptMessageId?: string): Promise<void> {
-    const ids = this.outstandingBindPrompts.get(scopeKey);
-    if (!ids) return;
-    for (const id of ids) {
-      if (id === exceptMessageId) continue;
-      await this.client.updateInteractiveCard(id, buildBindPromptSupersededCard());
-    }
-    this.outstandingBindPrompts.delete(scopeKey);
-  }
-
   async handleCommand(input: DispatchInput & { shouldRespond?: boolean }): Promise<void> {
     this.trace("received", input);
     if (input.shouldRespond === false) {
       this.trace("skipped_record_only", input);
-      return;
-    }
-
-    if (input.command.type === "chat") {
-      await this.dispatchChat(input, input.command.raw);
-      this.trace("completed", input);
       return;
     }
 
@@ -183,48 +76,11 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
       return;
     }
 
-    await this.deliver(input, reply);
+    await this.traceAsync("reply", input, () => deliverSlashReply(this.client, input.messageId, reply));
     this.trace("completed", input);
   }
 
-  private async dispatchChat(input: DispatchInput, userText: string): Promise<void> {
-    if (!this.options.chatHandler) {
-      await this.traceAsync("reply_text", input, () =>
-        this.client.replyText(input.messageId, "尚未配置 agent。请运行 /provider register <kind> cwd=<path> 注册并 /provider use 激活。")
-      );
-      return;
-    }
-    const sessionKey = input.sessionKey ?? `feishu:${input.chatId}:${input.chatId}`;
-    if (input.chatType === "group") {
-      const binding = this.options.chatBindingStore?.get(input.chatId);
-      if (!binding || binding.repositoryIds.length === 0) {
-        // Group binding scope is the chat id (see resolveBindingScopeKey); embed
-        // it in the card so the bind on submit lands here, not on the clicker.
-        const card = buildBindRepoPromptCard({ scopeKey: input.chatId, scopeNoun: "本群" });
-        const promptId = await this.traceAsync("reply_card", input, () =>
-          this.client.replyInteractiveCard(input.messageId, card)
-        );
-        if (typeof promptId === "string" && promptId !== "") {
-          this.addBindPrompt(input.chatId, promptId);
-        }
-        this.trace("chat_unbound", input);
-        return;
-      }
-      // Group is bound now; resolve any prompt cards still floating around
-      // (e.g. it was bound via /bind_repo, not through one of these cards).
-      await this.sweepBindPrompts(input.chatId);
-    }
-    await this.traceAsync("chat", input, () =>
-      this.options.chatHandler!.handle({
-        chatId: input.chatId,
-        triggerMessageId: input.messageId,
-        sessionKey,
-        userText
-      })
-    );
-  }
-
-  private async computeReply(input: DispatchInput): Promise<FeishuWorkbenchReply | undefined> {
+  private async computeReply(input: DispatchInput): Promise<SlashCommandReply | undefined> {
     const command = input.command;
     switch (command.type) {
       case "help":
@@ -240,37 +96,23 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return this.dispatchSlashCommand(input, command.definition.id, extractSlashCommandArgs(command.raw, command.definition.command));
       case "platform_action":
         return this.dispatchPlatformAction(input, command);
+      // Following command types are handled by the ingress/runtime — no-op here.
+      case "chat":
+      case "repo_select":
+      case "push_repository":
       case "workbench_plan_revision_submit":
-        return this.dispatchWorkbenchPlanRevisionSubmit(input, command);
       case "workbench_plan_revise":
-        return this.dispatchWorkbenchPlanRevise(input, command);
       case "workbench_plan_approve":
       case "workbench_plan_cancel":
       case "workbench_plan_reject":
       case "workbench_plan_push":
       case "workbench_plan_cleanup":
-      case "workbench_plan_revise_execution":
-        return this.dispatchPlanAction(input, command);
       case "workbench_plan_base_branch_submit":
-        return this.dispatchPlanBaseBranchSubmit(input, command);
+      case "workbench_plan_revise_execution":
       case "workbench_plan_revise_execution_submit":
-        return this.dispatchPlanReviseExecutionSubmit(input, command);
       case "bind_repo_submit":
-        return this.dispatchBindRepoSubmit(input, command);
       case "bind_repo_cancel":
-        return this.dispatchBindRepoCancel(input, command);
-      case "chat":
         return undefined;
-      case "repo_select":
-        return {
-          kind: "text",
-          text: `已收到仓库选择：${command.repositoryIds.join("、")}。\n下一步我会基于这些仓库建议需求分支名称。`
-        };
-      case "push_repository":
-        return {
-          kind: "text",
-          text: `已收到推送请求：需求 ${command.requirementId}，仓库 ${command.repositoryId}。\n当前入口还没有接入 git push 执行器。`
-        };
       case "unknown":
         return { kind: "text", text: `未知命令：${command.raw}` };
       default: {
@@ -278,123 +120,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         return _exhaustive;
       }
     }
-  }
-
-  private async dispatchWorkbenchPlanRevise(
-    input: DispatchInput,
-    command: Extract<FeishuCommand, { type: "workbench_plan_revise" }>
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    if (!this.options.workbench?.handlePlanRevise) {
-      return { kind: "text", text: "已收到计划修改请求，当前入口还没有接入修改表单。" };
-    }
-    return this.options.workbench.handlePlanRevise({
-      chatId: input.chatId,
-      messageId: input.messageId,
-      command
-    });
-  }
-
-  private async dispatchWorkbenchPlanRevisionSubmit(
-    input: DispatchInput,
-    command: Extract<FeishuCommand, { type: "workbench_plan_revision_submit" }>
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    if (!this.options.workbench?.handlePlanRevisionSubmit) {
-      return { kind: "text", text: "已收到计划修改意见，当前入口还没有接入计划修订执行器。" };
-    }
-    return this.options.workbench.handlePlanRevisionSubmit({
-      chatId: input.chatId,
-      messageId: input.messageId,
-      ...(input.sender ? { sender: input.sender } : {}),
-      command
-    });
-  }
-
-  private async dispatchPlanAction(
-    input: DispatchInput,
-    command: PlanActionInput["command"]
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    const handlerMap: Record<PlanActionInput["command"]["type"], keyof FeishuWorkbenchHandler> = {
-      workbench_plan_approve: "handlePlanApprove",
-      workbench_plan_cancel: "handlePlanCancel",
-      workbench_plan_reject: "handlePlanReject",
-      workbench_plan_push: "handlePlanPush",
-      workbench_plan_cleanup: "handlePlanCleanup",
-      workbench_plan_revise_execution: "handlePlanReviseExecution"
-    };
-    const key = handlerMap[command.type];
-    const handler = this.options.workbench?.[key] as
-      | ((input: PlanActionInput) => Promise<FeishuWorkbenchReply | undefined>)
-      | undefined;
-    if (!handler) {
-      return { kind: "text", text: `计划 ${command.type} 处理器尚未接入` };
-    }
-    return handler.call(this.options.workbench, {
-      chatId: input.chatId,
-      messageId: input.messageId,
-      command
-    });
-  }
-
-  private async dispatchPlanBaseBranchSubmit(
-    input: DispatchInput,
-    command: PlanBaseBranchSubmitInput["command"]
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    if (!this.options.workbench?.handlePlanBaseBranchSubmit) {
-      return { kind: "text", text: "BaseBranch 处理器尚未接入" };
-    }
-    return this.options.workbench.handlePlanBaseBranchSubmit({
-      chatId: input.chatId,
-      messageId: input.messageId,
-      command
-    });
-  }
-
-  private async dispatchPlanReviseExecutionSubmit(
-    input: DispatchInput,
-    command: PlanReviseExecutionSubmitInput["command"]
-  ): Promise<FeishuWorkbenchReply | undefined> {
-    if (!this.options.workbench?.handlePlanReviseExecutionSubmit) {
-      return { kind: "text", text: "继续调整处理器尚未接入" };
-    }
-    return this.options.workbench.handlePlanReviseExecutionSubmit({
-      chatId: input.chatId,
-      messageId: input.messageId,
-      command
-    });
-  }
-
-  private async dispatchBindRepoSubmit(
-    input: DispatchInput,
-    command: Extract<FeishuCommand, { type: "bind_repo_submit" }>
-  ): Promise<FeishuWorkbenchReply> {
-    if (!this.options.repositoryStore || !this.options.chatBindingStore) {
-      return { kind: "text", text: "仓库绑定能力尚未接入。" };
-    }
-    const { record, binding } = await bindRepositoryToScope(
-      { repositoryStore: this.options.repositoryStore, chatBindingStore: this.options.chatBindingStore },
-      command.scopeKey,
-      command.url
-    );
-    // Resolve the other prompt cards in this chat; this one updates via the reply.
-    await this.sweepBindPrompts(command.scopeKey, input.messageId);
-    return {
-      kind: "feishu_card_update",
-      card: buildRepoBoundCard({
-        scopeNoun: command.scopeNoun,
-        repoName: record.name,
-        repoId: record.id,
-        boundLines: formatBoundRepoLines(this.options.repositoryStore, binding)
-      })
-    };
-  }
-
-  private async dispatchBindRepoCancel(
-    input: DispatchInput,
-    command: Extract<FeishuCommand, { type: "bind_repo_cancel" }>
-  ): Promise<FeishuWorkbenchReply> {
-    // Untrack so a later bind's sweep can't overwrite this deliberately-cancelled card.
-    this.removeBindPrompt(command.scopeKey, input.messageId);
-    return { kind: "feishu_card_update", card: buildRepoBindCancelledCard() };
   }
 
   private async dispatchSlashCommand(
@@ -502,30 +227,6 @@ export class FeishuCommandResponder implements FeishuCommandHandler {
         elements: [...reply.card.elements, { kind: "markdown", content: banner }]
       }
     };
-  }
-
-  private async deliver(input: DispatchInput, reply: FeishuWorkbenchReply): Promise<void> {
-    if (reply.kind === "text") {
-      await this.traceAsync("reply_text", input, () => this.client.replyText(input.messageId, reply.text));
-      return;
-    }
-    if (reply.kind === "card") {
-      await this.traceAsync("reply_card", input, () =>
-        this.client.replyInteractiveCard(input.messageId, renderFeishuCard(reply.card))
-      );
-      return;
-    }
-    if (reply.kind === "feishu_card") {
-      await this.traceAsync("reply_card", input, () => this.client.replyInteractiveCard(input.messageId, reply.card));
-      return;
-    }
-    if (reply.kind === "feishu_card_update") {
-      await this.traceAsync("update_card", input, () => this.client.updateInteractiveCard(input.messageId, reply.card));
-      return;
-    }
-    await this.traceAsync("update_card", input, () =>
-      this.client.updateInteractiveCard(input.messageId, renderFeishuCard(reply.card))
-    );
   }
 
   private trace(stage: string, input: DispatchInput, detail?: Record<string, unknown>): void {
