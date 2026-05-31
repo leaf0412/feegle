@@ -7,7 +7,17 @@ import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js"
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
+
+function createMockCloudDoc(): FeishuCloudDocClientPort {
+  return {
+    createDoc: vi.fn().mockResolvedValue({ documentId: "doc_test" }),
+    writeMarkdown: vi.fn().mockResolvedValue(undefined),
+    buildDocUrl: vi.fn().mockReturnValue("https://feishu.cn/docx/doc_test"),
+    deleteDoc: vi.fn().mockResolvedValue(undefined)
+  };
+}
 
 function createMockClient(): FeishuClientPort {
   return {
@@ -45,7 +55,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: new EffectHandlerRegistry()
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     const intent = await ctx.intentResolvers.resolve({
       triggerEventId: "trg_1",
@@ -73,7 +83,7 @@ describe("feishuRuntimeContribution", () => {
     });
 
     gitlabRuntimeContribution(() => ({} as GitLabClient)).register(ctx);
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     const intent = await ctx.intentResolvers.resolve({
       triggerEventId: "trg_feishu",
@@ -105,7 +115,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     const result = await handlers.execute({
       effectId: "eff_reply_1",
@@ -128,7 +138,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     await expect(
       handlers.execute({
@@ -150,7 +160,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     await expect(
       handlers.execute({
@@ -172,7 +182,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     const cardData = { elements: [{ tag: "markdown", content: "Updated card" }] };
     const result = await handlers.execute({
@@ -196,7 +206,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     await expect(
       handlers.execute({
@@ -218,7 +228,7 @@ describe("feishuRuntimeContribution", () => {
       effectHandlers: handlers
     });
 
-    await feishuRuntimeContribution(mockClient).register(ctx);
+    await feishuRuntimeContribution(mockClient, createMockCloudDoc()).register(ctx);
 
     expect(handlers.has("feishu", "requirement.plan_review.render")).toBe(true);
     expect(handlers.has("feishu", "requirement.execution_progress.render")).toBe(true);

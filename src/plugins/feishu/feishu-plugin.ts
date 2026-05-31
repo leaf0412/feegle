@@ -49,7 +49,7 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient)]
+    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient, deps.cloudDoc)]
   };
 }
 

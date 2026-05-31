@@ -1,5 +1,6 @@
 import type { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 
 type RequirementRenderInput = {
   chatId?: string;
@@ -11,7 +12,7 @@ interface MinimalFeishuCard {
   schema: "2.0";
   config: { wide_screen_mode: true; update_multi: true };
   header: { template: string; title: { tag: "plain_text"; content: string } };
-  body: { elements: Array<{ tag: "markdown"; content: string }> };
+  body: { elements: Array<{ tag: "markdown" | "action"; content?: string; actions?: unknown[] }> };
 }
 
 function plainText(content: string): { tag: "plain_text"; content: string } {
@@ -37,28 +38,21 @@ function validateRequiredFields(input: RequirementRenderInput): { chatId: string
   return { chatId: input.chatId, requirementId: input.requirementId };
 }
 
-async function sendRequirementCard(
-  client: Pick<FeishuClientPort, "sendInteractiveCard">,
-  chatId: string,
-  card: MinimalFeishuCard
-): Promise<{ rendered: true; messageId: string | undefined }> {
-  const messageId = await client.sendInteractiveCard(chatId, card);
-  return { rendered: true, messageId };
-}
+function buildPlanReviewLinkCard(
+  requirementId: string,
+  planVersion: number,
+  summary: string | undefined,
+  docUrl: string
+): MinimalFeishuCard {
+  const summaryLine = summary ? `**摘要**：${summary}\n\n` : "";
+  const body = [
+    `**需求 ID**：${requirementId}`,
+    `**计划版本**：v${planVersion}`,
+    "",
+    summaryLine + `[查看完整计划文档（云文档）](${docUrl})`
+  ].join("\n");
 
-interface RequirementRenderEntry {
-  effectType: string;
-  buildCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard;
-}
-
-function buildPlanReviewCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
-  const markdown = typeof input.markdown === "string" ? input.markdown : "_无计划内容_";
-  const version = typeof input.planVersion === "number" ? input.planVersion : 1;
-  return buildMinimalCard(
-    `需求计划待确认 · ${requirementId}`,
-    "blue",
-    [`**需求 ID**：${requirementId}`, `**计划版本**：v${version}`, "", markdown].join("\n")
-  );
+  return buildMinimalCard(`需求计划待确认 · ${requirementId}`, "blue", body);
 }
 
 function buildExecutionProgressCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard {
@@ -76,8 +70,12 @@ function buildReportCard(title: string, requirementId: string, input: Requiremen
   return buildMinimalCard(title, "green", [`**需求 ID**：${requirementId}`, "", report].join("\n"));
 }
 
-const RENDER_ENTRIES: readonly RequirementRenderEntry[] = [
-  { effectType: "requirement.plan_review.render", buildCard: buildPlanReviewCard },
+interface RequirementRenderEntry {
+  effectType: string;
+  buildCard(requirementId: string, input: RequirementRenderInput): MinimalFeishuCard;
+}
+
+const SIMPLE_RENDER_ENTRIES: readonly RequirementRenderEntry[] = [
   { effectType: "requirement.execution_progress.render", buildCard: buildExecutionProgressCard },
   {
     effectType: "requirement.verification_result.render",
@@ -89,11 +87,11 @@ const RENDER_ENTRIES: readonly RequirementRenderEntry[] = [
   }
 ];
 
-export function registerFeishuRequirementRenderEffects(
+function registerSimpleCardEffects(
   registry: EffectHandlerRegistry,
   client: Pick<FeishuClientPort, "sendInteractiveCard">
 ): void {
-  for (const entry of RENDER_ENTRIES) {
+  for (const entry of SIMPLE_RENDER_ENTRIES) {
     registry.register({
       pluginId: "feishu",
       effectType: entry.effectType,
@@ -101,8 +99,47 @@ export function registerFeishuRequirementRenderEffects(
         const input = effect.input as RequirementRenderInput;
         const { chatId, requirementId } = validateRequiredFields(input);
         const card = entry.buildCard(requirementId, input);
-        return sendRequirementCard(client, chatId, card);
+        const messageId = await client.sendInteractiveCard(chatId, card);
+        return { rendered: true, messageId };
       }
     });
   }
+}
+
+function registerPlanReviewEffect(
+  registry: EffectHandlerRegistry,
+  client: Pick<FeishuClientPort, "sendInteractiveCard">,
+  cloudDoc: FeishuCloudDocClientPort
+): void {
+  registry.register({
+    pluginId: "feishu",
+    effectType: "requirement.plan_review.render",
+    execute: async (effect) => {
+      const input = effect.input as RequirementRenderInput;
+      const { chatId, requirementId } = validateRequiredFields(input);
+
+      const planVersion = typeof input.planVersion === "number" ? input.planVersion : 1;
+      const markdown = String(input.markdown ?? "");
+      const summary = typeof input.summary === "string" ? input.summary : undefined;
+      const docTitle = `需求计划 ${requirementId} v${planVersion}`;
+
+      const { documentId } = await cloudDoc.createDoc({ title: docTitle });
+      await cloudDoc.writeMarkdown({ documentId, markdown });
+      const docUrl = cloudDoc.buildDocUrl(documentId);
+
+      const card = buildPlanReviewLinkCard(requirementId, planVersion, summary, docUrl);
+      const messageId = await client.sendInteractiveCard(chatId, card);
+
+      return { rendered: true, messageId, documentId, docUrl };
+    }
+  });
+}
+
+export function registerFeishuRequirementRenderEffects(
+  registry: EffectHandlerRegistry,
+  client: Pick<FeishuClientPort, "sendInteractiveCard">,
+  cloudDoc: FeishuCloudDocClientPort
+): void {
+  registerPlanReviewEffect(registry, client, cloudDoc);
+  registerSimpleCardEffects(registry, client);
 }

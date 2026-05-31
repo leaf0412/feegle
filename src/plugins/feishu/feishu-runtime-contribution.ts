@@ -3,6 +3,7 @@ import type { AgentConversationResult } from "@core/agent-conversation/agent-con
 import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
+import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
 import { registerFeishuRequirementRenderEffects } from "./feishu-requirement-renderer.js";
@@ -41,7 +42,7 @@ function textFromEvent(event: TriggerEvent): string | undefined {
   return typeof commandText === "string" ? commandText : undefined;
 }
 
-export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeContributionModule {
+export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: FeishuCloudDocClientPort): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
     register: (ctx) => {
@@ -245,7 +246,7 @@ export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeCont
         }
       });
 
-      registerFeishuRequirementRenderEffects(ctx.effectHandlers, client);
+      registerFeishuRequirementRenderEffects(ctx.effectHandlers, client, cloudDoc);
     }
   };
 }
