@@ -291,6 +291,51 @@ describe("FeishuLongConnectionRuntime", () => {
     expect(handled).toHaveLength(0);
   });
 
+  it("dedups card actions by callback token, not messageId, so an evolving card accepts successive clicks", async () => {
+    const registered: {
+      "card.action.trigger"?: (event: FeishuCardActionTriggerEvent) => Promise<void>;
+    } = {};
+    const dispatched: unknown[] = [];
+
+    class FakeEventDispatcher {
+      register(handles: { "card.action.trigger": (event: FeishuCardActionTriggerEvent) => Promise<void> }): this {
+        Object.assign(registered, handles);
+        return this;
+      }
+    }
+    class FakeWSClient {
+      async start(): Promise<void> {}
+    }
+
+    const runtime = new FeishuLongConnectionRuntime(
+      fullConfig(),
+      { EventDispatcher: FakeEventDispatcher, WSClient: FakeWSClient },
+      { handleCommand: async () => {} },
+      {
+        dispatch: async (event) => {
+          dispatched.push(event);
+          return { status: "succeeded" as const };
+        }
+      }
+    );
+    await runtime.start();
+
+    const click = (token: string) =>
+      registered["card.action.trigger"]?.({
+        token,
+        action: { value: { action: "act:/requirement plan approve", requirement_id: "reqwf_1", plan_version: "1" } },
+        context: { open_chat_id: "oc_card", open_message_id: "om_evolving" }
+      });
+
+    // same evolving card (one messageId), two distinct clicks → both dispatch
+    await click("tok_first");
+    await click("tok_second");
+    // Feishu redelivery repeats a token → that one is deduped
+    await click("tok_second");
+
+    expect(dispatched).toHaveLength(2);
+  });
+
   it("dispatches bot menu events through ingress instead of handleCommand when configured", async () => {
     const registered: {
       "application.bot.menu_v6"?: (event: FeishuBotMenuEvent) => Promise<void>;

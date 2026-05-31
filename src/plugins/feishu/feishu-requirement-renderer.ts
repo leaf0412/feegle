@@ -55,6 +55,28 @@ function validateRequiredFields(input: RequirementRenderInput): { chatId: string
   return { chatId: input.chatId, requirementId: input.requirementId };
 }
 
+function readCardMessageId(input: RequirementRenderInput): string | undefined {
+  return typeof input.cardMessageId === "string" && input.cardMessageId.length > 0
+    ? input.cardMessageId
+    : undefined;
+}
+
+// Single evolving card: a card action carries the clicked card's message id, so
+// we patch that message in place. The first render (from a text intake) has no
+// cardMessageId and sends a fresh card. Returns the message id either way.
+async function deliverCard(
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">,
+  chatId: string,
+  cardMessageId: string | undefined,
+  card: unknown
+): Promise<string | undefined> {
+  if (cardMessageId) {
+    await client.updateInteractiveCard(cardMessageId, card);
+    return cardMessageId;
+  }
+  return client.sendInteractiveCard(chatId, card);
+}
+
 function actionValue(requirementId: string, action: string, planVersion?: number): Record<string, string> {
   const value: Record<string, string> = { action, requirement_id: requirementId };
   if (planVersion !== undefined) {
@@ -216,7 +238,7 @@ function buildAcceptanceResultCard(requirementId: string, input: RequirementRend
 
 function registerSimpleCardEffects(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
 ): void {
   registry.register({
     pluginId: "feishu",
@@ -225,7 +247,7 @@ function registerSimpleCardEffects(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildAcceptanceResultCard(requirementId, input);
-      const messageId = await client.sendInteractiveCard(chatId, card);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }
   });
@@ -233,7 +255,7 @@ function registerSimpleCardEffects(
 
 function registerPlanReviewEffect(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">,
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">,
   cloudDoc: FeishuCloudDocClientPort
 ): void {
   registry.register({
@@ -253,7 +275,7 @@ function registerPlanReviewEffect(
       const docUrl = cloudDoc.buildDocUrl(documentId);
 
       const card = buildPlanReviewLinkCard(requirementId, planVersion, summary, docUrl);
-      const messageId = await client.sendInteractiveCard(chatId, card);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
 
       return { rendered: true, messageId, documentId, docUrl };
     }
@@ -262,7 +284,7 @@ function registerPlanReviewEffect(
 
 function registerPlanApprovedEffect(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
 ): void {
   registry.register({
     pluginId: "feishu",
@@ -271,7 +293,7 @@ function registerPlanApprovedEffect(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildPlanApprovedCard(requirementId, input);
-      const messageId = await client.sendInteractiveCard(chatId, card);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }
   });
@@ -279,7 +301,7 @@ function registerPlanApprovedEffect(
 
 function registerExecutionProgressEffect(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
 ): void {
   registry.register({
     pluginId: "feishu",
@@ -288,7 +310,7 @@ function registerExecutionProgressEffect(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildExecutionProgressCard(requirementId, input);
-      const messageId = await client.sendInteractiveCard(chatId, card);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }
   });
@@ -296,7 +318,7 @@ function registerExecutionProgressEffect(
 
 function registerVerificationResultEffect(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">
 ): void {
   registry.register({
     pluginId: "feishu",
@@ -305,7 +327,7 @@ function registerVerificationResultEffect(
       const input = effect.input as RequirementRenderInput;
       const { chatId, requirementId } = validateRequiredFields(input);
       const card = buildVerificationResultCard(requirementId, input);
-      const messageId = await client.sendInteractiveCard(chatId, card);
+      const messageId = await deliverCard(client, chatId, readCardMessageId(input), card);
       return { rendered: true, messageId };
     }
   });
@@ -313,7 +335,7 @@ function registerVerificationResultEffect(
 
 export function registerFeishuRequirementRenderEffects(
   registry: EffectHandlerRegistry,
-  client: Pick<FeishuClientPort, "sendInteractiveCard">,
+  client: Pick<FeishuClientPort, "sendInteractiveCard" | "updateInteractiveCard">,
   cloudDoc: FeishuCloudDocClientPort
 ): void {
   registerPlanReviewEffect(registry, client, cloudDoc);

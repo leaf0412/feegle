@@ -68,6 +68,10 @@ export function resolveFeishuRequirementCardActionIntent(
       ...input.actionPayload,
       chatId: input.chatId,
       messageId: input.messageId,
+      // the clicked card's message id — renderers update THIS card in place
+      // (single evolving card) rather than sending a new message. Text intake
+      // carries no cardMessageId, so its plan_review render sends a fresh card.
+      cardMessageId: input.messageId,
       conversationKey: input.conversationKey ?? `feishu:${input.chatId}`
     }
   };

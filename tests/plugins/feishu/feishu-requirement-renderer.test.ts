@@ -20,7 +20,43 @@ function makeCloudDoc() {
   };
 }
 
+function makeClient() {
+  return {
+    sendInteractiveCard: vi.fn().mockResolvedValue("om_new"),
+    updateInteractiveCard: vi.fn().mockResolvedValue(undefined)
+  };
+}
+
 describe("Feishu requirement render effects", () => {
+  it("updates the clicked card in place when cardMessageId is present (single evolving card)", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    const out = await handlers["feishu:requirement.execution_progress.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", cardMessageId: "om_card", result: { status: "done" } }
+    });
+
+    // an in-place update must NOT post a new message — that is what let users
+    // re-click the stale card and re-trigger the action.
+    expect(client.updateInteractiveCard).toHaveBeenCalledWith("om_card", expect.objectContaining({ schema: "2.0" }));
+    expect(client.sendInteractiveCard).not.toHaveBeenCalled();
+    expect(out).toEqual({ rendered: true, messageId: "om_card" });
+  });
+
+  it("sends a fresh card when cardMessageId is absent (first render from text intake)", async () => {
+    const { handlers, registry } = makeRegistry();
+    const client = makeClient();
+    registerFeishuRequirementRenderEffects(registry as never, client as never, makeCloudDoc() as never);
+
+    await handlers["feishu:requirement.plan_review.render"].execute({
+      input: { chatId: "oc_1", requirementId: "reqwf_1", planVersion: 1, markdown: "# Plan" }
+    });
+
+    expect(client.sendInteractiveCard).toHaveBeenCalledTimes(1);
+    expect(client.updateInteractiveCard).not.toHaveBeenCalled();
+  });
+
   it("renders plan review by publishing a cloud doc and linking to it", async () => {
     const { handlers, registry } = makeRegistry();
     const client = { sendInteractiveCard: vi.fn().mockResolvedValue("om_card") };

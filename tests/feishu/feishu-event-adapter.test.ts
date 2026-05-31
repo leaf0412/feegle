@@ -138,6 +138,19 @@ describe("feishu event adapter", () => {
     });
   });
 
+  it("captures the per-click callback token so an evolving card can be deduped per click", () => {
+    // A card that updates in place keeps one messageId across many clicks; the
+    // token is what distinguishes successive clicks (and matches on redelivery).
+    const parsed = extractCardActionCommand({
+      token: "callback_tok_abc",
+      action: { value: { action: "act:/requirement plan approve", requirement_id: "reqwf_1", plan_version: "1" } },
+      context: { open_chat_id: "oc_1", open_message_id: "om_card" }
+    });
+
+    expect(parsed?.actionToken).toBe("callback_tok_abc");
+    expect(parsed?.messageId).toBe("om_card");
+  });
+
   it("merges Feishu form_submit values from action.form_value into card action commands", () => {
     const parsed = extractCardActionCommand({
       action: {
