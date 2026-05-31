@@ -78,16 +78,22 @@ describe("HttpFeishuCloudDocClient", () => {
     });
   });
 
-  it("writeMarkdown splits >50 blocks into multiple descendant calls with incrementing index", async () => {
-    // A big plan converts to many first-level blocks. The descendant API caps at
-    // 50 blocks/call, so a single write would 400 — these must be batched.
-    const total = 120;
-    const ids = Array.from({ length: total }, (_, i) => `tmp_${i}`);
-    const blocks = ids.map((id) => ({ block_id: id, block_type: 2, text: {}, parent_id: "" }));
+  it("writeMarkdown sends the whole converted tree in ONE descendant call (no batching)", async () => {
+    // The tree's parent/child refs are by temp id within one descendants array —
+    // splitting it drops child references and Feishu 400s (code 1770001). Many
+    // blocks (incl. a nested table subtree) must all go in a single call.
+    const paragraphs = Array.from({ length: 80 }, (_, i) => `p_${i}`);
+    const firstLevel = [...paragraphs, "table"];
+    const blocks = [
+      ...paragraphs.map((id) => ({ block_id: id, block_type: 2, text: {}, parent_id: "" })),
+      { block_id: "table", block_type: 31, table: {}, parent_id: "", children: ["cell_a", "cell_b"] },
+      { block_id: "cell_a", block_type: 32, table_cell: {}, parent_id: "table" },
+      { block_id: "cell_b", block_type: 32, table_cell: {}, parent_id: "table" }
+    ];
     const writeCalls: Array<{ children_id: string[]; index: number; count: number }> = [];
     const requester = fakeRequester((req) => {
       if (req.url.endsWith("/blocks/convert")) {
-        return { code: 0, data: { blocks, first_level_block_ids: ids } };
+        return { code: 0, data: { blocks, first_level_block_ids: firstLevel } };
       }
       const data = req.data as { children_id: string[]; descendants: unknown[]; index: number };
       writeCalls.push({ children_id: data.children_id, index: data.index, count: data.descendants.length });
@@ -95,46 +101,46 @@ describe("HttpFeishuCloudDocClient", () => {
     });
     const client = new HttpFeishuCloudDocClient(requester);
 
-    await client.writeMarkdown({ documentId: "doc_123", markdown: "big" });
+    await client.writeMarkdown({ documentId: "doc_123", markdown: "big plan with table" });
 
-    expect(writeCalls).toHaveLength(3);
-    expect(writeCalls.map((c) => c.count)).toEqual([50, 50, 20]);
-    expect(writeCalls.map((c) => c.index)).toEqual([0, 50, 100]);
-    // every block is written exactly once, in order, across the batches
-    const written = writeCalls.flatMap((c) => c.children_id);
-    expect(written).toEqual(ids);
+    expect(writeCalls).toHaveLength(1);
+    expect(writeCalls[0]?.children_id).toEqual(firstLevel);
+    expect(writeCalls[0]?.count).toBe(blocks.length);
+    expect(writeCalls[0]?.index).toBe(0);
   });
 
-  it("writeMarkdown never splits a parent block away from its children", async () => {
-    // 49 paragraphs then a table whose 3-block subtree would overflow the first
-    // batch. The table must move whole into the next batch, not be torn apart —
-    // a dangling child reference makes Feishu reject the descendant call.
-    const paragraphs = Array.from({ length: 49 }, (_, i) => `p_${i}`);
-    const tableSubtree = ["table", "cell_a", "cell_b"];
-    const blocks = [
-      ...paragraphs.map((id) => ({ block_id: id, block_type: 2, text: {}, parent_id: "" })),
-      { block_id: "table", block_type: 31, table: {}, parent_id: "", children: ["cell_a", "cell_b"] },
-      { block_id: "cell_a", block_type: 32, table_cell: {}, parent_id: "table" },
-      { block_id: "cell_b", block_type: 32, table_cell: {}, parent_id: "table" }
-    ];
-    const writeCalls: Array<{ children_id: string[]; ids: string[] }> = [];
+  it("writeMarkdown fails loud when the tree exceeds the 1000-block descendant limit", async () => {
+    const ids = Array.from({ length: 1001 }, (_, i) => `tmp_${i}`);
+    const blocks = ids.map((id) => ({ block_id: id, block_type: 2, text: {}, parent_id: "" }));
+    let wrote = false;
     const requester = fakeRequester((req) => {
       if (req.url.endsWith("/blocks/convert")) {
-        return { code: 0, data: { blocks, first_level_block_ids: [...paragraphs, "table"] } };
+        return { code: 0, data: { blocks, first_level_block_ids: ids } };
       }
-      const data = req.data as { children_id: string[]; descendants: Array<{ block_id: string }> };
-      writeCalls.push({ children_id: data.children_id, ids: data.descendants.map((b) => b.block_id) });
+      wrote = true;
       return { code: 0, data: {} };
     });
     const client = new HttpFeishuCloudDocClient(requester);
 
-    await client.writeMarkdown({ documentId: "doc_123", markdown: "table plan" });
+    await expect(client.writeMarkdown({ documentId: "doc_123", markdown: "huge" })).rejects.toThrow(
+      /1001 blocks, exceeding Feishu's 1000-block/
+    );
+    expect(wrote).toBe(false);
+  });
 
-    expect(writeCalls).toHaveLength(2);
-    expect(writeCalls[0]?.children_id).toEqual(paragraphs);
-    expect(writeCalls[1]?.children_id).toEqual(["table"]);
-    // the table batch carries the whole subtree together
-    expect(writeCalls[1]?.ids).toEqual(tableSubtree);
+  it("writeMarkdown surfaces Feishu's code+msg when the descendant call 400s", async () => {
+    const requester = fakeRequester((req) => {
+      if (req.url.endsWith("/blocks/convert")) {
+        return { code: 0, data: { blocks: [{ block_id: "b1", block_type: 2 }], first_level_block_ids: ["b1"] } };
+      }
+      // mimic the Lark SDK throwing an axios error with Feishu's body on a 400
+      throw { response: { status: 400, data: { code: 1770001, msg: "invalid param" } } };
+    });
+    const client = new HttpFeishuCloudDocClient(requester);
+
+    await expect(client.writeMarkdown({ documentId: "doc_123", markdown: "x" })).rejects.toThrow(
+      "Feishu writeBlocks request failed: code=1770001 msg=invalid param http=400"
+    );
   });
 
   it("writeMarkdown skips the write call when the converter returns zero blocks", async () => {

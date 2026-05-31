@@ -23,17 +23,11 @@ interface ConvertResponseData {
   first_level_block_ids: string[];
 }
 
-type DocBlock = Record<string, unknown> & { block_id: string };
-
-interface DescendantBatch {
-  children_id: string[];
-  descendants: DocBlock[];
-  index: number;
-}
-
-// Feishu's create-descendant API accepts at most 50 blocks per call. Larger plans
-// (tables, long step lists) must be written across several calls or the API 400s.
-const MAX_DESCENDANTS_PER_CALL = 50;
+// Feishu's create-descendant API accepts up to 1000 blocks in a single call, and
+// the whole converted tree must go in one call — the parent/child references are
+// by temp id within that one `descendants` array. Splitting it across calls drops
+// child references and Feishu rejects it (code 1770001 "invalid param").
+const MAX_DESCENDANTS_PER_CALL = 1000;
 
 export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   private readonly docBaseUrl: string;
@@ -45,8 +39,18 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
     this.docBaseUrl = options.docBaseUrl ?? "https://feishu.cn";
   }
 
+  // The Lark SDK throws an AxiosError on an HTTP 4xx, with Feishu's {code,msg}
+  // buried in response.data. Surface that instead of an opaque "status 400".
+  private async request(operation: string, payload: Parameters<FeishuRawRequester["request"]>[0]): Promise<unknown> {
+    try {
+      return await this.requester.request(payload);
+    } catch (error) {
+      throw new Error(`Feishu ${operation} request failed: ${describeRequestError(error)}`);
+    }
+  }
+
   async createDoc(input: { title: string }): Promise<{ documentId: string }> {
-    const response = await this.requester.request({
+    const response = await this.request("createDoc", {
       url: "/open-apis/docx/v1/documents",
       method: "POST",
       data: { title: input.title }
@@ -60,7 +64,7 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   }
 
   async writeMarkdown(input: { documentId: string; markdown: string }): Promise<void> {
-    const convertResponse = await this.requester.request({
+    const convertResponse = await this.request("convertMarkdown", {
       url: "/open-apis/docx/v1/documents/blocks/convert",
       method: "POST",
       data: { content_type: "markdown", content: input.markdown }
@@ -71,24 +75,28 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
     if (blocks.length === 0 || firstLevel.length === 0) {
       return;
     }
-
-    const batches = splitIntoDescendantBatches(blocks, firstLevel, MAX_DESCENDANTS_PER_CALL);
-    for (const batch of batches) {
-      const writeResponse = await this.requester.request({
-        url: `/open-apis/docx/v1/documents/${input.documentId}/blocks/${input.documentId}/descendant`,
-        method: "POST",
-        data: {
-          children_id: batch.children_id,
-          descendants: batch.descendants,
-          index: batch.index
-        }
-      });
-      expectSuccess("writeBlocks", writeResponse);
+    if (blocks.length > MAX_DESCENDANTS_PER_CALL) {
+      // The whole tree must go in one call; >1000 blocks needs incremental
+      // parent-then-children writes (not built). Fail loud rather than truncate.
+      throw new Error(
+        `Plan converts to ${blocks.length} blocks, exceeding Feishu's ${MAX_DESCENDANTS_PER_CALL}-block descendant limit`
+      );
     }
+
+    const writeResponse = await this.request("writeBlocks", {
+      url: `/open-apis/docx/v1/documents/${input.documentId}/blocks/${input.documentId}/descendant`,
+      method: "POST",
+      data: {
+        children_id: firstLevel,
+        descendants: blocks,
+        index: 0
+      }
+    });
+    expectSuccess("writeBlocks", writeResponse);
   }
 
   async deleteDoc(input: { documentId: string }): Promise<void> {
-    const response = await this.requester.request({
+    const response = await this.request("deleteDoc", {
       url: `/open-apis/drive/v1/files/${input.documentId}`,
       method: "DELETE",
       params: { type: "docx" }
@@ -99,67 +107,6 @@ export class HttpFeishuCloudDocClient implements FeishuCloudDocClientPort {
   buildDocUrl(documentId: string): string {
     return `${this.docBaseUrl}/docx/${documentId}`;
   }
-}
-
-// Walk one first-level block plus its full subtree (children referenced by id).
-// The descendant call must carry a parent together with every block it links to,
-// otherwise Feishu rejects the dangling child reference.
-function collectClosure(rootId: string, byId: Map<string, DocBlock>): DocBlock[] {
-  const closure: DocBlock[] = [];
-  const seen = new Set<string>();
-  const stack = [rootId];
-  while (stack.length > 0) {
-    const id = stack.pop() as string;
-    if (seen.has(id)) {
-      continue;
-    }
-    seen.add(id);
-    const block = byId.get(id);
-    if (!block) {
-      continue;
-    }
-    closure.push(block);
-    const children = Array.isArray(block.children) ? (block.children as string[]) : [];
-    // push in reverse so the stack pops children back in document order (pre-order)
-    for (let i = children.length - 1; i >= 0; i -= 1) {
-      stack.push(children[i]);
-    }
-  }
-  return closure;
-}
-
-// Pack first-level blocks (each with its subtree) into descendant batches of at
-// most `max` blocks, preserving order. A parent and its children always stay in
-// one batch; `index` tracks how many first-level blocks were already inserted so
-// later batches append after earlier ones. A single subtree larger than `max` is
-// sent alone — the API will surface that loudly rather than us silently dropping.
-function splitIntoDescendantBatches(blocks: DocBlock[], firstLevel: string[], max: number): DescendantBatch[] {
-  const byId = new Map(blocks.map((block) => [block.block_id, block]));
-  const batches: DescendantBatch[] = [];
-  let children: string[] = [];
-  let descendants: DocBlock[] = [];
-  let writtenFirstLevel = 0;
-
-  const flush = (): void => {
-    if (children.length === 0) {
-      return;
-    }
-    batches.push({ children_id: children, descendants, index: writtenFirstLevel });
-    writtenFirstLevel += children.length;
-    children = [];
-    descendants = [];
-  };
-
-  for (const rootId of firstLevel) {
-    const closure = collectClosure(rootId, byId);
-    if (children.length > 0 && descendants.length + closure.length > max) {
-      flush();
-    }
-    children.push(rootId);
-    descendants.push(...closure);
-  }
-  flush();
-  return batches;
 }
 
 function expectSuccess(operation: string, response: unknown): Record<string, unknown> {
@@ -177,6 +124,29 @@ function expectSuccess(operation: string, response: unknown): Record<string, unk
     return {};
   }
   return data as Record<string, unknown>;
+}
+
+// Pull Feishu's {code,msg} out of an axios-style error (response.data), falling
+// back to common error fields, so a 4xx surfaces the real reason not "status 400".
+function describeRequestError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const err = error as Record<string, unknown>;
+    const response = err.response as { data?: unknown; status?: unknown } | undefined;
+    const data = response?.data;
+    if (data && typeof data === "object") {
+      const body = data as Record<string, unknown>;
+      const code = body.code;
+      const msg = body.msg ?? body.message;
+      if (code !== undefined || msg !== undefined) {
+        const status = response?.status !== undefined ? ` http=${String(response.status)}` : "";
+        return `code=${String(code)} msg=${String(msg)}${status}`;
+      }
+    }
+    if (typeof err.message === "string" && err.message.length > 0) {
+      return err.message;
+    }
+  }
+  return String(error);
 }
 
 function readString(value: Record<string, unknown>, path: ReadonlyArray<string>): string | undefined {
