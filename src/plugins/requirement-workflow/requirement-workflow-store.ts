@@ -124,22 +124,24 @@ export class RequirementWorkflowStore {
     expected: RequirementWorkflowStatus;
     next: RequirementWorkflowStatus;
   }): RequirementWorkflowRecord {
-    const current = this.get(input.requirementId);
-    const actualStatus = current?.status ?? "missing";
-
-    if (!current || current.status !== input.expected) {
-      throw new Error(
-        `Unexpected requirement workflow status for ${input.requirementId}: expected ${input.expected}, found ${actualStatus}`
-      );
-    }
-
     const updatedAt = new Date().toISOString();
 
-    this.db
+    const result = this.db
       .prepare(
-        `update requirement_workflows set status = ?, updated_at = ? where requirement_id = ?`
+        `update requirement_workflows set status = ?, updated_at = ?
+         where requirement_id = ? and status = ?`
       )
-      .run(input.next, updatedAt, input.requirementId);
+      .run(input.next, updatedAt, input.requirementId, input.expected);
+
+    if (result.changes === 0) {
+      const current = this.get(input.requirementId);
+      if (!current) {
+        throw new Error(`Requirement workflow not found: ${input.requirementId}`);
+      }
+      throw new Error(
+        `Unexpected requirement workflow status for ${input.requirementId}: expected ${input.expected}, found ${current.status}`
+      );
+    }
 
     const updated = this.get(input.requirementId);
     if (!updated) {

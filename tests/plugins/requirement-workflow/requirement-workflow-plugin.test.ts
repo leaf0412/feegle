@@ -74,7 +74,7 @@ describe("RequirementWorkflowStore", () => {
 
     expect(() =>
       store.setStatus({ requirementId: record.requirementId, expected: "planning", next: "plan_reviewing" })
-    ).toThrow();
+    ).toThrow("expected planning, found intake_received");
 
     const updated = store.setStatus({ requirementId: record.requirementId, expected: "intake_received", next: "planning" });
     expect(updated.status).toBe("planning");
