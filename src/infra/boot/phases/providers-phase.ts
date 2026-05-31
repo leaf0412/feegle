@@ -2,6 +2,7 @@ import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import type { Contributions } from "../feegle-plugin.js";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { AgentConversationService } from "@core/agent-conversation/agent-conversation-service.js";
 import { buildNotificationBroker } from "../../app/build-notification-broker.js";
 import { GitService } from "../../git/git-service.js";
 import { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
@@ -9,8 +10,10 @@ import { GitLabFollowStore } from "@integrations/gitlab/gitlab-follow-store.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { buildQuoteClientRegistry } from "@integrations/stock/build-quote-client-registry.js";
 import { resolveGitLabToken } from "./resolve-gitlab-token.js";
+import { resolveWorkspaceDir } from "../../app/workspace-dir.js";
 
 export interface ProvidersPhaseDeps {
+  feegleHome: string;
   feishuClient: FeishuClientPort;
   quoteClientId: string;
   contributions: Contributions;
@@ -21,8 +24,16 @@ export function providersPhase(deps: ProvidersPhaseDeps): BootPhase {
   return {
     name: "providers",
     run: async (ctx: BootContext) => {
-      ctx.provide("agents", await deps.resolveAgents(ctx));
-      const gitlabConfig = ctx.require("configStore").get().gitlab;
+      const agents = await deps.resolveAgents(ctx);
+      ctx.provide("agents", agents);
+      const configStore = ctx.require("configStore");
+      ctx.provide("agentConversationService", new AgentConversationService({
+        providers: agents,
+        history: ctx.require("chatHistory"),
+        sessionStore: ctx.require("sessionStore"),
+        workspaceDir: resolveWorkspaceDir(deps.feegleHome, configStore.get().defaultWorkspace)
+      }));
+      const gitlabConfig = configStore.get().gitlab;
       const gitlabToken = resolveGitLabToken(gitlabConfig);
       ctx.provide("gitlab", new GitLabClient(gitlabToken));
       ctx.provide("gitlabFollowStore", new GitLabFollowStore(ctx.require("runtimeDb")));

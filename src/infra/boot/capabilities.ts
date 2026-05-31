@@ -1,3 +1,4 @@
+import type { AgentConversationRunner } from "@core/agent-conversation/agent-conversation-service.js";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import type { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
 import type { ProviderStorePort } from "@integrations/agent/provider-store.js";
@@ -69,6 +70,7 @@ export interface Capabilities {
   taskStore: TaskStore;
   taskRegistry: TaskRegistry;
   providerStore: ProviderStorePort;
+  agentConversationService: AgentConversationRunner;
   runtimeStore: RuntimeStore;
   workflowRegistry: WorkflowRegistry;
   workflowRuntime: WorkflowRuntime;

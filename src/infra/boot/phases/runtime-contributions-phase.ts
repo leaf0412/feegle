@@ -14,7 +14,8 @@ export function runtimeContributionsPhase(deps: RuntimeContributionsPhaseDeps): 
         workflows: ctx.require("workflowRegistry"),
         intentResolvers: ctx.require("intentResolvers"),
         workflowSelector: ctx.require("workflowSelector"),
-        effectHandlers: ctx.require("effectHandlers")
+        effectHandlers: ctx.require("effectHandlers"),
+        agentConversationService: ctx.require("agentConversationService")
       });
 
       for (const module of deps.contributions.runtimeContributions) {

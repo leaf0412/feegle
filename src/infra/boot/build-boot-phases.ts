@@ -33,6 +33,7 @@ export function buildBootPhases(deps: BuildBootPhasesDeps): BootPhase[] {
     }),
     storesPhase({ feegleHome: appDeps.feegleHome, seedTasks: deps.seedTasks, provisions: deps.contributions.provisions }),
     providersPhase({
+      feegleHome: appDeps.feegleHome,
       feishuClient: appDeps.feishuClient,
       quoteClientId: deps.quoteClientId,
       contributions: deps.contributions,

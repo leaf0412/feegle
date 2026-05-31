@@ -6,6 +6,15 @@ import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { RuntimeContributionContext } from "@core/runtime/runtime-contribution-context.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
+import type { AgentConversationRunner } from "@core/agent-conversation/agent-conversation-service.js";
+
+function fakeAgentConversationService(): AgentConversationRunner {
+  return {
+    async run() {
+      return { status: "no_provider", reason: "test", progress: [] };
+    }
+  };
+}
 
 describe("RuntimeContributionContext", () => {
   it("groups runtime registries for plugin contribution registration", () => {
@@ -13,13 +22,15 @@ describe("RuntimeContributionContext", () => {
       workflows: new WorkflowRegistry(),
       intentResolvers: new IntentResolverRegistry(),
       workflowSelector: new WorkflowSelector(),
-      effectHandlers: new EffectHandlerRegistry()
+      effectHandlers: new EffectHandlerRegistry(),
+      agentConversationService: fakeAgentConversationService()
     });
 
     expect(ctx.workflows).toBeInstanceOf(WorkflowRegistry);
     expect(ctx.intentResolvers).toBeInstanceOf(IntentResolverRegistry);
     expect(ctx.workflowSelector).toBeInstanceOf(WorkflowSelector);
     expect(ctx.effectHandlers).toBeInstanceOf(EffectHandlerRegistry);
+    expect(ctx.agentConversationService).toBeDefined();
   });
 
   it("runs runtime contribution modules with runtime registries", async () => {
@@ -28,6 +39,7 @@ describe("RuntimeContributionContext", () => {
     boot.provide("intentResolvers", new IntentResolverRegistry());
     boot.provide("workflowSelector", new WorkflowSelector());
     boot.provide("effectHandlers", new EffectHandlerRegistry());
+    boot.provide("agentConversationService", fakeAgentConversationService());
 
     const phase = runtimeContributionsPhase({
       contributions: {

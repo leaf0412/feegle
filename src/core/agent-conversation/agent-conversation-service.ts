@@ -12,6 +12,10 @@ import type {
   AgentConversationResult
 } from "./agent-conversation-models.js";
 
+export interface AgentConversationRunner {
+  run(input: AgentConversationInput): Promise<AgentConversationResult>;
+}
+
 export interface AgentConversationServiceDeps {
   providers: AgentProviderRegistry;
   history: ChatHistoryStore;
@@ -21,7 +25,7 @@ export interface AgentConversationServiceDeps {
   now?: () => number;
 }
 
-export class AgentConversationService {
+export class AgentConversationService implements AgentConversationRunner {
   private readonly balancer: AgentLoadBalancer;
   private readonly now: () => number;
 
