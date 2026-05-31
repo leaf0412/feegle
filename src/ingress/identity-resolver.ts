@@ -1,4 +1,4 @@
-import type { WorkspaceStore } from "../resources/workspace/workspace-store.js";
+import type { WorkspaceStore } from "@resources/workspace/workspace-store.js";
 
 export type ResolvedIdentity =
   | { status: "resolved"; userId: string; displayName: string }

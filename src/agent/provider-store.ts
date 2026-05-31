@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ConfigStoreProviderWriter } from "../infra/app/config-store.js";
+import type { ConfigStoreProviderWriter } from "@infra/app/config-store.js";
 
 export const ProviderRecordSchema = z
   .object({

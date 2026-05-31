@@ -1,5 +1,5 @@
-import type { FeishuCommandHandler } from "../integrations/feishu/feishu-long-connection-runtime.js";
-import { parseFeishuCommand } from "../integrations/feishu/feishu-gateway.js";
+import type { FeishuCommandHandler } from "@integrations/feishu/feishu-long-connection-runtime.js";
+import { parseFeishuCommand } from "@integrations/feishu/feishu-gateway.js";
 import type { PlatformIncomingMessage } from "./platform-message.js";
 import type { PlatformMessageHandler } from "./platform-port.js";
 
