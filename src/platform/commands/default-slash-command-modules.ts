@@ -3,6 +3,7 @@ import { agentCommandModule } from "./agent-command-module.js";
 import { glsumCommandModule } from "./glsum/glsum-command-module.js";
 import { providerCommandModule } from "./provider-command-module.js";
 import { repoCommandModule } from "./repo-command-module.js";
+import { runtimeCommandModule } from "./runtime-command-module.js";
 import { schedulerCommandModule } from "./scheduler-command-module.js";
 import { sessionCommandModule } from "./session-command-module.js";
 import { setupCommandModule } from "./setup-command-module.js";
@@ -16,7 +17,8 @@ const defaultModuleFactories = [
   repoCommandModule,
   schedulerCommandModule,
   providerCommandModule,
-  glsumCommandModule
+  glsumCommandModule,
+  runtimeCommandModule
 ];
 
 export function defaultSlashCommandModules(): SlashCommandModule[] {

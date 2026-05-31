@@ -32,7 +32,9 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         "providerStore",
         "sessionStore",
         "chatHistory",
-        "aliasStore"
+        "aliasStore",
+        "controlActionProcessor",
+        "workflowRuntime"
       );
       const registry = buildSlashCommandRegistry({
         feegleHome: deps.feegleHome,
@@ -53,6 +55,8 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         sessionStore: cap.sessionStore,
         chatHistory: cap.chatHistory,
         aliasStore: cap.aliasStore,
+        controlActionProcessor: cap.controlActionProcessor,
+        workflowRuntime: cap.workflowRuntime,
         modules: deps.contributions.slashCommands,
         defaults: false
       });
