@@ -54,7 +54,7 @@ export interface FeishuWsClient {
 }
 
 export interface FeishuRuntimeIngress {
-  dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" }>;
+  dispatch(event: TriggerEvent): Promise<{ status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; reason?: string }>;
 }
 
 export class FeishuLongConnectionRuntime {
@@ -107,30 +107,43 @@ export class FeishuLongConnectionRuntime {
         });
         if (envelope && this.markUnhandled("message", envelope.messageId)) {
           if (this.ingress) {
-            await this.ingress.dispatch(
-              feishuMessageEnvelopeToTriggerEvent({
-                triggerEventId: `feishu:${envelope.messageId}`,
-                receivedAt: new Date().toISOString(),
-                chatId: envelope.chatId,
+            try {
+              const result = await this.ingress.dispatch(
+                feishuMessageEnvelopeToTriggerEvent({
+                  triggerEventId: `feishu:${envelope.messageId}`,
+                  receivedAt: new Date().toISOString(),
+                  chatId: envelope.chatId,
+                  messageId: envelope.messageId,
+                  senderUserId: envelope.sender?.userId,
+                  commandType: envelope.command.type,
+                  textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0,
+                  raw: envelope.command.type === "chat" || envelope.command.type === "slash_input" || envelope.command.type === "unknown"
+                    ? envelope.command.raw
+                    : undefined,
+                  shouldRespond: envelope.shouldRespond,
+                  chatType: envelope.chatType,
+                  sessionKey: envelope.message?.sessionKey
+                })
+              );
+              if (result.status === "failed") {
+                console.error("Feishu ingress dispatch failed", {
+                  messageId: envelope.messageId,
+                  status: result.status,
+                  reason: result.reason
+                });
+              }
+            } catch (error) {
+              console.error("Feishu ingress dispatch threw", {
                 messageId: envelope.messageId,
-                senderUserId: envelope.sender?.userId,
-                commandType: envelope.command.type,
-                textLength: envelope.command.type === "chat" ? envelope.command.raw.length : 0
-              })
-            );
-          }
-          void this.handler
-            .handleCommand({
-              source: "message",
-              chatId: envelope.chatId,
+                error: String(error)
+              });
+            }
+          } else {
+            console.warn("Feishu message dropped — no ingress configured", {
               messageId: envelope.messageId,
-              sender: envelope.sender,
-              sessionKey: envelope.message?.sessionKey,
-              chatType: envelope.chatType,
-              command: envelope.command,
-              shouldRespond: envelope.shouldRespond
-            })
-            .catch((error) => console.error("Feishu message handler failed", error));
+              chatId: envelope.chatId
+            });
+          }
         }
       },
       "card.action.trigger": async (event) => {

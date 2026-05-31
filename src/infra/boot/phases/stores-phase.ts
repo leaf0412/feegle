@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import type { BootContext } from "../boot-context.js";
 import type { BootPhase } from "../boot-phase.js";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { PolicyService } from "@core/security/policy-service.js";
 import { ControlActionProcessor } from "@core/control/control-action-processor.js";
 import { ControlActionStore } from "@core/control/control-action-store.js";
 import { IdentityResolver } from "@core/ingress/identity-resolver.js";
+import { IngressDispatcher, type PluginDefaultWorkspaceResolver } from "@core/ingress/ingress-dispatcher.js";
 import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
 import { PermissionPolicy } from "@core/ingress/permission-policy.js";
 import { WorkflowSelector } from "@core/ingress/workflow-selector.js";
@@ -115,6 +117,48 @@ export function storesPhase(deps: StoresPhaseDeps): BootPhase {
             })
         })
       );
+
+      // Construct the single production IngressDispatcher so every platform
+      // runtime receives the same ingress pipeline from boot.
+      const defaultWorkspaceId = ctx.require("configStore").get().defaultWorkspace;
+      const pluginDefaultWorkspace: PluginDefaultWorkspaceResolver = {
+        resolveDefaultWorkspace: (_pluginId: string) =>
+          typeof defaultWorkspaceId === "string" && defaultWorkspaceId.length > 0
+            ? defaultWorkspaceId
+            : undefined
+      };
+      const ingressDispatcher = new IngressDispatcher({
+        identityResolver: ctx.require("identityResolver"),
+        workspaceResolver: ctx.require("workspaceResolver"),
+        permissionPolicy: ctx.require("permissionPolicy"),
+        intentResolvers,
+        workflowSelector,
+        workflowRuntime: ctx.require("workflowRuntime"),
+        eventSink: {
+          emit: (input) =>
+            runtimeStore.appendRuntimeEvent({
+              id: input.id,
+              workspaceId: input.workspaceId,
+              workflowInstanceId: input.workflowInstanceId,
+              runAttemptId: input.runAttemptId,
+              stepStateId: null,
+              effectExecutionId: null,
+              category: input.category,
+              type: input.type,
+              payload: input.payload,
+              now: input.now
+            })
+        },
+        pluginDefaultWorkspace,
+        idFactory: {
+          workflowInstanceId: () => `wfi_${randomId()}`,
+          runAttemptId: () => `ra_${randomId()}`
+        },
+        clock: {
+          nowIso: () => new Date().toISOString()
+        }
+      });
+      ctx.provide("runtimeIngress", ingressDispatcher);
 
       await migrateLegacySessionsJson(deps.feegleHome, runtimeDb);
       ctx.provide("sessionStore", new SessionStore(runtimeDb));
@@ -623,4 +667,8 @@ export function deleteOrphanWorkspacesJson(home: string): void {
     unlinkSync(filePath);
     console.info("feegle: removed orphan workspaces.json (named-workspace feature was removed)");
   }
+}
+
+function randomId(): string {
+  return randomBytes(12).toString("base64url");
 }

@@ -7,7 +7,7 @@ import { collectContributions, type FeeglePlugin } from "../boot/feegle-plugin.j
 import { runBoot } from "../boot/run-boot.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
-import type { FeishuCommandHandler } from "@integrations/feishu/feishu-long-connection-runtime.js";
+import type { FeishuCommandHandler, FeishuRuntimeIngress } from "@integrations/feishu/feishu-long-connection-runtime.js";
 import type { SlashCommandModule } from "@platform/slash-command-module.js";
 import type { HandlerKindModule } from "@features/scheduler/handler-kind-module.js";
 import type { Task } from "@features/scheduler/task.js";
@@ -31,7 +31,7 @@ export interface FeegleAppDeps {
   cloudDoc: FeishuCloudDocClientPort;
   agentProviders?: AgentProviderRegistry;
   loadAgentProviders?: (feegleHome: string) => Promise<AgentProviderRegistry>;
-  runtimeFactory: (handler: FeishuCommandHandler) => Startable;
+  runtimeFactory: (handler: FeishuCommandHandler, ingress?: FeishuRuntimeIngress) => Startable;
   acquireLock?: (feegleHome: string) => Promise<() => Promise<void>>;
   loadConfigStore?: (feegleHome: string) => Promise<ConfigStoreProviderWriter>;
   createScheduler?: (deps: { notify: NotificationBroker; configStore: ConfigStorePort; hooks?: HookManager }) => Startable;

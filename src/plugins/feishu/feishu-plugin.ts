@@ -4,7 +4,7 @@ import type { Startable } from "@infra/app/feegle-app.js";
 import { GitService } from "@infra/git/git-service.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
-import type { FeishuCommandHandler } from "@integrations/feishu/feishu-long-connection-runtime.js";
+import type { FeishuCommandHandler, FeishuRuntimeIngress } from "@integrations/feishu/feishu-long-connection-runtime.js";
 import { FeishuChatHandler } from "@integrations/feishu/feishu-chat-handler.js";
 import {
   FeishuCommandResponder,
@@ -28,7 +28,7 @@ export interface FeishuPluginDeps {
   feegleHome: string;
   feishuClient: FeishuClientPort;
   cloudDoc: FeishuCloudDocClientPort;
-  runtimeFactory: (handler: FeishuCommandHandler) => Startable;
+  runtimeFactory: (handler: FeishuCommandHandler, ingress?: FeishuRuntimeIngress) => Startable;
 }
 
 export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
@@ -77,7 +77,8 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
     "agents",
     "sessionStore",
     "chatHistory",
-    "planArtifactStore"
+    "planArtifactStore",
+    "runtimeIngress"
   );
   const config = cap.configStore.get();
   const chatHandler = new FeishuChatHandler({
@@ -121,7 +122,7 @@ function buildFeishuRuntime(deps: FeishuPluginDeps, ctx: CapabilityContext): Sta
       planExecution
     })
   });
-  return deps.runtimeFactory(responder);
+  return deps.runtimeFactory(responder, cap.runtimeIngress);
 }
 
 interface WorkbenchHandlerDeps {

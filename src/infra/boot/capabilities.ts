@@ -43,6 +43,7 @@ import type { TaskStore } from "@features/scheduler/task-store.js";
 import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
 import type { StockStore } from "@integrations/stock/stock-store.js";
 import type { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
+import type { IngressDispatcher } from "@core/ingress/ingress-dispatcher.js";
 
 /**
  * The catalog of every capability the host can provide during boot. Grows only
@@ -88,6 +89,7 @@ export interface Capabilities {
   memoryService: MemoryService;
   controlActionStore: ControlActionStore;
   controlActionProcessor: ControlActionProcessor;
+  runtimeIngress: IngressDispatcher;
   // providers
   agents: AgentProviderRegistry;
   gitlab: GitLabClient;
