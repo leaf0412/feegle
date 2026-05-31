@@ -357,6 +357,18 @@ export function migrate(db: RuntimeDb): void {
     );
     create index if not exists memory_records_scope_idx
       on memory_records(workspace_id, project_id, scope, kind, status);
+
+    create table if not exists memory_record_history (
+      id text primary key,
+      memory_id text not null,
+      from_status text,
+      to_status text not null,
+      actor text,
+      created_at text not null,
+      foreign key (memory_id) references memory_records(id) on delete cascade
+    );
+    create index if not exists memory_record_history_memory_idx
+      on memory_record_history(memory_id, created_at);
   `);
 
   db.exec(`
