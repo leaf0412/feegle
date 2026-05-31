@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { TriggerEvent } from "../../ingress/trigger-event.js";
+import type { TriggerEvent } from "../../core/ingress/trigger-event.js";
 
 export function verifyWebhookSignature(input: {
   rawBody: string;
