@@ -33,6 +33,17 @@ export class GitLabClient {
     });
   }
 
+  async updateIssueStatus(url: GitLabIssueUrl, status: string): Promise<void> {
+    const projectPath = this.encodeProjectPath(url);
+    const apiUrl = `${this.baseUrl(url.host)}/projects/${projectPath}/issues/${url.issueIid}`;
+    const stateEvent = status === "close" || status === "closed" ? "close" : "reopen";
+    await this.request(apiUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state_event: stateEvent })
+    });
+  }
+
   async searchMentionedIssues(username: string, host: string): Promise<GitLabIssueSearchResult[]> {
     const query = encodeURIComponent(`@${username}`);
     const url = `https://${host}/api/v4/search?scope=issues&search=${query}&state=opened&per_page=50`;

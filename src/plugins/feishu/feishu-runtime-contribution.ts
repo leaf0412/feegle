@@ -1,7 +1,8 @@
 import type { RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
+import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 
-export function feishuRuntimeContribution(): RuntimeContributionModule {
+export function feishuRuntimeContribution(client: FeishuClientPort): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
     register: (ctx) => {
@@ -35,12 +36,12 @@ export function feishuRuntimeContribution(): RuntimeContributionModule {
           {
             stepId: "reply",
             run: async (stepCtx) => {
-              const payload = stepCtx.input as { chatId?: string; text?: string };
+              const payload = stepCtx.input as { chatId?: string; messageId?: string; text?: string };
               if (payload.chatId && payload.text) {
                 await stepCtx.executeEffect({
                   pluginId: "feishu",
                   effectType: "reply",
-                  input: { chatId: payload.chatId, content: payload.text }
+                  input: { messageId: payload.messageId ?? payload.chatId, content: payload.text }
                 });
               }
               return { kind: "complete", output: { replied: true } };
@@ -53,16 +54,32 @@ export function feishuRuntimeContribution(): RuntimeContributionModule {
       ctx.effectHandlers.register({
         pluginId: "feishu",
         effectType: "reply",
-        execute: (effect) => {
-          return { replied: true, chatId: (effect.input as Record<string, unknown>).chatId };
+        execute: async (effect) => {
+          const input = effect.input as { messageId?: string; content?: string };
+          if (!input.messageId || typeof input.messageId !== "string") {
+            throw new Error("Missing required field: messageId (string)");
+          }
+          if (!input.content || typeof input.content !== "string") {
+            throw new Error("Missing required field: content (string)");
+          }
+          const messageId = await client.replyText(input.messageId, input.content);
+          return { replied: true, messageId, originalMessageId: input.messageId };
         }
       });
 
       ctx.effectHandlers.register({
         pluginId: "feishu",
         effectType: "card.update",
-        execute: (effect) => {
-          return { updated: true, cardId: (effect.input as Record<string, unknown>).cardId };
+        execute: async (effect) => {
+          const input = effect.input as { messageId?: string; card?: unknown };
+          if (!input.messageId || typeof input.messageId !== "string") {
+            throw new Error("Missing required field: messageId (string)");
+          }
+          if (input.card === undefined || input.card === null) {
+            throw new Error("Missing required field: card");
+          }
+          await client.updateInteractiveCard(input.messageId, input.card);
+          return { updated: true, messageId: input.messageId };
         }
       });
     }

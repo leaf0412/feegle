@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EffectHandlerRegistry } from "@core/runtime/effect-handler-registry.js";
 import { IntentResolverRegistry } from "@core/ingress/intent-resolver-registry.js";
 import { WorkflowRegistry } from "@core/runtime/workflow-registry.js";
@@ -62,5 +62,89 @@ describe("webhook runtime contribution", () => {
     });
 
     expect(selection.definitionId).toBe("webhook.inbound.workflow");
+  });
+
+  it("record_event effect calls outbound callback with payload", async () => {
+    const callback = vi.fn().mockResolvedValue(undefined);
+    const effectHandlers = new EffectHandlerRegistry();
+
+    webhookRuntimeContribution(callback).register({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers
+    });
+
+    const payload = { event: "merge_request", action: "open", id: 42 };
+    const result = await effectHandlers.execute({
+      effectId: "eff_wh_1",
+      pluginId: "webhook",
+      effectType: "record_event",
+      input: { payload }
+    });
+
+    expect(callback).toHaveBeenCalledWith(payload);
+    expect(result).toMatchObject({ recorded: true, eventId: "eff_wh_1" });
+  });
+
+  it("record_event effect works without a callback", async () => {
+    const effectHandlers = new EffectHandlerRegistry();
+
+    webhookRuntimeContribution().register({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers
+    });
+
+    const result = await effectHandlers.execute({
+      effectId: "eff_wh_2",
+      pluginId: "webhook",
+      effectType: "record_event",
+      input: { payload: { event: "push" } }
+    });
+
+    expect(result).toMatchObject({ recorded: true, eventId: "eff_wh_2" });
+  });
+
+  it("record_event effect throws for missing payload", async () => {
+    const effectHandlers = new EffectHandlerRegistry();
+
+    webhookRuntimeContribution().register({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers
+    });
+
+    await expect(
+      effectHandlers.execute({
+        effectId: "eff_wh_bad",
+        pluginId: "webhook",
+        effectType: "record_event",
+        input: {}
+      })
+    ).rejects.toThrow("Missing required field: payload");
+  });
+
+  it("record_event propagates callback errors", async () => {
+    const callback = vi.fn().mockRejectedValue(new Error("Webhook send failed"));
+    const effectHandlers = new EffectHandlerRegistry();
+
+    webhookRuntimeContribution(callback).register({
+      workflows: new WorkflowRegistry(),
+      intentResolvers: new IntentResolverRegistry(),
+      workflowSelector: new WorkflowSelector(),
+      effectHandlers
+    });
+
+    await expect(
+      effectHandlers.execute({
+        effectId: "eff_wh_fail",
+        pluginId: "webhook",
+        effectType: "record_event",
+        input: { payload: { event: "push" } }
+      })
+    ).rejects.toThrow("Webhook send failed");
   });
 });

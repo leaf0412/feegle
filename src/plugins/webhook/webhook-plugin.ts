@@ -1,7 +1,15 @@
 import type { FeeglePlugin, RuntimeContributionModule } from "@infra/boot/feegle-plugin.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 
-export function webhookRuntimeContribution(): RuntimeContributionModule {
+/**
+ * Optional callback invoked when a webhook `record_event` effect executes.
+ * In production this could forward the event to an external system.
+ */
+export type WebhookEventCallback = (payload: unknown) => Promise<void>;
+
+export function webhookRuntimeContribution(
+  outboundCallback?: WebhookEventCallback
+): RuntimeContributionModule {
   return {
     id: "webhook-runtime",
     register: (ctx) => {
@@ -47,8 +55,18 @@ export function webhookRuntimeContribution(): RuntimeContributionModule {
       ctx.effectHandlers.register({
         pluginId: "webhook",
         effectType: "record_event",
-        execute: (effect) => {
-          return { recorded: true, input: (effect.input as Record<string, unknown>).payload };
+        execute: async (effect) => {
+          const input = effect.input as { payload?: unknown };
+          if (input.payload === undefined || input.payload === null) {
+            throw new Error("Missing required field: payload");
+          }
+
+          // Call the configured outbound callback if one is set
+          if (outboundCallback) {
+            await outboundCallback(input.payload);
+          }
+
+          return { recorded: true, eventId: effect.effectId };
         }
       });
     }
