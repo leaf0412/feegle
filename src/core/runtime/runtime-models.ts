@@ -1,5 +1,6 @@
 export const runAttemptStatuses = [
   "pending",
+  "queued",
   "running",
   "waiting",
   "succeeded",

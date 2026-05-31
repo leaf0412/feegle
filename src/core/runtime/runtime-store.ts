@@ -71,6 +71,26 @@ export function decodeJson(value: string | null): unknown {
   return value === null ? null : JSON.parse(value);
 }
 
+export interface QueueAttemptRow {
+  id: string;
+  workflowInstanceId: string;
+  attemptCount: number;
+  nextRunAt: string | null;
+  leaseOwner: string | null;
+  leaseExpiresAt: string | null;
+  status: string;
+}
+
+interface QueueAttemptDbRow {
+  id: string;
+  workflow_instance_id: string;
+  attempt_count: number;
+  next_run_at: string | null;
+  lease_owner: string | null;
+  lease_expires_at: string | null;
+  status: string;
+}
+
 export class RuntimeStore {
   constructor(private readonly db: RuntimeDb) {}
 
@@ -579,6 +599,201 @@ export class RuntimeStore {
       workflowInstanceId: row.workflow_instance_id,
       status: row.status,
       createdAt: row.created_at
+    }));
+  }
+
+  // ---- Queue/lease operations ----
+
+  enqueueAttempt(input: {
+    id: string;
+    workflowInstanceId: string;
+    triggerEventId: string | null;
+    nextRunAt: string | null;
+    attemptCount: number;
+    now: string;
+  }): void {
+    this.db
+      .prepare(
+        `insert into run_attempts
+         (id, workflow_instance_id, status, trigger_event_id, next_run_at, attempt_count, created_at, updated_at)
+         values (?, ?, 'queued', ?, ?, ?, ?, ?)`
+      )
+      .run(input.id, input.workflowInstanceId, input.triggerEventId, input.nextRunAt, input.attemptCount, input.now, input.now);
+  }
+
+  claimNextAttempt(input: {
+    workerId: string;
+    leaseExpiresAt: string;
+    now: string;
+  }): QueueAttemptRow | undefined {
+    const claimFn = this.db.transaction((workerId: string, leaseExpiresAt: string, now: string) => {
+      const candidate = this.db
+        .prepare(
+          `select id from run_attempts
+           where status = 'queued'
+           and (next_run_at is null or next_run_at <= ?)
+           and (lease_expires_at is null or lease_expires_at <= ?)
+           order by created_at asc
+           limit 1`
+        )
+        .get(now, now) as { id: string } | undefined;
+
+      if (!candidate) return undefined;
+
+      this.db
+        .prepare(
+          `update run_attempts
+           set lease_owner = ?, lease_expires_at = ?, locked_at = ?, status = 'running'
+           where id = ?`
+        )
+        .run(workerId, leaseExpiresAt, now, candidate.id);
+
+      return this.db
+        .prepare(
+          `select id, workflow_instance_id, attempt_count, next_run_at, lease_owner, lease_expires_at, status
+           from run_attempts where id = ?`
+        )
+        .get(candidate.id) as QueueAttemptDbRow | undefined;
+    });
+
+    const row = claimFn(input.workerId, input.leaseExpiresAt, input.now);
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      workflowInstanceId: row.workflow_instance_id,
+      attemptCount: row.attempt_count,
+      nextRunAt: row.next_run_at,
+      leaseOwner: row.lease_owner,
+      leaseExpiresAt: row.lease_expires_at,
+      status: row.status
+    };
+  }
+
+  renewLease(input: {
+    attemptId: string;
+    leaseOwner: string;
+    leaseExpiresAt: string;
+  }): boolean {
+    const result = this.db
+      .prepare(
+        `update run_attempts set lease_expires_at = ?
+         where id = ? and lease_owner = ? and status = 'running'`
+      )
+      .run(input.leaseExpiresAt, input.attemptId, input.leaseOwner);
+    return result.changes > 0;
+  }
+
+  completeAttempt(input: {
+    attemptId: string;
+    leaseOwner: string;
+    now: string;
+  }): void {
+    this.db
+      .prepare(
+        `update run_attempts
+         set status = 'succeeded', lease_owner = null, lease_expires_at = null, locked_at = null,
+             finished_at = ?, updated_at = ?
+         where id = ? and lease_owner = ?`
+      )
+      .run(input.now, input.now, input.attemptId, input.leaseOwner);
+  }
+
+  failAttempt(input: {
+    attemptId: string;
+    leaseOwner: string;
+    nextRunAt: string | null;
+    error: RuntimeError | null;
+    now: string;
+  }): void {
+    const newStatus = input.nextRunAt ? 'queued' : 'failed';
+    this.db
+      .prepare(
+        `update run_attempts
+         set status = ?, lease_owner = null, lease_expires_at = null, locked_at = null,
+             next_run_at = ?, error_json = ?, finished_at = ?, updated_at = ?
+         where id = ? and lease_owner = ?`
+      )
+      .run(newStatus, input.nextRunAt, encodeJson(input.error), input.now, input.now, input.attemptId, input.leaseOwner);
+  }
+
+  releaseAttempt(input: {
+    attemptId: string;
+    leaseOwner: string;
+    now: string;
+  }): void {
+    this.db
+      .prepare(
+        `update run_attempts
+         set status = 'queued', lease_owner = null, lease_expires_at = null, locked_at = null, updated_at = ?
+         where id = ? and lease_owner = ?`
+      )
+      .run(input.now, input.attemptId, input.leaseOwner);
+  }
+
+  getExpiredLeases(now: string): Array<{
+    id: string;
+    workflowInstanceId: string;
+    leaseOwner: string;
+    leaseExpiresAt: string;
+  }> {
+    const rows = this.db
+      .prepare(
+        `select id, workflow_instance_id, lease_owner, lease_expires_at
+         from run_attempts
+         where status = 'running' and lease_expires_at is not null and lease_expires_at <= ?`
+      )
+      .all(now) as Array<{
+        id: string;
+        workflow_instance_id: string;
+        lease_owner: string;
+        lease_expires_at: string;
+      }>;
+    return rows.map((r) => ({
+      id: r.id,
+      workflowInstanceId: r.workflow_instance_id,
+      leaseOwner: r.lease_owner,
+      leaseExpiresAt: r.lease_expires_at
+    }));
+  }
+
+  getQueuedAttempt(id: string): QueueAttemptRow | undefined {
+    const row = this.db
+      .prepare(
+        `select id, workflow_instance_id, attempt_count, next_run_at, lease_owner, lease_expires_at, status
+         from run_attempts where id = ?`
+      )
+      .get(id) as QueueAttemptDbRow | undefined;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      workflowInstanceId: row.workflow_instance_id,
+      attemptCount: row.attempt_count,
+      nextRunAt: row.next_run_at,
+      leaseOwner: row.lease_owner,
+      leaseExpiresAt: row.lease_expires_at,
+      status: row.status
+    };
+  }
+
+  listRunningAttemptsForDefinition(definitionId: string): Array<{
+    id: string;
+    workflowInstanceId: string;
+  }> {
+    const rows = this.db
+      .prepare(
+        `select ra.id, ra.workflow_instance_id
+         from run_attempts ra
+         inner join workflow_instances wi on ra.workflow_instance_id = wi.id
+         where wi.definition_id = ? and ra.status in ('queued', 'running', 'waiting')
+         order by ra.created_at asc`
+      )
+      .all(definitionId) as Array<{
+      id: string;
+      workflow_instance_id: string;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      workflowInstanceId: r.workflow_instance_id
     }));
   }
 }

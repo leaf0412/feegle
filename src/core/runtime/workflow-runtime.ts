@@ -13,6 +13,8 @@ interface WorkflowRuntimeStartInput {
   now: string;
 }
 
+export type WorkflowStartResult = { status: "succeeded" | "failed" | "waiting" | "queued" | "skipped"; error?: RuntimeError };
+
 let effectCounter = 0;
 
 export class WorkflowRuntime {
@@ -27,9 +29,10 @@ export class WorkflowRuntime {
     this.memoryService = memoryService;
   }
 
-  async start(input: WorkflowRuntimeStartInput): Promise<{ status: "succeeded" | "failed" | "waiting" }> {
+  async start(input: WorkflowRuntimeStartInput): Promise<WorkflowStartResult> {
     const definition = this.registry.require(input.definitionId);
-    const eventId = (suffix: string) => `${input.runAttemptId}:${suffix}`;
+
+    // Always register definition and create instance first (FK constraint requirement)
     this.store.registerWorkflowDefinition({
       id: definition.definitionId,
       version: definition.version,
@@ -45,6 +48,86 @@ export class WorkflowRuntime {
       status: "running",
       now: input.now
     });
+
+    // ---- Concurrency policy check ----
+    const policy = definition.concurrencyPolicy;
+
+    if (policy !== "allow_readonly_parallel") {
+      const runningAttempts = this.store.listRunningAttemptsForDefinition(input.definitionId);
+      const hasRunning = runningAttempts.length > 0;
+
+      if (hasRunning) {
+        const eventId = (suffix: string) => `${input.runAttemptId}:${suffix}`;
+
+        if (policy === "reject_if_running") {
+          this.store.createRunAttempt({
+            id: input.runAttemptId,
+            workflowInstanceId: input.workflowInstanceId,
+            status: "failed",
+            triggerEventId: null,
+            now: input.now
+          });
+          this.store.finishRunAttempt({
+            id: input.runAttemptId,
+            status: "failed",
+            error: { code: "CONCURRENCY_REJECTED", category: "precondition", message: "Another attempt is already running", retryable: true, recoverable: false },
+            now: input.now
+          });
+          this.store.updateWorkflowInstanceStatus({
+            id: input.workflowInstanceId,
+            status: "failed",
+            currentStepId: null,
+            now: input.now
+          });
+          return { status: "failed", error: { code: "CONCURRENCY_REJECTED", category: "precondition", message: "Another attempt is already running", retryable: true, recoverable: false } };
+        }
+
+        if (policy === "queue_if_running") {
+          const nextRunAt = new Date(new Date(input.now).getTime() + 30_000).toISOString();
+          this.store.enqueueAttempt({
+            id: input.runAttemptId,
+            workflowInstanceId: input.workflowInstanceId,
+            triggerEventId: null,
+            nextRunAt,
+            attemptCount: 0,
+            now: input.now
+          });
+          this.store.updateWorkflowInstanceStatus({
+            id: input.workflowInstanceId,
+            status: "queued",
+            currentStepId: null,
+            now: input.now
+          });
+          return { status: "queued" };
+        }
+
+        if (policy === "skip_if_running") {
+          // Create a skipped attempt record and return succeeded
+          this.store.createRunAttempt({
+            id: input.runAttemptId,
+            workflowInstanceId: input.workflowInstanceId,
+            status: "succeeded",
+            triggerEventId: null,
+            now: input.now
+          });
+          this.store.finishRunAttempt({
+            id: input.runAttemptId,
+            status: "succeeded",
+            error: null,
+            now: input.now
+          });
+          this.store.updateWorkflowInstanceStatus({
+            id: input.workflowInstanceId,
+            status: "succeeded",
+            currentStepId: null,
+            now: input.now
+          });
+          return { status: "skipped" };
+        }
+      }
+    }
+
+    const eventId = (suffix: string) => `${input.runAttemptId}:${suffix}`;
     this.appendEvent(input, eventId("workflow-created"), "workflow_instance.created", {
       definitionId: definition.definitionId
     });
@@ -234,7 +317,7 @@ export class WorkflowRuntime {
     signal: WorkflowSignal;
     workspaceId: string;
     now: string;
-  }): Promise<{ status: "succeeded" | "failed" | "waiting" }> {
+  }): Promise<WorkflowStartResult> {
     const instance = this.store.getWorkflowInstance(input.workflowInstanceId);
     if (!instance) {
       throw new Error(`workflow instance not found: ${input.workflowInstanceId}`);
