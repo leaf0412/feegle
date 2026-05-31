@@ -4,7 +4,10 @@ import {
   buildPlanGenerateHandler,
   buildPlanReviseHandler,
   buildExecutionApproveHandler,
-  buildExecutionCancelHandler
+  buildExecutionCancelHandler,
+  buildExecutionRunHandler,
+  buildVerificationRunHandler,
+  buildAcceptanceRunHandler
 } from "./requirement-workflow-effect-handlers.js";
 
 export type { RequirementWorkflowHandlerDeps };
@@ -184,6 +187,9 @@ export function requirementWorkflowRuntimeContribution(
         ctx.effectHandlers.register(buildPlanReviseHandler(deps));
         ctx.effectHandlers.register(buildExecutionApproveHandler(deps));
         ctx.effectHandlers.register(buildExecutionCancelHandler(deps));
+        ctx.effectHandlers.register(buildExecutionRunHandler(deps));
+        ctx.effectHandlers.register(buildVerificationRunHandler(deps));
+        ctx.effectHandlers.register(buildAcceptanceRunHandler(deps));
       }
     }
   };

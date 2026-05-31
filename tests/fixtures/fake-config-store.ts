@@ -14,6 +14,14 @@ export function fakeConfigStore(initial?: Partial<FeegleConfig>): ConfigStorePro
   let data: FeegleConfig = {
     schemaVersion: 1,
     failureTarget: null,
+    // Boot tests run the full providers phase which now requires gitlab.workspace.
+    // Provide a minimal fake gitlab config so tests that don't override it still pass.
+    gitlab: {
+      token: "fake-token",
+      secretRef: "",
+      host: "fake.gitlab.example",
+      workspace: "/tmp/fake-workspace"
+    },
     ...initial
   };
   return {

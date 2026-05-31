@@ -13,6 +13,24 @@ import { RequirementPlanStore } from "@plugins/requirement-workflow/requirement-
 import { RequirementExecutionStore } from "@plugins/requirement-workflow/requirement-execution-store.js";
 import { requirementWorkflowRuntimeContribution } from "@plugins/requirement-workflow/requirement-workflow-runtime-contribution.js";
 import type { RequirementPlanningAgent } from "@plugins/requirement-workflow/requirement-planning-service.js";
+import { VerificationReportStore } from "@plugins/requirement-workflow/verification/verification-report-store.js";
+import type { RequirementExecutionGit } from "@plugins/requirement-workflow/requirement-execution-service.js";
+import type { RequirementDevelopmentAgent } from "@plugins/requirement-workflow/requirement-execution-service.js";
+import type { VerificationCommandRunner } from "@plugins/requirement-workflow/verification/verification-models.js";
+
+function buildStubExecutionDeps() {
+  const fakeGit: RequirementExecutionGit = {
+    getRepoRoot: vi.fn().mockResolvedValue("/repo"),
+    createWorktree: vi.fn().mockResolvedValue(undefined),
+    diffStats: vi.fn().mockResolvedValue({ filesChanged: 0, insertions: 0, deletions: 0 })
+  };
+  const fakeDevAgent: RequirementDevelopmentAgent = {
+    runDevelopmentTask: vi.fn().mockResolvedValue({ exitCode: 0, summary: "stub" })
+  };
+  const fakeRunCommand: VerificationCommandRunner = vi.fn().mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" });
+  const verificationReportStore = new VerificationReportStore();
+  return { fakeGit, fakeDevAgent, fakeRunCommand, verificationReportStore };
+}
 
 function buildTestRegistries(db: RuntimeDb) {
   const workflowStore = new RequirementWorkflowStore(db);
@@ -24,12 +42,18 @@ function buildTestRegistries(db: RuntimeDb) {
     runPlanRevision: vi.fn().mockResolvedValue({ summary: "S2", markdown: "# Plan revised\n- y" })
   };
 
+  const { fakeGit, fakeDevAgent, fakeRunCommand, verificationReportStore } = buildStubExecutionDeps();
+
   const workflowRegistry = new WorkflowRegistry();
   const intentResolvers = new IntentResolverRegistry();
   const workflowSelector = new WorkflowSelector();
   const effectHandlers = new EffectHandlerRegistry();
 
-  return { workflowStore, planStore, executionStore, fakePlanningAgent, workflowRegistry, intentResolvers, workflowSelector, effectHandlers };
+  return {
+    workflowStore, planStore, executionStore, fakePlanningAgent,
+    git: fakeGit, devAgent: fakeDevAgent, runCommand: fakeRunCommand, verificationReportStore,
+    workflowRegistry, intentResolvers, workflowSelector, effectHandlers
+  };
 }
 
 describe("requirementWorkflowRuntimeContribution — with getDeps", () => {
@@ -47,14 +71,13 @@ describe("requirementWorkflowRuntimeContribution — with getDeps", () => {
   });
 
   it("registers all 4 business effect handlers when getDeps is provided", () => {
-    const { workflowStore, planStore, executionStore, fakePlanningAgent, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
+    const { workflowStore, planStore, executionStore, fakePlanningAgent, git, devAgent, runCommand, verificationReportStore, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
       buildTestRegistries(db);
 
     requirementWorkflowRuntimeContribution(() => ({
-      workflowStore,
-      planStore,
-      executionStore,
-      planningAgent: fakePlanningAgent
+      workflowStore, planStore, executionStore, planningAgent: fakePlanningAgent,
+      git, devAgent, verificationReportStore, runCommand,
+      workspacePath: "/workspace", worktreeRoot: "/worktrees"
     })).register(new RuntimeContributionContext({ workflows: workflowRegistry, intentResolvers, workflowSelector, effectHandlers }));
 
     expect(effectHandlers.has("requirement-workflow", "plan.generate")).toBe(true);
@@ -64,14 +87,13 @@ describe("requirementWorkflowRuntimeContribution — with getDeps", () => {
   });
 
   it("plan.generate creates intake, runs planning, transitions to plan_reviewing, returns version info", async () => {
-    const { workflowStore, planStore, executionStore, fakePlanningAgent, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
+    const { workflowStore, planStore, executionStore, fakePlanningAgent, git, devAgent, runCommand, verificationReportStore, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
       buildTestRegistries(db);
 
     requirementWorkflowRuntimeContribution(() => ({
-      workflowStore,
-      planStore,
-      executionStore,
-      planningAgent: fakePlanningAgent
+      workflowStore, planStore, executionStore, planningAgent: fakePlanningAgent,
+      git, devAgent, verificationReportStore, runCommand,
+      workspacePath: "/workspace", worktreeRoot: "/worktrees"
     })).register(new RuntimeContributionContext({ workflows: workflowRegistry, intentResolvers, workflowSelector, effectHandlers }));
 
     const result = await effectHandlers.execute({
@@ -106,14 +128,13 @@ describe("requirementWorkflowRuntimeContribution — with getDeps", () => {
   });
 
   it("execution.approve after plan.generate transitions to plan_approved and records execution", async () => {
-    const { workflowStore, planStore, executionStore, fakePlanningAgent, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
+    const { workflowStore, planStore, executionStore, fakePlanningAgent, git, devAgent, runCommand, verificationReportStore, workflowRegistry, intentResolvers, workflowSelector, effectHandlers } =
       buildTestRegistries(db);
 
     requirementWorkflowRuntimeContribution(() => ({
-      workflowStore,
-      planStore,
-      executionStore,
-      planningAgent: fakePlanningAgent
+      workflowStore, planStore, executionStore, planningAgent: fakePlanningAgent,
+      git, devAgent, verificationReportStore, runCommand,
+      workspacePath: "/workspace", worktreeRoot: "/worktrees"
     })).register(new RuntimeContributionContext({ workflows: workflowRegistry, intentResolvers, workflowSelector, effectHandlers }));
 
     // Step 1: generate plan to reach plan_reviewing
