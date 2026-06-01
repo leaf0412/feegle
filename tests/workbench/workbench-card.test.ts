@@ -125,23 +125,23 @@ describe("renderWorkbenchCard", () => {
   describe("button visibility", () => {
     it("shows only manage_repos in empty state", () => {
       const actions = buttonActions(renderWorkbenchCard(emptyState()));
-      expect(actions).toContain("workbench_manage_repos");
-      expect(actions).not.toContain("workbench_discuss_requirement");
-      expect(actions).not.toContain("workbench_revise_requirement");
-      expect(actions).not.toContain("workbench_generate_plan");
-      expect(actions).not.toContain("workbench_revise_plan");
-      expect(actions).not.toContain("workbench_delete_requirement");
-      expect(actions).not.toContain("workbench_delete_plan");
+      expect(actions).toContain("act:/workbench manage_repos");
+      expect(actions).not.toContain("act:/workbench discuss");
+      expect(actions).not.toContain("act:/workbench revise_requirement");
+      expect(actions).not.toContain("act:/workbench generate_plan");
+      expect(actions).not.toContain("act:/workbench revise_plan");
+      expect(actions).not.toContain("act:/workbench delete_requirement");
+      expect(actions).not.toContain("act:/workbench delete_plan");
     });
 
     it("shows discuss_requirement when repos exist", () => {
       const actions = buttonActions(renderWorkbenchCard(emptyState({
         repositories: ["repo1"],
       })));
-      expect(actions).toContain("workbench_manage_repos");
-      expect(actions).toContain("workbench_discuss_requirement");
-      expect(actions).not.toContain("workbench_revise_requirement");
-      expect(actions).not.toContain("workbench_generate_plan");
+      expect(actions).toContain("act:/workbench manage_repos");
+      expect(actions).toContain("act:/workbench discuss");
+      expect(actions).not.toContain("act:/workbench revise_requirement");
+      expect(actions).not.toContain("act:/workbench generate_plan");
     });
 
     it("shows revise/generate buttons when requirement exists", () => {
@@ -149,11 +149,11 @@ describe("renderWorkbenchCard", () => {
         repositories: ["repo1"],
         requirementText: "req text",
       })));
-      expect(actions).toContain("workbench_discuss_requirement");
-      expect(actions).toContain("workbench_revise_requirement");
-      expect(actions).toContain("workbench_generate_plan");
-      expect(actions).not.toContain("workbench_revise_plan");
-      expect(actions).toContain("workbench_delete_requirement");
+      expect(actions).toContain("act:/workbench discuss");
+      expect(actions).toContain("act:/workbench revise_requirement");
+      expect(actions).toContain("act:/workbench generate_plan");
+      expect(actions).not.toContain("act:/workbench revise_plan");
+      expect(actions).toContain("act:/workbench delete_requirement");
     });
 
     it("shows plan buttons when plan exists", () => {
@@ -162,25 +162,25 @@ describe("renderWorkbenchCard", () => {
         requirementText: "req",
         planText: "plan",
       })));
-      expect(actions).toContain("workbench_revise_plan");
-      expect(actions).toContain("workbench_delete_plan");
-      expect(actions).not.toContain("workbench_generate_plan");
+      expect(actions).toContain("act:/workbench revise_plan");
+      expect(actions).toContain("act:/workbench delete_plan");
+      expect(actions).not.toContain("act:/workbench generate_plan");
     });
 
     it("hides revision/deletion when no requirement or plan", () => {
       const actions = buttonActions(renderWorkbenchCard(emptyState({
         repositories: ["repo1"],
       })));
-      expect(actions).not.toContain("workbench_revise_requirement");
-      expect(actions).not.toContain("workbench_generate_plan");
-      expect(actions).not.toContain("workbench_revise_plan");
-      expect(actions).not.toContain("workbench_delete_requirement");
-      expect(actions).not.toContain("workbench_delete_plan");
+      expect(actions).not.toContain("act:/workbench revise_requirement");
+      expect(actions).not.toContain("act:/workbench generate_plan");
+      expect(actions).not.toContain("act:/workbench revise_plan");
+      expect(actions).not.toContain("act:/workbench delete_requirement");
+      expect(actions).not.toContain("act:/workbench delete_plan");
     });
   });
 
   describe("button actions", () => {
-    it("all button actions follow workbench_<name> format", () => {
+    it("all button actions follow act:/workbench <action> format", () => {
       const actions = buttonActions(renderWorkbenchCard(emptyState({
         repositories: ["r1"],
         requirementText: "req",
@@ -189,7 +189,7 @@ describe("renderWorkbenchCard", () => {
         planDocUrl: "https://example.com",
       })));
       for (const action of actions) {
-        expect(action).toMatch(/^workbench_[a-z_]+$/);
+        expect(action).toMatch(/^act:\/workbench [a-z_]+$/);
       }
     });
   });

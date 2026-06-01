@@ -23,6 +23,7 @@ export const slashCommandGroups: SlashCommandGroup[] = [
   { key: "stock", title: "股票" },
   { key: "setup", title: "配置" },
   { key: "knowledge", title: "知识" },
+  { key: "workspace", title: "工作台" },
   { key: "system", title: "系统" }
 ];
 

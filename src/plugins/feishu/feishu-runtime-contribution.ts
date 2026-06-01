@@ -7,6 +7,11 @@ import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
 import { registerFeishuRequirementRenderEffects } from "./feishu-requirement-renderer.js";
+import {
+  registerWorkbenchIntentResolver,
+  registerWorkbenchCardWorkflowSelector,
+  workbenchCardWorkflowId
+} from "@features/workbench/workbench-intent-resolver.js";
 
 function intentKindFromEvent(event: TriggerEvent): IntentKind {
   const commandType = event.external.commandType;
@@ -47,6 +52,11 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
     id: "feishu-runtime",
     register: (ctx) => {
       // --- Intent resolvers ---
+
+      // Workbench card: claims chat messages before feishu-message so idle chat
+      // is replaced by the workbench card flow.
+      registerWorkbenchIntentResolver(ctx.intentResolvers);
+      registerWorkbenchCardWorkflowSelector(ctx.workflowSelector);
 
       // Requirement message events: claim before feishu-message so requirement
       // texts are routed to requirement_intake rather than agent chat.
@@ -194,6 +204,32 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
         ]
       });
 
+      // Workbench card workflow: renders the workbench card for chat messages
+      // entering the workbench_card intent. Phase 1 sends an acknowledgement
+      // text; card rendering via the WorkbenchCardService effect handler is
+      // wired but awaits a chatId-aware card.send effect.
+      ctx.workflows.register({
+        definitionId: workbenchCardWorkflowId,
+        version: 1,
+        concurrencyPolicy: "skip_if_running",
+        steps: [
+          {
+            stepId: "render_workbench",
+            run: async (stepCtx) => {
+              const payload = stepCtx.input as Record<string, unknown>;
+              const chatId = payload.chatId as string;
+              const messageId = payload.messageId as string;
+              const card = await stepCtx.executeEffect({
+                pluginId: "feishu",
+                effectType: "workbench.render",
+                input: { chatId, messageId }
+              });
+              return { kind: "complete", output: card };
+            }
+          }
+        ]
+      });
+
       // --- Client-backed effect handlers ---
 
       ctx.effectHandlers.register({
@@ -247,6 +283,28 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
       });
 
       registerFeishuRequirementRenderEffects(ctx.effectHandlers, client, cloudDoc);
+
+      // Workbench render effect: Phase 1 stub. The WorkbenchCardService-backed
+      // implementation will be wired once the service is exposed through
+      // RuntimeContributionContext. For now, chat messages entering the
+      // workbench_card intent produce an acknowledgement text.
+      ctx.effectHandlers.register({
+        pluginId: "feishu",
+        effectType: "workbench.render",
+        execute: async (effect) => {
+          const input = effect.input as { chatId?: string; messageId?: string };
+          const chatId = typeof input.chatId === "string" ? input.chatId : null;
+          const messageId = typeof input.messageId === "string" ? input.messageId : null;
+          if (!chatId || !messageId) {
+            throw new Error("feishu.workbench.render requires chatId and messageId");
+          }
+          await client.replyText(
+            messageId,
+            `工作台已接入（Phase 1）。聊天消息已进入 workbench_card 工作流。请使用卡片按钮操作。`
+          );
+          return { acknowledged: true, chatId };
+        }
+      });
     }
   };
 }

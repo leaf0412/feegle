@@ -87,6 +87,16 @@ export function renderWorkbenchCard(state: ChatWorkbenchState): PlatformCard {
   return builder.build();
 }
 
+const WORKBENCH_ACTION: Record<WorkbenchButton, string> = {
+  manage_repos: "manage_repos",
+  discuss_requirement: "discuss",
+  revise_requirement: "revise_requirement",
+  generate_plan: "generate_plan",
+  revise_plan: "revise_plan",
+  delete_requirement: "delete_requirement",
+  delete_plan: "delete_plan",
+};
+
 function toButton(def: ButtonDef): PlatformCardButton {
-  return { text: def.text, type: def.type, action: `workbench_${def.key}` };
+  return { text: def.text, type: def.type, action: `act:/workbench ${WORKBENCH_ACTION[def.key]}` };
 }

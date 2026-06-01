@@ -37,7 +37,8 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         "workflowRuntime",
         "memoryService",
         "runtimeInspectionService",
-        "recoveryService"
+        "recoveryService",
+        "workbenchCardService"
       );
       const operatorWsId = cap.configStore?.get().defaultWorkspace;
       const registry = buildSlashCommandRegistry({
@@ -64,6 +65,7 @@ export function commandsPhase(deps: CommandsPhaseDeps): BootPhase {
         memoryService: cap.memoryService,
         runtimeInspectionService: cap.runtimeInspectionService,
         recoveryService: cap.recoveryService,
+        workbenchCardService: cap.workbenchCardService,
         controlActionStore: cap.controlActionProcessor ? undefined : undefined,
         operatorWorkspaceId: operatorWsId,
         modules: deps.contributions.slashCommands,
