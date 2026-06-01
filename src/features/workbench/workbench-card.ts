@@ -1,13 +1,17 @@
-import type { ChatWorkbenchState } from "./workbench-models.js";
+import type { ChatWorkbenchState, WorkbenchButton } from "./workbench-models.js";
 import { createPlatformCard, type PlatformCard, type PlatformCardColor, type PlatformCardButton } from "@platform/platform-card.js";
+
+const hasRequirement = (s: ChatWorkbenchState): boolean => s.requirementText != null;
+const hasPlan = (s: ChatWorkbenchState): boolean => s.planText != null;
 
 function canManageRepos(_state: ChatWorkbenchState): boolean { return true; }
 function canDiscuss(state: ChatWorkbenchState): boolean { return state.repositories.length >= 1; }
-function canReviseRequirement(state: ChatWorkbenchState): boolean { return state.requirementText != null; }
 function canGeneratePlan(state: ChatWorkbenchState): boolean { return state.requirementText != null && state.planText == null; }
-function canRevisePlan(state: ChatWorkbenchState): boolean { return state.planText != null; }
-function canDeleteRequirement(state: ChatWorkbenchState): boolean { return state.requirementText != null; }
-function canDeletePlan(state: ChatWorkbenchState): boolean { return state.planText != null; }
+
+const canReviseRequirement = hasRequirement;
+const canDeleteRequirement = hasRequirement;
+const canRevisePlan = hasPlan;
+const canDeletePlan = hasPlan;
 
 function headerColor(state: ChatWorkbenchState): PlatformCardColor {
   if (state.planStale) return "orange";
@@ -17,7 +21,7 @@ function headerColor(state: ChatWorkbenchState): PlatformCardColor {
 }
 
 interface ButtonDef {
-  key: string;
+  key: WorkbenchButton;
   text: string;
   type: PlatformCardButton["type"];
   enabled: (state: ChatWorkbenchState) => boolean;
