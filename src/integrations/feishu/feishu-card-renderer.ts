@@ -87,16 +87,17 @@ export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Recor
         }
       ];
     }
-    if (element.kind === "form_input") {
+     if (element.kind === "form_input") {
       const submitButton = renderButton(element.button, sessionKey);
       return [
         {
-          tag: "action",
-          actions: [
+          tag: "form",
+          name: element.name,
+          elements: [
             {
               tag: "input",
-              placeholder: plainText(element.placeholder),
-              name: element.name
+              name: element.name,
+              placeholder: plainText(element.placeholder)
             },
             { ...submitButton, action_type: "form_submit" }
           ]
