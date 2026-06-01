@@ -7,6 +7,7 @@ function emptyState(overrides: Partial<ChatWorkbenchState> = {}): ChatWorkbenchS
   return {
     chatId: "oc_test",
     repositories: [],
+    requirementId: null,
     requirementText: null,
     requirementDocUrl: null,
     requirementVersion: 0,

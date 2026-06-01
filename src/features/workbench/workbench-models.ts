@@ -1,6 +1,7 @@
 export interface ChatWorkbenchState {
   chatId: string;
   repositories: string[];
+  requirementId: string | null;
   requirementText: string | null;
   requirementDocUrl: string | null;
   requirementVersion: number;

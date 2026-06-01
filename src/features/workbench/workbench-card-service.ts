@@ -65,7 +65,7 @@ export class WorkbenchCardService {
     await this.deps.cloudDoc.writeMarkdown({ documentId, markdown: userInput });
     const docUrl = this.deps.cloudDoc.buildDocUrl(documentId);
 
-    this.deps.store.setRequirement(chatId, userInput, docUrl);
+    this.deps.store.setRequirement(chatId, requirementId, userInput, docUrl);
 
     const state = this.deps.store.getOrCreate(chatId);
     if (state.planText != null) {
@@ -76,8 +76,11 @@ export class WorkbenchCardService {
   }
 
   private async handleReviseRequirement(chatId: string, feedback: string): Promise<PlatformCard> {
-    const state = this.deps.store.getOrCreate(chatId);
-    const currentText = state.requirementText ?? "";
+    const existing = this.deps.store.getOrCreate(chatId);
+    if (!existing.requirementId) {
+      throw new Error("Cannot revise requirement: no requirementId");
+    }
+    const currentText = existing.requirementText ?? "";
     const revisedText = currentText + "\n\n---\n\n## 用户反馈\n\n" + feedback;
 
     const firstLine = revisedText.split("\n")[0].trim();
@@ -87,7 +90,7 @@ export class WorkbenchCardService {
     await this.deps.cloudDoc.writeMarkdown({ documentId, markdown: revisedText });
     const docUrl = this.deps.cloudDoc.buildDocUrl(documentId);
 
-    this.deps.store.setRequirement(chatId, revisedText, docUrl);
+    this.deps.store.setRequirement(chatId, existing.requirementId, revisedText, docUrl);
 
     const updatedState = this.deps.store.getOrCreate(chatId);
     if (updatedState.planText != null) {
@@ -102,10 +105,12 @@ export class WorkbenchCardService {
     if (!state.requirementText) {
       throw new Error("Cannot generate plan: no requirement set");
     }
+    if (!state.requirementId) {
+      throw new Error("Cannot generate plan: no requirementId");
+    }
 
-    const requirementId = this.deps.requirementIdFactory();
     const result = await this.deps.agent.generatePlan({
-      requirementId,
+      requirementId: state.requirementId,
       requirementText: state.requirementText,
       repositories: state.repositories,
     });
@@ -126,10 +131,12 @@ export class WorkbenchCardService {
     if (!state.planText) {
       throw new Error("Cannot revise plan: no plan exists");
     }
+    if (!state.requirementId) {
+      throw new Error("Cannot revise plan: no requirementId");
+    }
 
-    const requirementId = this.deps.requirementIdFactory();
     const result = await this.deps.agent.revisePlan({
-      requirementId,
+      requirementId: state.requirementId,
       currentPlanMarkdown: state.planText,
       feedback,
     });

@@ -9,6 +9,7 @@ function emptyState(overrides: Partial<ChatWorkbenchState> = {}): ChatWorkbenchS
   return {
     chatId: "oc_test",
     repositories: ["https://example.com/repo"],
+    requirementId: null,
     requirementText: null,
     requirementDocUrl: null,
     requirementVersion: 0,
@@ -22,14 +23,32 @@ function emptyState(overrides: Partial<ChatWorkbenchState> = {}): ChatWorkbenchS
 }
 
 function makeMocks() {
-  const store: Pick<WorkbenchStore, "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement"> = {
-    getOrCreate: vi.fn().mockReturnValue(emptyState()),
-    setRequirement: vi.fn(),
-    setPlan: vi.fn(),
-    markPlanStale: vi.fn(),
-    deletePlan: vi.fn(),
-    deleteRequirement: vi.fn(),
+  const requirementIdFactory = vi.fn().mockReturnValue("req_001");
+  const storeMock = () => {
+    let currentState: ChatWorkbenchState = emptyState();
+    return {
+      getOrCreate: vi.fn().mockImplementation(() => currentState),
+      setRequirement: vi.fn().mockImplementation((_chatId, requirementId, text, docUrl) => {
+        currentState = {
+          ...currentState,
+          requirementId,
+          requirementText: text,
+          requirementDocUrl: docUrl,
+          requirementVersion: (currentState.requirementVersion ?? 0) + 1,
+        };
+      }),
+      setPlan: vi.fn(),
+      markPlanStale: vi.fn().mockImplementation(() => {
+        currentState = { ...currentState, planStale: true };
+      }),
+      deletePlan: vi.fn(),
+      deleteRequirement: vi.fn(),
+      currentState,
+    };
   };
+
+  const storeObj = storeMock();
+  const store: Pick<WorkbenchStore, "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement"> = storeObj;
 
   const cloudDoc: FeishuCloudDocClientPort = {
     createDoc: vi.fn().mockResolvedValue({ documentId: "doc_123" }),
@@ -43,9 +62,7 @@ function makeMocks() {
     revisePlan: vi.fn().mockResolvedValue({ markdown: "revised plan" }),
   };
 
-  const requirementIdFactory = vi.fn().mockReturnValue("req_001");
-
-  return { store, cloudDoc, agent, requirementIdFactory };
+  return { store: { ...store, _inner: storeObj }, cloudDoc, agent, requirementIdFactory };
 }
 
 describe("WorkbenchCardService", () => {
@@ -86,6 +103,7 @@ describe("WorkbenchCardService", () => {
       );
       expect(mocks.store.setRequirement).toHaveBeenCalledWith(
         "oc_test",
+        "req_001",
         "需要实现用户登录功能",
         "https://feishu.cn/docx/doc_123",
       );
@@ -100,8 +118,9 @@ describe("WorkbenchCardService", () => {
 
   describe("revise_requirement", () => {
     it("includes prior requirement text in new markdown", async () => {
-      const state = emptyState({ requirementText: "original req text", requirementVersion: 1, planText: "old plan" });
+      const state = emptyState({ requirementText: "original req text", requirementVersion: 1, planText: "old plan", requirementId: "req_existing" });
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
+      (mocks.store.setRequirement as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {});
 
       await service.handleAction("oc_test", "revise_requirement", "需要加上权限校验");
 
@@ -116,6 +135,7 @@ describe("WorkbenchCardService", () => {
       expect(writeCall.markdown).toContain("用户反馈");
       expect(mocks.store.setRequirement).toHaveBeenCalledWith(
         "oc_test",
+        "req_existing",
         expect.stringContaining("original req text"),
         expect.any(String),
       );
@@ -123,7 +143,7 @@ describe("WorkbenchCardService", () => {
     });
 
     it("does not mark plan stale when no plan exists", async () => {
-      const state = emptyState({ requirementText: "req", requirementVersion: 1, planText: null });
+      const state = emptyState({ requirementText: "req", requirementId: "req_x", requirementVersion: 1, planText: null });
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
 
       await service.handleAction("oc_test", "revise_requirement", "feedback");
@@ -132,16 +152,17 @@ describe("WorkbenchCardService", () => {
     });
 
     it("throws when payload is missing", async () => {
-      const state = emptyState({ requirementText: "req" });
+      const state = emptyState({ requirementText: "req", requirementId: "req_x" });
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
       await expect(service.handleAction("oc_test", "revise_requirement")).rejects.toThrow();
     });
   });
 
   describe("generate_plan", () => {
-    it("calls agent.generatePlan, creates cloud doc, stores plan", async () => {
+    it("uses persisted requirementId and reuses it across calls", async () => {
       const state = emptyState({
         requirementText: "做登录功能",
+        requirementId: "req_persisted",
         requirementVersion: 1,
         repositories: ["https://example.com/repo"],
       });
@@ -151,10 +172,12 @@ describe("WorkbenchCardService", () => {
 
       expect(mocks.agent.generatePlan).toHaveBeenCalledWith(
         expect.objectContaining({
+          requirementId: "req_persisted",
           requirementText: "做登录功能",
           repositories: ["https://example.com/repo"],
         }),
       );
+      expect(mocks.requirementIdFactory).not.toHaveBeenCalled();
       expect(mocks.cloudDoc.createDoc).toHaveBeenCalledWith(
         expect.objectContaining({ title: expect.stringContaining("计划") }),
       );
@@ -174,12 +197,19 @@ describe("WorkbenchCardService", () => {
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
       await expect(service.handleAction("oc_test", "generate_plan")).rejects.toThrow();
     });
+
+    it("throws when requirementId is null", async () => {
+      const state = emptyState({ requirementId: null, requirementText: "req text" });
+      (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
+      await expect(service.handleAction("oc_test", "generate_plan")).rejects.toThrow();
+    });
   });
 
   describe("revise_plan", () => {
-    it("calls agent.revisePlan, creates cloud doc, stores revised plan", async () => {
+    it("uses persisted requirementId when revising plan", async () => {
       const state = emptyState({
         requirementText: "req",
+        requirementId: "req_persisted",
         planText: "existing plan markdown",
         planVersion: 1,
       });
@@ -189,10 +219,12 @@ describe("WorkbenchCardService", () => {
 
       expect(mocks.agent.revisePlan).toHaveBeenCalledWith(
         expect.objectContaining({
+          requirementId: "req_persisted",
           currentPlanMarkdown: "existing plan markdown",
           feedback: "把步骤2改得更细",
         }),
       );
+      expect(mocks.requirementIdFactory).not.toHaveBeenCalled();
       expect(mocks.cloudDoc.createDoc).toHaveBeenCalled();
       expect(mocks.cloudDoc.writeMarkdown).toHaveBeenCalledWith(
         expect.objectContaining({ markdown: "revised plan" }),
@@ -204,8 +236,14 @@ describe("WorkbenchCardService", () => {
       );
     });
 
+    it("throws when requirementId is null", async () => {
+      const state = emptyState({ requirementId: null, requirementText: "req", planText: "plan" });
+      (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
+      await expect(service.handleAction("oc_test", "revise_plan", "feedback")).rejects.toThrow();
+    });
+
     it("throws when payload is missing", async () => {
-      const state = emptyState({ planText: "plan" });
+      const state = emptyState({ planText: "plan", requirementId: "req_x" });
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
       await expect(service.handleAction("oc_test", "revise_plan")).rejects.toThrow();
     });
@@ -231,7 +269,7 @@ describe("WorkbenchCardService", () => {
 
   describe("delete_requirement", () => {
     it("calls store.deleteRequirement (cascades to plan)", async () => {
-      const state = emptyState({ requirementText: "req", planText: "plan" });
+      const state = emptyState({ requirementText: "req", requirementId: "req_x", planText: "plan" });
       (mocks.store.getOrCreate as ReturnType<typeof vi.fn>).mockReturnValue(state);
 
       await service.handleAction("oc_test", "delete_requirement");

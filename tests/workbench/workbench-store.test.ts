@@ -19,12 +19,13 @@ describe("WorkbenchStore", () => {
     await rm(home, { recursive: true, force: true });
   });
 
-  it("returns an empty state for a new chatId", () => {
+  it("returns an empty state with null requirementId for a new chatId", () => {
     const store = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
     const state = store.getOrCreate("oc_new");
     expect(state).toEqual({
       chatId: "oc_new",
       repositories: [],
+      requirementId: null,
       requirementText: null,
       requirementDocUrl: null,
       requirementVersion: 0,
@@ -60,23 +61,33 @@ describe("WorkbenchStore", () => {
     ]);
   });
 
-  it("sets requirement and bumps version", () => {
+  it("sets requirement, persists requirementId, and bumps version", () => {
     const store = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
-    store.setRequirement("oc_1", "Build feature X", "https://docs.example.com/x");
+    store.setRequirement("oc_1", "req_abc", "Build feature X", "https://docs.example.com/x");
     const state = store.getOrCreate("oc_1");
+    expect(state.requirementId).toBe("req_abc");
     expect(state.requirementText).toBe("Build feature X");
     expect(state.requirementDocUrl).toBe("https://docs.example.com/x");
     expect(state.requirementVersion).toBe(1);
 
-    store.setRequirement("oc_1", "Build feature X v2", "https://docs.example.com/x2");
+    store.setRequirement("oc_1", "req_abc", "Build feature X v2", "https://docs.example.com/x2");
     const updated = store.getOrCreate("oc_1");
+    expect(updated.requirementId).toBe("req_abc");
     expect(updated.requirementText).toBe("Build feature X v2");
     expect(updated.requirementVersion).toBe(2);
   });
 
+  it("clears requirementId when requirement is deleted", () => {
+    const store = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
+    store.setRequirement("oc_1", "req_abc", "req", "https://docs.example.com/req");
+    store.deleteRequirement("oc_1");
+    const state = store.getOrCreate("oc_1");
+    expect(state.requirementId).toBeNull();
+  });
+
   it("sets plan and bumps version, clears planStale", () => {
     const store = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
-    store.setRequirement("oc_1", "req", "https://docs.example.com/req");
+    store.setRequirement("oc_1", "req_abc", "req", "https://docs.example.com/req");
     store.markPlanStale("oc_1");
     expect(store.getOrCreate("oc_1").planStale).toBe(true);
 
@@ -108,7 +119,7 @@ describe("WorkbenchStore", () => {
 
   it("deletes requirement and plan together", () => {
     const store = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
-    store.setRequirement("oc_1", "req", "https://docs.example.com/req");
+    store.setRequirement("oc_1", "req_abc", "req", "https://docs.example.com/req");
     store.setPlan("oc_1", "# Plan", "https://docs.example.com/plan");
     store.deleteRequirement("oc_1");
     const state = store.getOrCreate("oc_1");
@@ -122,11 +133,12 @@ describe("WorkbenchStore", () => {
   it("persists state across store instances", () => {
     const store1 = new WorkbenchStore(db, () => new Date("2026-06-01T00:00:00.000Z"));
     store1.addRepository("oc_1", "https://git.example.com/a.git");
-    store1.setRequirement("oc_1", "req", "https://docs.example.com/req");
+    store1.setRequirement("oc_1", "req_abc", "req", "https://docs.example.com/req");
 
     const store2 = new WorkbenchStore(db, () => new Date("2026-06-01T01:00:00.000Z"));
     const state = store2.getOrCreate("oc_1");
     expect(state.repositories).toEqual(["https://git.example.com/a.git"]);
+    expect(state.requirementId).toBe("req_abc");
     expect(state.requirementText).toBe("req");
   });
 });

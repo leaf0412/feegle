@@ -21,6 +21,7 @@ export class WorkbenchStore {
     return {
       chatId,
       repositories: [],
+      requirementId: null,
       requirementText: null,
       requirementDocUrl: null,
       requirementVersion: 0,
@@ -53,15 +54,15 @@ export class WorkbenchStore {
       .run(JSON.stringify(repos), this.now().toISOString(), chatId);
   }
 
-  setRequirement(chatId: string, text: string, docUrl: string): void {
+  setRequirement(chatId: string, requirementId: string, text: string, docUrl: string): void {
     this.getOrCreate(chatId);
     this.db
       .prepare(
         `update chat_workbench
-         set req_text = ?, req_doc_url = ?, req_version = req_version + 1, updated_at = ?
+         set req_id = ?, req_text = ?, req_doc_url = ?, req_version = req_version + 1, updated_at = ?
          where chat_id = ?`,
       )
-      .run(text, docUrl, this.now().toISOString(), chatId);
+      .run(requirementId, text, docUrl, this.now().toISOString(), chatId);
   }
 
   markPlanStale(chatId: string): void {
@@ -102,7 +103,7 @@ export class WorkbenchStore {
     this.db
       .prepare(
         `update chat_workbench
-         set req_text = null, req_doc_url = null, req_version = 0,
+         set req_id = null, req_text = null, req_doc_url = null, req_version = 0,
              plan_text = null, plan_doc_url = null, plan_version = 0,
              plan_stale = 0, updated_at = ?
          where chat_id = ?`,
@@ -114,6 +115,7 @@ export class WorkbenchStore {
     return {
       chatId: row.chat_id,
       repositories: JSON.parse(row.repositories) as string[],
+      requirementId: row.req_id ?? null,
       requirementText: row.req_text,
       requirementDocUrl: row.req_doc_url,
       requirementVersion: row.req_version,
@@ -129,6 +131,7 @@ export class WorkbenchStore {
 interface Row {
   chat_id: string;
   repositories: string;
+  req_id: string | null;
   req_text: string | null;
   req_doc_url: string | null;
   req_version: number;
