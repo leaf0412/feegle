@@ -27,7 +27,8 @@ export type PlatformCardElement =
   | { kind: "actions"; buttons: PlatformCardButton[]; layout: PlatformCardActionLayout }
   | { kind: "list_item"; text: string; button: PlatformCardButton }
   | { kind: "select"; placeholder: string; options: PlatformCardSelectOption[]; initialAction?: string }
-  | { kind: "note"; text: string; tag?: string };
+  | { kind: "note"; text: string; tag?: string }
+  | { kind: "form_input"; name: string; placeholder: string; button: PlatformCardButton };
 
 export type PlatformCardActionLayout = "row" | "equal_columns";
 
@@ -90,6 +91,11 @@ export class PlatformCardBuilder {
     if (text.trim()) {
       this.card.elements.push({ kind: "note", text, tag });
     }
+    return this;
+  }
+
+  formInput(name: string, placeholder: string, button: PlatformCardButton): this {
+    this.card.elements.push({ kind: "form_input", name, placeholder, button });
     return this;
   }
 

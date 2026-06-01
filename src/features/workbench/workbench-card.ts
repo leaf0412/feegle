@@ -89,6 +89,9 @@ export function renderWorkbenchCard(state: ChatWorkbenchState): PlatformCard {
 
 const WORKBENCH_ACTION: Record<WorkbenchButton, string> = {
   manage_repos: "manage_repos",
+  add_repo: "add_repo",
+  remove_repo: "remove_repo",
+  back: "back",
   discuss_requirement: "discuss",
   revise_requirement: "revise_requirement",
   generate_plan: "generate_plan",

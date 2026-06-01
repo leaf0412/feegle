@@ -48,7 +48,11 @@ function makeMocks() {
   };
 
   const storeObj = storeMock();
-  const store: Pick<WorkbenchStore, "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement"> = storeObj;
+  const store: Pick<WorkbenchStore, "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement" | "addRepository" | "removeRepository"> = {
+    ...storeObj,
+    addRepository: vi.fn(),
+    removeRepository: vi.fn(),
+  };
 
   const cloudDoc: FeishuCloudDocClientPort = {
     createDoc: vi.fn().mockResolvedValue({ documentId: "doc_123" }),

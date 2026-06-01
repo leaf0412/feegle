@@ -109,7 +109,7 @@ describe("workbenchCommandModule", () => {
     expect(service.handleAction).toHaveBeenCalledWith("oc_test", "generate_plan", undefined);
   });
 
-  it("returns text guidance for manage_repos", async () => {
+  it("dispatches manage_repos through handleAction", async () => {
     const service = buildServiceMock();
     const registry = new SlashCommandRegistry();
     workbenchCommandModule().register(registry, {
@@ -120,9 +120,8 @@ describe("workbenchCommandModule", () => {
     const handler = registry.resolve("workbench");
     const reply = await handler!.execute(buildContext({ args: "manage_repos" }));
 
-    expect(reply.kind).toBe("text");
-    expect((reply as { text: string }).text).toContain("/bind_repo");
-    expect(service.handleAction).not.toHaveBeenCalled();
+    expect(service.handleAction).toHaveBeenCalledWith("oc_test", "manage_repos", undefined);
+    expect(reply.kind).not.toBe("text");
   });
 
   it("returns error text when service throws", async () => {

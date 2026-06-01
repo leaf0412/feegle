@@ -3,21 +3,32 @@ import type { ChatWorkbenchState, WorkbenchButton } from "@features/workbench/wo
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import type { PlatformCard } from "@platform/platform-card.js";
 import { renderWorkbenchCard } from "@features/workbench/workbench-card.js";
+import { renderWorkbenchRepoManageCard } from "@features/workbench/workbench-repo-manage-card.js";
 
 export interface WorkbenchAgent {
   generatePlan(input: { requirementId: string; requirementText: string; repositories: string[] }): Promise<{ markdown: string }>;
   revisePlan(input: { requirementId: string; currentPlanMarkdown: string; feedback: string }): Promise<{ markdown: string }>;
 }
 
+export interface HandleActionOptions {
+  formValue?: Record<string, unknown>;
+}
+
 export interface WorkbenchCardServiceDeps {
-  store: Pick<WorkbenchStore, "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement">;
+  store: Pick<
+    WorkbenchStore,
+    "getOrCreate" | "setRequirement" | "setPlan" | "markPlanStale" | "deletePlan" | "deleteRequirement" | "addRepository" | "removeRepository"
+  >;
   cloudDoc: FeishuCloudDocClientPort;
   requirementIdFactory: () => string;
   agent: WorkbenchAgent;
 }
 
+type View = "main" | "repo_manage";
+
 export class WorkbenchCardService {
   private readonly deps: WorkbenchCardServiceDeps;
+  private readonly views = new Map<string, View>();
 
   constructor(deps: WorkbenchCardServiceDeps) {
     this.deps = deps;
@@ -25,35 +36,79 @@ export class WorkbenchCardService {
 
   async getCard(chatId: string): Promise<PlatformCard> {
     const state = this.deps.store.getOrCreate(chatId);
-    return renderWorkbenchCard(state);
+    return this.renderCurrentView(chatId, state);
   }
 
-  async handleAction(chatId: string, action: WorkbenchButton, payload?: string): Promise<PlatformCard> {
+  async handleAction(
+    chatId: string,
+    action: WorkbenchButton,
+    payload?: string,
+    options: HandleActionOptions = {}
+  ): Promise<PlatformCard> {
     switch (action) {
       case "manage_repos":
-        return this.getCard(chatId);
+        this.views.set(chatId, "repo_manage");
+        return this.renderCurrentView(chatId);
+
+      case "add_repo": {
+        const url =
+          (typeof options.formValue?.repo_url === "string" ? options.formValue.repo_url.trim() : "")
+          || (typeof payload === "string" ? payload.trim() : "");
+        if (!url) {
+          throw new Error("请输入仓库 URL");
+        }
+        this.deps.store.addRepository(chatId, url);
+        this.views.set(chatId, "repo_manage");
+        return this.renderCurrentView(chatId);
+      }
+
+      case "remove_repo":
+        if (!payload) {
+          throw new Error("缺少要移除的仓库 URL");
+        }
+        this.deps.store.removeRepository(chatId, payload);
+        this.views.set(chatId, "repo_manage");
+        return this.renderCurrentView(chatId);
+
+      case "back":
+        this.views.set(chatId, "main");
+        return this.renderCurrentView(chatId);
 
       case "discuss_requirement":
         if (!payload) throw new Error("discuss_requirement requires payload");
+        this.views.set(chatId, "main");
         return this.handleDiscussRequirement(chatId, payload);
 
       case "revise_requirement":
         if (!payload) throw new Error("revise_requirement requires payload");
+        this.views.set(chatId, "main");
         return this.handleReviseRequirement(chatId, payload);
 
       case "generate_plan":
+        this.views.set(chatId, "main");
         return this.handleGeneratePlan(chatId);
 
       case "revise_plan":
         if (!payload) throw new Error("revise_plan requires payload");
+        this.views.set(chatId, "main");
         return this.handleRevisePlan(chatId, payload);
 
       case "delete_plan":
+        this.views.set(chatId, "main");
         return this.handleDeletePlan(chatId);
 
       case "delete_requirement":
+        this.views.set(chatId, "main");
         return this.handleDeleteRequirement(chatId);
     }
+  }
+
+  private renderCurrentView(chatId: string, state?: ChatWorkbenchState): PlatformCard {
+    const view = this.views.get(chatId) ?? "main";
+    const resolvedState = state ?? this.deps.store.getOrCreate(chatId);
+    return view === "repo_manage"
+      ? renderWorkbenchRepoManageCard(resolvedState)
+      : renderWorkbenchCard(resolvedState);
   }
 
   private async handleDiscussRequirement(chatId: string, userInput: string): Promise<PlatformCard> {
@@ -72,7 +127,7 @@ export class WorkbenchCardService {
       this.deps.store.markPlanStale(chatId);
     }
 
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 
   private async handleReviseRequirement(chatId: string, feedback: string): Promise<PlatformCard> {
@@ -97,7 +152,7 @@ export class WorkbenchCardService {
       this.deps.store.markPlanStale(chatId);
     }
 
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 
   private async handleGeneratePlan(chatId: string): Promise<PlatformCard> {
@@ -123,7 +178,7 @@ export class WorkbenchCardService {
     const docUrl = this.deps.cloudDoc.buildDocUrl(documentId);
 
     this.deps.store.setPlan(chatId, result.markdown, docUrl);
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 
   private async handleRevisePlan(chatId: string, feedback: string): Promise<PlatformCard> {
@@ -149,16 +204,16 @@ export class WorkbenchCardService {
     const docUrl = this.deps.cloudDoc.buildDocUrl(documentId);
 
     this.deps.store.setPlan(chatId, result.markdown, docUrl);
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 
   private async handleDeletePlan(chatId: string): Promise<PlatformCard> {
     this.deps.store.deletePlan(chatId);
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 
   private async handleDeleteRequirement(chatId: string): Promise<PlatformCard> {
     this.deps.store.deleteRequirement(chatId);
-    return this.getCard(chatId);
+    return this.renderCurrentView(chatId);
   }
 }

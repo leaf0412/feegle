@@ -36,22 +36,19 @@ export class WorkbenchStore {
   addRepository(chatId: string, url: string): void {
     const state = this.getOrCreate(chatId);
     if (state.repositories.includes(url)) return;
-    const repos = [...state.repositories, url];
+    state.repositories.push(url);
     this.db
-      .prepare(
-        `update chat_workbench set repositories = ?, updated_at = ? where chat_id = ?`,
-      )
-      .run(JSON.stringify(repos), this.now().toISOString(), chatId);
+      .prepare("update chat_workbench set repositories = ?, updated_at = ? where chat_id = ?")
+      .run(JSON.stringify(state.repositories), this.now().toISOString(), chatId);
   }
 
   removeRepository(chatId: string, url: string): void {
     const state = this.getOrCreate(chatId);
-    const repos = state.repositories.filter((r) => r !== url);
+    if (!state.repositories.includes(url)) return;
+    state.repositories = state.repositories.filter((r) => r !== url);
     this.db
-      .prepare(
-        `update chat_workbench set repositories = ?, updated_at = ? where chat_id = ?`,
-      )
-      .run(JSON.stringify(repos), this.now().toISOString(), chatId);
+      .prepare("update chat_workbench set repositories = ?, updated_at = ? where chat_id = ?")
+      .run(JSON.stringify(state.repositories), this.now().toISOString(), chatId);
   }
 
   setRequirement(chatId: string, requirementId: string, text: string, docUrl: string): void {

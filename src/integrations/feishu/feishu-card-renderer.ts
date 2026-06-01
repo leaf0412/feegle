@@ -87,6 +87,22 @@ export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Recor
         }
       ];
     }
+    if (element.kind === "form_input") {
+      const submitButton = renderButton(element.button, sessionKey);
+      return [
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "input",
+              placeholder: plainText(element.placeholder),
+              name: element.name
+            },
+            { ...submitButton, action_type: "form_submit" }
+          ]
+        }
+      ];
+    }
     return [];
   });
 

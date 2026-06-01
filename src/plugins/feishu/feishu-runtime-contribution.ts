@@ -225,10 +225,11 @@ export function feishuRuntimeContribution(
               const messageId = payload.messageId as string;
               const button = payload.button as string | undefined;
               const actionPayload = payload.payload as string | undefined;
+              const formValue = payload.formValue as Record<string, unknown> | undefined;
               const card = await stepCtx.executeEffect({
                 pluginId: "feishu",
                 effectType: "workbench.render",
-                input: { chatId, messageId, button, payload: actionPayload }
+                input: { chatId, messageId, button, payload: actionPayload, formValue }
               });
               return { kind: "complete", output: card };
             }
@@ -301,6 +302,7 @@ export function feishuRuntimeContribution(
             messageId?: string;
             button?: string;
             payload?: string;
+            formValue?: Record<string, unknown>;
           };
           const chatId = typeof input.chatId === "string" ? input.chatId : null;
           const messageId = typeof input.messageId === "string" ? input.messageId : null;
@@ -314,7 +316,12 @@ export function feishuRuntimeContribution(
           const button = typeof input.button === "string" ? input.button : null;
           const payload = typeof input.payload === "string" ? input.payload : undefined;
           const card = button
-            ? await service.handleAction(chatId, button as import("@features/workbench/workbench-models.js").WorkbenchButton, payload)
+            ? await service.handleAction(
+                chatId,
+                button as import("@features/workbench/workbench-models.js").WorkbenchButton,
+                payload,
+                { formValue: input.formValue }
+              )
             : await service.getCard(chatId);
           const rendered = renderFeishuCard(card);
           if (button) {

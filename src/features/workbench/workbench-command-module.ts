@@ -15,6 +15,9 @@ const workbenchDefinition = defineSlashCommand(
 
 const SLUG_TO_BUTTON: Record<string, WorkbenchButton> = {
   manage_repos: "manage_repos",
+  add_repo: "add_repo",
+  remove_repo: "remove_repo",
+  back: "back",
   discuss: "discuss_requirement",
   revise_requirement: "revise_requirement",
   generate_plan: "generate_plan",
@@ -32,9 +35,6 @@ class WorkbenchCommandHandler implements SlashCommandHandler {
     const button = SLUG_TO_BUTTON[slug];
     if (!button) {
       return { kind: "text", text: `未知的工作台操作：${slug || "(空)"}` };
-    }
-    if (button === "manage_repos") {
-      return { kind: "text", text: "请使用 /bind_repo 命令绑定仓库" };
     }
     const payload = context.args.slice(slug.length).trim() || undefined;
     try {

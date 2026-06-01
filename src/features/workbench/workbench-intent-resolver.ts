@@ -17,7 +17,7 @@ const SLUG_TO_BUTTON: Record<string, string> = {
 };
 
 function extractWorkbenchAction(event: TriggerEvent):
-  | { chatId: string; messageId: string; button: string; payload: string | undefined }
+  | { chatId: string; messageId: string; button: string; payload: string; formValue: Record<string, unknown> | undefined }
   | null {
   if (event.source.pluginId !== "feishu" || event.source.triggerType !== "card_action") {
     return null;
@@ -43,11 +43,17 @@ function extractWorkbenchAction(event: TriggerEvent):
   if (typeof chatId !== "string" || typeof messageId !== "string") {
     return null;
   }
+  // form_value is merged into actionPayload by the event adapter when present
+  const formValue =
+    actionPayload && typeof actionPayload.form_value === "object" && actionPayload.form_value !== null
+      ? (actionPayload.form_value as Record<string, unknown>)
+      : undefined;
   return {
     chatId,
     messageId,
     button,
-    payload: rest.join(" ") || undefined
+    payload: rest.join(" "),
+    formValue
   };
 }
 
@@ -82,6 +88,7 @@ export function registerWorkbenchIntentResolver(registry: IntentResolverRegistry
           messageId: info.messageId,
           button: info.button,
           payload: info.payload,
+          formValue: info.formValue,
           conversationKey: `feishu:${info.chatId}`
         }
       };

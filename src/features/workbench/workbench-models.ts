@@ -14,9 +14,14 @@ export interface ChatWorkbenchState {
 
 export type WorkbenchButton =
   | "manage_repos"
+  | "add_repo"
+  | "remove_repo"
+  | "back"
   | "discuss_requirement"
   | "revise_requirement"
   | "generate_plan"
   | "revise_plan"
   | "delete_requirement"
   | "delete_plan";
+
+export type WorkbenchView = "main" | "repo_manage";
