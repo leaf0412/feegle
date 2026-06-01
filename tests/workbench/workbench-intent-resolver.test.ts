@@ -28,6 +28,42 @@ function makeMessageEvent(overrides: Partial<TriggerEvent["external"]> = {}): Tr
   };
 }
 
+function makeCardActionEvent(
+  actionValue: string,
+  overrides: Partial<TriggerEvent["external"]> = {}
+): TriggerEvent {
+  // actionValue is the raw button value like "act:/workbench discuss" or "act:/other command"
+  // Parse it exactly like parsePlatformAction would.
+  const body = actionValue.startsWith("act:") ? actionValue.slice(4) : actionValue;
+  const [command = "", ...rest] = body.split(/\s+/);
+  return {
+    triggerEventId: "trg_card_test",
+    source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "card_action" },
+    receivedAt: "2026-06-01T00:00:00.000Z",
+    external: {
+      chatId: "oc_test",
+      messageId: "om_card_test",
+      actionType: "platform_action",
+      actionPayload: {
+        type: "platform_action",
+        action: {
+          kind: "act",
+          command,
+          args: rest.join(" "),
+          raw: actionValue
+        }
+      },
+      resolvedWorkspaceId: "ws_test",
+      resolvedUserId: "ou_test",
+      resolvedProjectId: "proj_test",
+      ...overrides
+    },
+    actorHint: { provider: "feishu", externalUserId: "ou_test" },
+    conversationHint: { conversationKey: "feishu:oc_test" },
+    payloadSummary: {}
+  };
+}
+
 describe("workbench intent resolver", () => {
   it("resolves feishu message with chatId to workbench_card intent", async () => {
     const registry = new IntentResolverRegistry();
@@ -125,6 +161,22 @@ describe("workbench card workflow selector", () => {
     expect(result.definitionId).toBe(workbenchCardWorkflowId);
   });
 
+  it("selects workbench.card workflow for workbench_action intent", () => {
+    const selector = new WorkflowSelector();
+    registerWorkbenchCardWorkflowSelector(selector);
+
+    const result = selector.select({
+      intentId: "intent:test",
+      kind: "workbench_action",
+      workspaceId: "ws",
+      projectId: null,
+      actor: { kind: "system" },
+      payload: {}
+    });
+
+    expect(result.definitionId).toBe(workbenchCardWorkflowId);
+  });
+
   it("does not select for non-workbench intents", () => {
     const selector = new WorkflowSelector();
     registerWorkbenchCardWorkflowSelector(selector);
@@ -137,5 +189,69 @@ describe("workbench card workflow selector", () => {
       actor: { kind: "system" },
       payload: {}
     })).toThrow();
+  });
+});
+
+describe("workbench card action intent resolver", () => {
+  it("resolves workbench button clicks to workbench_action intent", async () => {
+    const registry = new IntentResolverRegistry();
+    registerWorkbenchIntentResolver(registry);
+
+    const intent = await registry.resolve(makeCardActionEvent("act:/workbench discuss"));
+
+    expect(intent.kind).toBe("workbench_action");
+    const payload = intent.payload as { chatId: string; messageId: string; button: string };
+    expect(payload.chatId).toBe("oc_test");
+    expect(payload.messageId).toBe("om_card_test");
+    expect(payload.button).toBe("discuss_requirement");
+  });
+
+  it("extracts payload for revise_plan action", async () => {
+    const registry = new IntentResolverRegistry();
+    registerWorkbenchIntentResolver(registry);
+
+    const intent = await registry.resolve(makeCardActionEvent("act:/workbench revise_plan"));
+    const payload = intent.payload as { button: string };
+    expect(payload.button).toBe("revise_plan");
+  });
+
+  it("does not match non-workbench card actions", async () => {
+    const registry = new IntentResolverRegistry();
+    registerWorkbenchIntentResolver(registry);
+    registry.register({
+      id: "fallback",
+      canResolve: (e) => e.source.triggerType === "card_action",
+      resolve: () => ({
+        intentId: "intent:fallback",
+        kind: "control_action",
+        workspaceId: "ws",
+        projectId: null,
+        actor: { kind: "system" },
+        payload: {}
+      })
+    });
+
+    const intent = await registry.resolve(makeCardActionEvent("act:/other command"));
+    expect(intent.kind).toBe("control_action");
+  });
+
+  it("claims workbench card actions before fallback resolver", async () => {
+    const registry = new IntentResolverRegistry();
+    registerWorkbenchIntentResolver(registry);
+    registry.register({
+      id: "fallback",
+      canResolve: (e) => e.source.triggerType === "card_action",
+      resolve: () => ({
+        intentId: "intent:fallback",
+        kind: "control_action",
+        workspaceId: "ws",
+        projectId: null,
+        actor: { kind: "system" },
+        payload: {}
+      })
+    });
+
+    const intent = await registry.resolve(makeCardActionEvent("act:/workbench generate_plan"));
+    expect(intent.kind).toBe("workbench_action");
   });
 });
