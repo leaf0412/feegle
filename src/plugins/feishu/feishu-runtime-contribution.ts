@@ -4,6 +4,8 @@ import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
+import type { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
+import { renderFeishuCard } from "@integrations/feishu/feishu-card-renderer.js";
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
 import { registerFeishuRequirementRenderEffects } from "./feishu-requirement-renderer.js";
@@ -47,7 +49,11 @@ function textFromEvent(event: TriggerEvent): string | undefined {
   return typeof commandText === "string" ? commandText : undefined;
 }
 
-export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: FeishuCloudDocClientPort): RuntimeContributionModule {
+export function feishuRuntimeContribution(
+  client: FeishuClientPort,
+  cloudDoc: FeishuCloudDocClientPort,
+  getWorkbenchCardService?: () => WorkbenchCardService
+): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
     register: (ctx) => {
@@ -284,10 +290,8 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
 
       registerFeishuRequirementRenderEffects(ctx.effectHandlers, client, cloudDoc);
 
-      // Workbench render effect: Phase 1 stub. The WorkbenchCardService-backed
-      // implementation will be wired once the service is exposed through
-      // RuntimeContributionContext. For now, chat messages entering the
-      // workbench_card intent produce an acknowledgement text.
+      // Workbench render effect: get card from WorkbenchCardService and send it
+      // via the Feishu interactive card API.
       ctx.effectHandlers.register({
         pluginId: "feishu",
         effectType: "workbench.render",
@@ -298,11 +302,13 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
           if (!chatId || !messageId) {
             throw new Error("feishu.workbench.render requires chatId and messageId");
           }
-          await client.replyText(
-            messageId,
-            `工作台已接入（Phase 1）。聊天消息已进入 workbench_card 工作流。请使用卡片按钮操作。`
-          );
-          return { acknowledged: true, chatId };
+          if (!getWorkbenchCardService) {
+            throw new Error("feishu.workbench.render: WorkbenchCardService not available");
+          }
+          const service = getWorkbenchCardService();
+          const card = await service.getCard(chatId);
+          await client.replyInteractiveCard(messageId, renderFeishuCard(card));
+          return { rendered: true, chatId };
         }
       });
     }

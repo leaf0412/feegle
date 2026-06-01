@@ -12,6 +12,7 @@ import {
 import { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
 import { WorkbenchStore } from "@features/workbench/workbench-store.js";
 import { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
+import { createWorkbenchAgent } from "@features/workbench/workbench-agent-adapter.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
 
 export interface FeishuPluginDeps {
@@ -21,16 +22,9 @@ export interface FeishuPluginDeps {
   runtimeFactory: (handler: FeishuCommandHandler, ingress?: FeishuRuntimeIngress) => Startable;
 }
 
-const NOT_IMPLEMENTED_AGENT = {
-  generatePlan: async () => {
-    throw new Error("workbench agent.generatePlan not yet implemented");
-  },
-  revisePlan: async () => {
-    throw new Error("workbench agent.revisePlan not yet implemented");
-  }
-};
-
 export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
+  let _workbenchCardService: WorkbenchCardService | undefined;
+
   return {
     id: "feishu",
     manifest: {
@@ -55,12 +49,14 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         run: (ctx) => {
           ctx.provide("userDirectory", new FeishuUserDirectory(deps.feishuClient));
           const workbenchStore = new WorkbenchStore(ctx.require("runtimeDb"));
-          ctx.provide("workbenchCardService", new WorkbenchCardService({
+          const agents = ctx.require("agents");
+          _workbenchCardService = new WorkbenchCardService({
             store: workbenchStore,
             cloudDoc: deps.cloudDoc,
             requirementIdFactory: () => randomUUID(),
-            agent: NOT_IMPLEMENTED_AGENT
-          }));
+            agent: createWorkbenchAgent(agents)
+          });
+          ctx.provide("workbenchCardService", _workbenchCardService);
         }
       }
     ],
@@ -70,7 +66,20 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient, deps.cloudDoc)]
+    runtimeContributions: [
+      feishuRuntimeContribution(
+        deps.feishuClient,
+        deps.cloudDoc,
+        () => {
+          if (!_workbenchCardService) {
+            throw new Error(
+              "WorkbenchCardService not initialized: providers phase must run before runtime-contributions"
+            );
+          }
+          return _workbenchCardService;
+        }
+      )
+    ]
   };
 }
 
