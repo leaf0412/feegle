@@ -99,7 +99,7 @@ export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Recor
               name: element.name,
               placeholder: plainText(element.placeholder)
             },
-            { ...submitButton, action_type: "form_submit" }
+            { ...submitButton, name: `${element.name}_submit`, action_type: "form_submit" }
           ]
         }
       ];
