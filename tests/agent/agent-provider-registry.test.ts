@@ -1,14 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
+import { fakeTextAgent } from "@tests/fixtures/fake-agent.js";
 
-function stubAgent(): AgentCli {
-  return {
-    chat: vi.fn(),
-    generatePrototype: vi.fn(),
-    generatePlan: vi.fn(),
-    runDevelopmentTask: vi.fn()
-  } as unknown as AgentCli;
+function stubAgent(): Agent {
+  return fakeTextAgent("");
 }
 
 describe("AgentProviderRegistry", () => {

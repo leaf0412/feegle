@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ulid } from "ulid";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { buildPlanReviewCard, type PlanReviewSummary } from "@integrations/feishu/feishu-workbench-cards.js";
@@ -28,7 +29,7 @@ export interface CreateInitialPlanInput {
 export interface RevisePlanInput {
   planId: string;
   revisionNote: string;
-  agent: Pick<AgentCli, "chat">;
+  agent: Agent;
 }
 
 export class PlanArtifactService {
@@ -58,15 +59,9 @@ export class PlanArtifactService {
 
     const currentPlan = await readFile(current.filePath, "utf8");
     const revisedPlan = (
-      await input.agent.chat(
-        [
-          {
-            role: "user",
-            content: buildRevisionPrompt(input.revisionNote, currentPlan)
-          }
-        ],
-        { cwd: current.workspacePath }
-      )
+      await collectText(input.agent, buildRevisionPrompt(input.revisionNote, currentPlan), {
+        cwd: current.workspacePath
+      })
     ).trim();
     if (!revisedPlan) {
       throw new Error(`plan revision returned empty content: ${input.planId}`);

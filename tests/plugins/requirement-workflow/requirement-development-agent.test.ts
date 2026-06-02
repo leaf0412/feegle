@@ -1,23 +1,37 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createRequirementDevelopmentAgent } from "@plugins/requirement-workflow/requirement-development-agent.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
 
-function makeFakeAgentCli(taskResult: string) {
-  return {
-    runDevelopmentTask: vi.fn().mockResolvedValue(taskResult)
+// A fake Agent that records each turn's prompt + cwd and answers with `summary`.
+function makeFakeAgent(summary: string): {
+  agent: Agent;
+  calls: Array<{ prompt: string; cwd?: string }>;
+} {
+  const calls: Array<{ prompt: string; cwd?: string }> = [];
+  const agent: Agent = {
+    startSession(options) {
+      return {
+        async *send(prompt) {
+          calls.push({ prompt, cwd: options?.cwd });
+          yield { kind: "text", text: summary };
+          yield { kind: "result" };
+        },
+        currentSessionId: () => undefined,
+        async close() {}
+      };
+    }
   };
+  return { agent, calls };
 }
 
-function makeAgents(agentCli: ReturnType<typeof makeFakeAgentCli> | undefined) {
-  return {
-    resolveActiveAgent: vi.fn().mockReturnValue(agentCli)
-  };
+function makeAgents(agent: Agent | undefined) {
+  return { resolveActiveAgent: () => agent };
 }
 
 describe("createRequirementDevelopmentAgent", () => {
-  it("calls runDevelopmentTask with repository.localPath equal to cwd", async () => {
-    const fakeAgent = makeFakeAgentCli("implementation complete");
-    const agents = makeAgents(fakeAgent);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+  it("runs the agent in cwd = the requested working directory", async () => {
+    const { agent, calls } = makeFakeAgent("implementation complete");
+    const adapter = createRequirementDevelopmentAgent(makeAgents(agent) as never);
 
     await adapter.runDevelopmentTask({
       cwd: "/workspace/my-repo",
@@ -25,20 +39,13 @@ describe("createRequirementDevelopmentAgent", () => {
       requirementId: "reqwf_abc"
     });
 
-    expect(fakeAgent.runDevelopmentTask).toHaveBeenCalledOnce();
-    const callArgs = fakeAgent.runDevelopmentTask.mock.calls[0] as [
-      { requirementId: string; title: string; requirementText: string },
-      { repositoryId: string; localPath: string; branchName: string },
-      string
-    ];
-    const [_reqCtx, repoCtx] = callArgs;
-    expect(repoCtx.localPath).toBe("/workspace/my-repo");
+    expect(calls[0].cwd).toBe("/workspace/my-repo");
+    expect(calls[0].prompt).toContain("/workspace/my-repo");
   });
 
-  it("calls runDevelopmentTask with task equal to prompt", async () => {
-    const fakeAgent = makeFakeAgentCli("done");
-    const agents = makeAgents(fakeAgent);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+  it("includes the task prompt in the development prompt", async () => {
+    const { agent, calls } = makeFakeAgent("done");
+    const adapter = createRequirementDevelopmentAgent(makeAgents(agent) as never);
 
     await adapter.runDevelopmentTask({
       cwd: "/workspace/repo",
@@ -46,15 +53,12 @@ describe("createRequirementDevelopmentAgent", () => {
       requirementId: "reqwf_xyz"
     });
 
-    const callArgs = fakeAgent.runDevelopmentTask.mock.calls[0] as [unknown, unknown, string];
-    const [_reqCtx, _repoCtx, task] = callArgs;
-    expect(task).toBe("Build the user dashboard");
+    expect(calls[0].prompt).toContain("Build the user dashboard");
   });
 
-  it("maps a resolved DevelopmentTaskResult string to {exitCode:0, summary}", async () => {
-    const fakeAgent = makeFakeAgentCli("Feature implemented successfully");
-    const agents = makeAgents(fakeAgent);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+  it("maps the agent's answer to {exitCode:0, summary}", async () => {
+    const { agent } = makeFakeAgent("Feature implemented successfully");
+    const adapter = createRequirementDevelopmentAgent(makeAgents(agent) as never);
 
     const result = await adapter.runDevelopmentTask({
       cwd: "/workspace/repo",
@@ -66,10 +70,9 @@ describe("createRequirementDevelopmentAgent", () => {
     expect(result.summary).toBe("Feature implemented successfully");
   });
 
-  it("passes requirementId to the agent requirement context", async () => {
-    const fakeAgent = makeFakeAgentCli("ok");
-    const agents = makeAgents(fakeAgent);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+  it("passes requirementId into the development prompt", async () => {
+    const { agent, calls } = makeFakeAgent("ok");
+    const adapter = createRequirementDevelopmentAgent(makeAgents(agent) as never);
 
     await adapter.runDevelopmentTask({
       cwd: "/workspace/repo",
@@ -77,18 +80,11 @@ describe("createRequirementDevelopmentAgent", () => {
       requirementId: "reqwf_check"
     });
 
-    const callArgs = fakeAgent.runDevelopmentTask.mock.calls[0] as [
-      { requirementId: string; title: string; requirementText: string },
-      unknown,
-      unknown
-    ];
-    const [reqCtx] = callArgs;
-    expect(reqCtx.requirementId).toBe("reqwf_check");
+    expect(calls[0].prompt).toContain("reqwf_check");
   });
 
   it("throws 'No active agent provider for requirement development' when no active agent", async () => {
-    const agents = makeAgents(undefined);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+    const adapter = createRequirementDevelopmentAgent(makeAgents(undefined) as never);
 
     await expect(
       adapter.runDevelopmentTask({
@@ -99,12 +95,20 @@ describe("createRequirementDevelopmentAgent", () => {
     ).rejects.toThrow("No active agent provider for requirement development");
   });
 
-  it("propagates errors thrown by runDevelopmentTask without swallowing", async () => {
-    const fakeAgent = {
-      runDevelopmentTask: vi.fn().mockRejectedValue(new Error("agent spawn failed"))
+  it("propagates errors thrown by the agent without swallowing", async () => {
+    const agent: Agent = {
+      startSession() {
+        return {
+          // eslint-disable-next-line require-yield
+          async *send() {
+            throw new Error("agent spawn failed");
+          },
+          currentSessionId: () => undefined,
+          async close() {}
+        };
+      }
     };
-    const agents = makeAgents(fakeAgent as never);
-    const adapter = createRequirementDevelopmentAgent(agents as never);
+    const adapter = createRequirementDevelopmentAgent(makeAgents(agent) as never);
 
     await expect(
       adapter.runDevelopmentTask({

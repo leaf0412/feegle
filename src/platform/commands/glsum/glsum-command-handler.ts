@@ -1,4 +1,5 @@
-import type { AgentCli, AgentChatMessage } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 import type { GitLabIssue, GitLabIssueUrl, GitLabNote } from "@integrations/gitlab/gitlab-types.js";
 import { parseGitLabIssueUrl } from "@integrations/gitlab/gitlab-url-parser.js";
@@ -19,7 +20,7 @@ export class GlsumCommandHandler implements SlashCommandHandler {
 
   constructor(
     private readonly client: GitLabClient,
-    private readonly agent: AgentCli | undefined,
+    private readonly agent: Agent | undefined,
     private readonly hooks: PipelineHooks = {}
   ) {}
 
@@ -103,7 +104,7 @@ export class GlsumCommandHandler implements SlashCommandHandler {
     this.hooks.onAgentPrompt?.(this.id, prompt);
 
     try {
-      const result = await this.agent.chat([{ role: "user", content: prompt }]);
+      const result = await collectText(this.agent, prompt);
       this.hooks.onAgentResponse?.(this.id, result);
       const parsed = this.extractJson(result);
       if (Array.isArray(parsed)) return parsed as QaPageResult[];
@@ -137,7 +138,7 @@ export class GlsumCommandHandler implements SlashCommandHandler {
     this.hooks.onAgentPrompt?.(this.id, prompt);
 
     try {
-      const result = await this.agent.chat([{ role: "user", content: prompt }]);
+      const result = await collectText(this.agent, prompt);
       this.hooks.onAgentResponse?.(this.id, result);
       return result;
     } catch (err) {

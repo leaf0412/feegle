@@ -82,7 +82,7 @@ describe("FeegleApp", () => {
           fakeConfigStore({
             agent: {
               default: "codex",
-              providers: { codex: { command: "codex" } }
+              providers: { codex: { command: "codex", protocol: "codex" } }
             }
           }),
         createScheduler: () => ({

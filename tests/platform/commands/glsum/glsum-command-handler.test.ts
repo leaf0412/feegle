@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { GlsumCommandHandler } from "@platform/commands/glsum/glsum-command-handler.js";
 import type { SlashCommandContext } from "@platform/slash-command-handler.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
+import { fakeAgentFromEvents } from "@tests/fixtures/fake-agent.js";
 import type { PipelineHooks } from "@platform/pipeline-hooks.js";
 
 function makeContext(args: string): SlashCommandContext {
@@ -31,13 +32,20 @@ function stubGitLabClient(overrides: Partial<GitLabClient> = {}): GitLabClient {
   } as unknown as GitLabClient;
 }
 
-function stubAgent(response: string): AgentCli {
-  return {
-    chat: vi.fn().mockResolvedValue(response),
-    generatePrototype: vi.fn(),
-    generatePlan: vi.fn(),
-    runDevelopmentTask: vi.fn()
-  } as unknown as AgentCli;
+// Records each prompt the agent received, so tests can assert it was invoked.
+function stubAgent(response: string): Agent & { sent: string[] } {
+  const sent: string[] = [];
+  const agent = fakeAgentFromEvents((prompt) => {
+    sent.push(prompt);
+    return [{ kind: "text", text: response }, { kind: "result" }];
+  });
+  return Object.assign(agent, { sent });
+}
+
+function throwingAgent(message: string): Agent {
+  return fakeAgentFromEvents(() => {
+    throw new Error(message);
+  });
 }
 
 function recordingHooks(): PipelineHooks & { prompts: string[]; responses: string[] } {
@@ -84,7 +92,7 @@ describe("GlsumCommandHandler", () => {
     const agent = stubAgent("AI 总结内容");
     const handler = new GlsumCommandHandler(client, agent);
     const reply = await handler.execute(makeContext("https://www.lejuhub.com/pc/kuavo-tools/-/issues/14"));
-    expect(agent.chat).toHaveBeenCalled();
+    expect(agent.sent).not.toHaveLength(0);
     expect((reply as { kind: "text"; text: string }).text).toContain("AI 总结内容");
   });
 
@@ -120,8 +128,7 @@ describe("GlsumCommandHandler", () => {
 
   it("handles agent chat failure and fires onAgentError hook", async () => {
     const client = stubGitLabClient();
-    const agent = stubAgent("");
-    (agent.chat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("agent timeout"));
+    const agent = throwingAgent("agent timeout");
     const errors: unknown[] = [];
     const hooks: PipelineHooks = { onAgentError(_id, err) { errors.push(err); } };
     const handler = new GlsumCommandHandler(client, agent, hooks);

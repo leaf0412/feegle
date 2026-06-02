@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import { simpleTextCard } from "../util/simple-text-card.js";
 import { AgentRunError, UnknownProviderError } from "../handler-errors.js";
 import type { HandlerKind, HandlerRunResult } from "../handler-kind.js";
@@ -35,7 +36,7 @@ export class AgentPromptKind implements HandlerKind<Params> {
     }
     let response: string;
     try {
-      response = await provider.buildAgent().chat([{ role: "user", content: params.prompt }]);
+      response = await collectText(provider.buildAgent(), params.prompt);
     } catch (error) {
       throw new AgentRunError(params.provider, error);
     }

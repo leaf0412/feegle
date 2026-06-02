@@ -1,21 +1,33 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Agent, AgentEvent } from "@integrations/agent/agent-session.js";
 import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
 import { SessionStore } from "@integrations/agent/session-store.js";
 import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { AgentConversationService } from "@core/agent-conversation/agent-conversation-service.js";
 
-function createAgent(chat: AgentCli["chat"]): AgentCli {
-  return {
-    chat,
-    generatePrototype: vi.fn(),
-    generatePlan: vi.fn(),
-    runDevelopmentTask: vi.fn()
+// An Agent that streams the given events and records each turn's prompt + cwd.
+function recordingAgent(events: AgentEvent[]): {
+  agent: Agent;
+  calls: Array<{ prompt: string; cwd?: string }>;
+} {
+  const calls: Array<{ prompt: string; cwd?: string }> = [];
+  const agent: Agent = {
+    startSession(options) {
+      return {
+        async *send(prompt: string) {
+          calls.push({ prompt, cwd: options?.cwd });
+          for (const event of events) yield event;
+        },
+        currentSessionId: () => undefined,
+        async close() {}
+      };
+    }
   };
+  return { agent, calls };
 }
 
 describe("AgentConversationService", () => {
@@ -39,11 +51,14 @@ describe("AgentConversationService", () => {
   });
 
   it("calls the selected agent and persists user and assistant history", async () => {
-    const chat = vi.fn().mockResolvedValue("agent answer");
+    const { agent, calls } = recordingAgent([
+      { kind: "text", text: "agent answer" },
+      { kind: "result" }
+    ]);
     providers.register({
       kind: "mock",
       displayName: "Mock Agent",
-      buildAgent: () => createAgent(chat)
+      buildAgent: () => agent
     });
 
     const service = new AgentConversationService({
@@ -69,10 +84,8 @@ describe("AgentConversationService", () => {
       provider: "Mock Agent",
       answer: "agent answer"
     });
-    expect(chat).toHaveBeenCalledWith(
-      [{ role: "user", content: "帮我看一下状态" }],
-      expect.objectContaining({ cwd: "/tmp/workspace" })
-    );
+    // History is replayed into a single flattened prompt; cwd reaches the session.
+    expect(calls).toEqual([{ prompt: "User: 帮我看一下状态", cwd: "/tmp/workspace" }]);
     expect(history.get("feishu:oc_1:user_1")).toEqual([
       { role: "user", content: "帮我看一下状态" },
       { role: "assistant", content: "agent answer" }
@@ -109,14 +122,12 @@ describe("AgentConversationService", () => {
     providers.register({
       kind: "mock",
       displayName: "Mock Agent",
-      buildAgent: () => createAgent(async (_messages, options) => {
-        await options?.onProgress?.({
-          kind: "tool_use",
-          tool: "read_file",
-          text: "Reading project context"
-        });
-        return "done";
-      })
+      buildAgent: () =>
+        recordingAgent([
+          { kind: "tool_use", tool: "read_file", text: "Reading project context" },
+          { kind: "text", text: "done" },
+          { kind: "result" }
+        ]).agent
     });
 
     const service = new AgentConversationService({

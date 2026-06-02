@@ -1,9 +1,11 @@
 import { AgentProviderRegistry } from "./agent-provider-registry.js";
-import {
-  buildProviderAdapter,
-  defaultProviderDisplayName
-} from "./provider-adapter-factory.js";
+import type { Agent } from "./agent-session.js";
+import { buildAgent } from "./build-agent.js";
 import type { ProviderRecord, ProvidersFile } from "./provider-store.js";
+
+function defaultProviderDisplayName(kind: string): string {
+  return kind;
+}
 
 export interface ProviderStoreReadView {
   snapshot(): Readonly<ProvidersFile>;
@@ -12,13 +14,13 @@ export interface ProviderStoreReadView {
 
 export interface BuildAgentProviderRegistryOptions {
   store: ProviderStoreReadView;
-  adapterFactory?: (record: ProviderRecord) => ReturnType<typeof buildProviderAdapter>;
+  adapterFactory?: (record: ProviderRecord) => Agent;
 }
 
 export function buildAgentProviderRegistry(
   options: BuildAgentProviderRegistryOptions
 ): AgentProviderRegistry {
-  const { store, adapterFactory = buildProviderAdapter } = options;
+  const { store, adapterFactory = buildAgent } = options;
   const file = store.snapshot();
   const registry = new AgentProviderRegistry();
   for (const record of file.providers) {

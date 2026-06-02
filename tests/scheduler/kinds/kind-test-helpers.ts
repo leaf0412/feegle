@@ -1,5 +1,6 @@
 import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
+import { fakeTextAgent } from "@tests/fixtures/fake-agent.js";
 import type { NotificationPort } from "@infra/app/notification-port.js";
 import type { Quote } from "@integrations/stock/stock-quote-port.js";
 import type { Task } from "@features/scheduler/task.js";
@@ -55,13 +56,8 @@ export function quote(patch: Partial<Quote> = {}): Quote {
   };
 }
 
-export function makeAgent(response: string): AgentCli {
-  return {
-    chat: async () => response,
-    generatePrototype: async () => "",
-    generatePlan: async () => "",
-    runDevelopmentTask: async () => ""
-  };
+export function makeAgent(response: string): Agent {
+  return fakeTextAgent(response);
 }
 
 const noopNotify: NotificationPort = {

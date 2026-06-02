@@ -1,32 +1,35 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createRequirementPlanningAgent } from "@plugins/requirement-workflow/requirement-planning-agent.js";
+import { fakeAgentFromEvents } from "@tests/fixtures/fake-agent.js";
 
 function makeFakeAgents(chatReply: string | undefined) {
-  const chat = chatReply !== undefined ? vi.fn().mockResolvedValue(chatReply) : undefined;
+  const prompts: string[] = [];
+  const agent =
+    chatReply === undefined
+      ? undefined
+      : fakeAgentFromEvents((prompt) => {
+          prompts.push(prompt);
+          return [{ kind: "text", text: chatReply }, { kind: "result" }];
+        });
   return {
-    registry: {
-      resolveActiveAgent: () => (chat !== undefined ? { chat } : undefined)
-    } as never,
-    chat
+    registry: { resolveActiveAgent: () => agent } as never,
+    prompts
   };
 }
 
 describe("createRequirementPlanningAgent", () => {
   describe("runPlanGeneration", () => {
     it("calls resolveActiveAgent and chat with a prompt containing the requirementText", async () => {
-      const { registry, chat } = makeFakeAgents("# Plan\n\n- step 1\n- step 2");
+      const { registry, prompts } = makeFakeAgents("# Plan\n\n- step 1\n- step 2");
       const agent = createRequirementPlanningAgent(registry);
 
-      const result = await agent.runPlanGeneration({
+      await agent.runPlanGeneration({
         requirementId: "reqwf_1",
         requirementText: "Build a login page"
       });
 
-      expect(chat).toHaveBeenCalledOnce();
-      const [messages] = (chat as ReturnType<typeof vi.fn>).mock.calls[0] as [Array<{ role: string; content: string }>];
-      expect(messages).toHaveLength(1);
-      expect(messages[0].role).toBe("user");
-      expect(messages[0].content).toContain("Build a login page");
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0]).toContain("Build a login page");
     });
 
     it("returns markdown equal to the trimmed agent reply", async () => {
@@ -109,7 +112,7 @@ describe("createRequirementPlanningAgent", () => {
 
   describe("runPlanRevision", () => {
     it("passes currentPlanMarkdown and feedback into the prompt", async () => {
-      const { registry, chat } = makeFakeAgents("# Revised Plan\n\n- new step");
+      const { registry, prompts } = makeFakeAgents("# Revised Plan\n\n- new step");
       const agent = createRequirementPlanningAgent(registry);
 
       await agent.runPlanRevision({
@@ -119,10 +122,9 @@ describe("createRequirementPlanningAgent", () => {
         feedback: "Add test coverage"
       });
 
-      const [messages] = (chat as ReturnType<typeof vi.fn>).mock.calls[0] as [Array<{ role: string; content: string }>];
-      expect(messages[0].content).toContain("# Old Plan\n\n- old step");
-      expect(messages[0].content).toContain("Add test coverage");
-      expect(messages[0].content).toContain("Build a login page");
+      expect(prompts[0]).toContain("# Old Plan\n\n- old step");
+      expect(prompts[0]).toContain("Add test coverage");
+      expect(prompts[0]).toContain("Build a login page");
     });
 
     it("returns parsed summary and markdown from the agent reply", async () => {

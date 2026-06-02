@@ -1,10 +1,10 @@
-import type { AgentCli } from "./agent-cli.js";
+import type { Agent } from "./agent-session.js";
 import type { AgentProviderStore } from "@core/runtime/agent-provider-store.js";
 
 export interface AgentProviderDefinition {
   kind: string;
   displayName: string;
-  buildAgent: () => AgentCli;
+  buildAgent: () => Agent;
 }
 
 export interface WorkspaceProviderResult {
@@ -96,7 +96,7 @@ export class AgentProviderRegistry {
     return provider ? { ...provider } : undefined;
   }
 
-  resolveActiveAgent(): AgentCli | undefined {
+  resolveActiveAgent(): Agent | undefined {
     const provider = this.active();
     return provider?.buildAgent();
   }

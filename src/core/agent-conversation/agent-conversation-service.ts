@@ -1,5 +1,7 @@
 import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
-import type { AgentProgressUpdate, AgentRunOptions } from "@integrations/agent/agent-cli.js";
+import type { AgentProgressUpdate } from "@integrations/agent/agent-cli.js";
+import type { AgentEvent } from "@integrations/agent/agent-session.js";
+import { promptFromMessages, streamAgentText } from "@integrations/agent/collect-text.js";
 import type {
   AgentProviderDefinition,
   AgentProviderRegistry
@@ -56,16 +58,17 @@ export class AgentConversationService implements AgentConversationRunner {
     this.deps.history.append(input.sessionKey, { role: "user", content: input.userText });
     const messages = this.deps.history.get(input.sessionKey);
     const agent = provider.buildAgent();
-    const options: AgentRunOptions = {
-      cwd: this.deps.workspaceDir,
-      onProgress: async (update) => {
-        progress.push(this.toConversationProgress(provider.displayName, update));
-      }
-    };
 
     this.balancer.acquire(provider.kind);
     try {
-      const answer = (await agent.chat(messages, options)).trim();
+      const answer = (
+        await streamAgentText(agent, promptFromMessages(messages), {
+          cwd: this.deps.workspaceDir,
+          onEvent: (event) => {
+            progress.push(this.toConversationProgress(provider.displayName, event));
+          }
+        })
+      ).trim();
       this.deps.history.append(input.sessionKey, { role: "assistant", content: answer });
       return {
         status: "delivered",
@@ -120,13 +123,15 @@ export class AgentConversationService implements AgentConversationRunner {
 
   private toConversationProgress(
     provider: string,
-    update: AgentProgressUpdate
+    event: AgentEvent
   ): AgentConversationProgress {
     return {
       type: "progress",
       provider,
       at: this.nowIso(),
-      ...update
+      kind: event.kind as AgentProgressUpdate["kind"],
+      text: event.text ?? "",
+      tool: event.tool
     };
   }
 

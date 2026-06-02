@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
-import type { AgentCli, AgentChatMessage, AgentRunOptions } from "@integrations/agent/agent-cli.js";
+import type { Agent, AgentEvent } from "@integrations/agent/agent-session.js";
 import { ChatHistoryStore } from "@integrations/agent/chat-history-store.js";
 import { FeishuChatHandler } from "@integrations/feishu/feishu-chat-handler.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
@@ -45,7 +45,7 @@ describe("FeishuChatHandler", () => {
     providers.register({
       kind: "codex",
       displayName: "Codex",
-      buildAgent: () => stubAgent({ chat: async () => "hi from codex" })
+      buildAgent: () => answerAgent("hi from codex")
     });
     const handler = new FeishuChatHandler({
       client,
@@ -69,13 +69,12 @@ describe("FeishuChatHandler", () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
     const history = new ChatHistoryStore();
-    const agent = stubAgent({
-      chat: async (_messages, options) => {
-        await options?.onProgress?.({ kind: "tool_use", tool: "Bash", text: "ls -la" });
-        await options?.onProgress?.({ kind: "tool_result", tool: "Bash", text: "total 0" });
-        return "I am Codex.";
-      }
-    });
+    const agent = eventAgent(() => [
+      { kind: "tool_use", tool: "Bash", text: "ls -la" },
+      { kind: "tool_result", tool: "Bash", text: "total 0" },
+      { kind: "text", text: "I am Codex." },
+      { kind: "result" }
+    ]);
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
     let tick = 1000;
@@ -110,7 +109,7 @@ describe("FeishuChatHandler", () => {
     const providers = new AgentProviderRegistry();
     const history = new ChatHistoryStore();
     const huge = "段落内容很长。".repeat(8_000); // far past the 28KB single-card limit
-    const agent = stubAgent({ chat: async () => huge });
+    const agent = answerAgent(huge);
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
     const handler = new FeishuChatHandler({ client, providers, history, workspaceDir: "/tmp/ws" });
@@ -148,9 +147,7 @@ describe("FeishuChatHandler", () => {
     const chatPromise = new Promise<string>((resolve) => {
       resolveChat = resolve;
     });
-    const agent = stubAgent({
-      chat: async () => chatPromise
-    });
+    const agent = answerAgent(() => chatPromise);
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
     let tick = 1000;
@@ -186,12 +183,11 @@ describe("FeishuChatHandler", () => {
     vi.useFakeTimers();
     const client = trackingClient({ minUpdateGapMs: 1000 });
     const providers = new AgentProviderRegistry();
-    const agent = stubAgent({
-      chat: async (_messages, options) => {
-        await options?.onProgress?.({ kind: "thinking", text: "分析中" });
-        return "最终答案";
-      }
-    });
+    const agent = eventAgent(() => [
+      { kind: "thinking", text: "分析中" },
+      { kind: "text", text: "最终答案" },
+      { kind: "result" }
+    ]);
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
     let nowMs = 0;
@@ -227,11 +223,9 @@ describe("FeishuChatHandler", () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
     let seenCwd: string | undefined;
-    const agent = stubAgent({
-      chat: async (_messages, options) => {
-        seenCwd = options?.cwd;
-        return "done";
-      }
+    const agent = eventAgent(({ cwd }) => {
+      seenCwd = cwd;
+      return [{ kind: "text", text: "done" }, { kind: "result" }];
     });
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
@@ -258,7 +252,7 @@ describe("FeishuChatHandler", () => {
     providers.register({
       kind: "codex",
       displayName: "Codex",
-      buildAgent: () => stubAgent({ chat: async () => { throw new Error("boom"); } })
+      buildAgent: () => eventAgent(() => { throw new Error("boom"); })
     });
     providers.setActive("codex");
     const handler = new FeishuChatHandler({
@@ -288,12 +282,10 @@ describe("FeishuChatHandler", () => {
     const client = trackingClient();
     const providers = new AgentProviderRegistry();
     const history = new ChatHistoryStore();
-    const seen: AgentChatMessage[][] = [];
-    const agent = stubAgent({
-      chat: async (messages) => {
-        seen.push(messages.map((message) => ({ ...message })));
-        return "ack";
-      }
+    const seen: string[] = [];
+    const agent = eventAgent(({ prompt }) => {
+      seen.push(prompt);
+      return [{ kind: "text", text: "ack" }, { kind: "result" }];
     });
     providers.register({ kind: "codex", displayName: "Codex", buildAgent: () => agent });
     providers.setActive("codex");
@@ -302,11 +294,8 @@ describe("FeishuChatHandler", () => {
     await handler.handle({ chatId: "oc_1", triggerMessageId: "om_1", sessionKey: "sk_1", userText: "one" });
     await handler.handle({ chatId: "oc_1", triggerMessageId: "om_2", sessionKey: "sk_1", userText: "two" });
 
-    expect(seen[1]).toEqual([
-      { role: "user", content: "one" },
-      { role: "assistant", content: "ack" },
-      { role: "user", content: "two" }
-    ]);
+    // Turn 2 replays the full history flattened into a single prompt.
+    expect(seen[1]).toBe("User: one\n\nAssistant: ack\n\nUser: two");
   });
 
   it("pins a new session to the balanced provider and reuses it on later turns", async () => {
@@ -320,12 +309,20 @@ describe("FeishuChatHandler", () => {
     providers.register({
       kind: "codex",
       displayName: "Codex",
-      buildAgent: () => stubAgent({ chat: async () => { calls.push("codex"); return "c"; } })
+      buildAgent: () =>
+        eventAgent(() => {
+          calls.push("codex");
+          return [{ kind: "text", text: "c" }, { kind: "result" }];
+        })
     });
     providers.register({
       kind: "claude_code",
       displayName: "Claude Code",
-      buildAgent: () => stubAgent({ chat: async () => { calls.push("claude"); return "k"; } })
+      buildAgent: () =>
+        eventAgent(() => {
+          calls.push("claude");
+          return [{ kind: "text", text: "k" }, { kind: "result" }];
+        })
     });
     const handler = new FeishuChatHandler({
       client: trackingClient(),
@@ -355,7 +352,7 @@ describe("FeishuChatHandler", () => {
     providers.register({
       kind: "claude_code",
       displayName: "Claude Code",
-      buildAgent: () => stubAgent({ chat: async () => "k" })
+      buildAgent: () => answerAgent("k")
     });
     const handler = new FeishuChatHandler({
       client,
@@ -383,7 +380,7 @@ describe("FeishuChatHandler", () => {
     providers.register({
       kind: "codex",
       displayName: "Codex",
-      buildAgent: () => stubAgent({ chat: async () => { throw new Error("boom"); } })
+      buildAgent: () => eventAgent(() => { throw new Error("boom"); })
     });
     const handler = new FeishuChatHandler({
       client: trackingClient(),
@@ -401,14 +398,31 @@ describe("FeishuChatHandler", () => {
   });
 });
 
-function stubAgent(overrides: Partial<AgentCli>): AgentCli {
+// Build an Agent whose single turn yields the events from `make` (given the
+// flattened prompt + session cwd). The streaming-interface fakes for this suite.
+function eventAgent(
+  make: (ctx: { prompt: string; cwd?: string }) => AgentEvent[] | Promise<AgentEvent[]>
+): Agent {
   return {
-    chat: async () => "stub",
-    generatePrototype: async () => "",
-    generatePlan: async () => "",
-    runDevelopmentTask: async () => "",
-    ...overrides
-  } as AgentCli;
+    startSession(options) {
+      return {
+        async *send(prompt: string): AsyncIterable<AgentEvent> {
+          for (const event of await make({ prompt, cwd: options?.cwd })) {
+            yield event;
+          }
+        },
+        currentSessionId: () => undefined,
+        async close() {}
+      };
+    }
+  };
+}
+
+function answerAgent(answer: string | (() => string | Promise<string>)): Agent {
+  return eventAgent(async () => [
+    { kind: "text", text: typeof answer === "function" ? await answer() : answer },
+    { kind: "result" }
+  ]);
 }
 
 interface TrackingClient extends FeishuClientPort {

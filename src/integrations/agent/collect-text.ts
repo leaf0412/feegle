@@ -1,4 +1,5 @@
-import type { Agent, AgentSessionOptions } from "./agent-session.js";
+import type { AgentChatMessage } from "./agent-cli.js";
+import type { Agent, AgentEvent, AgentSessionOptions } from "./agent-session.js";
 
 /**
  * Convenience facade for callers that only want the final answer string, not a
@@ -13,6 +14,25 @@ export async function collectText(
   prompt: string,
   options?: AgentSessionOptions
 ): Promise<string> {
+  return streamAgentText(agent, prompt, options);
+}
+
+export interface StreamAgentTextOptions extends AgentSessionOptions {
+  /** Called for each non-text, non-result event (thinking / tool_use / tool_result). */
+  onEvent?: (event: AgentEvent) => void | Promise<void>;
+}
+
+/**
+ * Runs one turn and returns the concatenated `text` answer, forwarding every
+ * progress event (thinking / tool_use / tool_result) to `onEvent` as it
+ * arrives. The streaming counterpart of {@link collectText}; an `error` event
+ * throws, and the session is always closed.
+ */
+export async function streamAgentText(
+  agent: Agent,
+  prompt: string,
+  options?: StreamAgentTextOptions
+): Promise<string> {
   const session = agent.startSession(options);
   try {
     let answer = "";
@@ -21,10 +41,19 @@ export async function collectText(
         answer += event.text ?? "";
       } else if (event.kind === "error") {
         throw new Error(event.text ?? "agent error");
+      } else if (event.kind !== "result") {
+        await options?.onEvent?.(event);
       }
     }
     return answer;
   } finally {
     await session.close();
   }
+}
+
+/** Flattens a multi-turn history into a single prompt (callers replay context). */
+export function promptFromMessages(messages: ReadonlyArray<AgentChatMessage>): string {
+  return messages
+    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
+    .join("\n\n");
 }

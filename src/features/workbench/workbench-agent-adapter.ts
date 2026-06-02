@@ -1,4 +1,5 @@
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import type { WorkbenchAgent } from "@features/workbench/workbench-card-service.js";
 
 function buildGenerationPrompt(requirementText: string, repositories: string[]): string {
@@ -30,7 +31,7 @@ export function createWorkbenchAgent(registry: AgentProviderRegistry): Workbench
         throw new Error("No active agent provider for workbench plan generation");
       }
       const prompt = buildGenerationPrompt(requirementText, repositories);
-      const markdown = await agent.chat([{ role: "user", content: prompt }]);
+      const markdown = await collectText(agent, prompt);
       return { markdown };
     },
 
@@ -40,7 +41,7 @@ export function createWorkbenchAgent(registry: AgentProviderRegistry): Workbench
         throw new Error("No active agent provider for workbench plan revision");
       }
       const prompt = buildRevisionPrompt(currentPlanMarkdown, feedback);
-      const markdown = await agent.chat([{ role: "user", content: prompt }]);
+      const markdown = await collectText(agent, prompt);
       return { markdown };
     }
   };

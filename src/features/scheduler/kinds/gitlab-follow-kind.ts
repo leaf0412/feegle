@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
+import { buildDevelopmentTaskPrompt } from "@integrations/agent/agent-prompts.js";
 import type { GitLabClient } from "@integrations/gitlab/gitlab-client.js";
 import type { FollowEntry, GitLabFollowStore } from "@integrations/gitlab/gitlab-follow-store.js";
 import type { GitLabIssueSearchResult } from "@integrations/gitlab/gitlab-types.js";
@@ -142,7 +143,7 @@ export class GitLabFollowKind implements HandlerKind<Params> {
     const prompt = buildAnalysisPrompt(issue, notes);
     this.deps.store.setStatus(entry, "analyzing", { agentPrompt: prompt });
 
-    const response = await agent.chat([{ role: "user", content: prompt }]);
+    const response = await collectText(agent, prompt);
 
     const commentBody = `## 自动分析\n\n${response}\n\n---\n回复任意内容确认方案并进入分支创建，或回复 **拒绝** 取消。`;
     await this.deps.gitlab.postNote(parsed, commentBody);
@@ -187,7 +188,7 @@ export class GitLabFollowKind implements HandlerKind<Params> {
       "只需回复分支名，不要其他文字。"
     ].join("\n");
 
-    const branchName = (await agent.chat([{ role: "user", content: branchPrompt }])).trim();
+    const branchName = (await collectText(agent, branchPrompt)).trim();
 
     const commentBody = `## 分支建议\n\n建议分支名：**\`${branchName}\`**\n\n回复确认后开始执行，或提供其他分支名。`;
     await this.deps.gitlab.postNote(parsed, commentBody);
@@ -280,12 +281,14 @@ export class GitLabFollowKind implements HandlerKind<Params> {
         const issue = await this.deps.gitlab.getIssue(parsed);
         const notes = await this.deps.gitlab.getNotes(parsed);
         const task = buildExecutionTask(issue, notes, entry);
-        await agent.runDevelopmentTask(
-          { requirementId: `gitlab-${entry.id}`, title: entry.title, requirementText: task },
-          { repositoryId: `repo-${entry.id}`, localPath: worktreePath, branchName },
-          task,
-          { cwd: worktreePath }
-        );
+        const devPrompt = buildDevelopmentTaskPrompt({
+          localPath: worktreePath,
+          branchName,
+          title: entry.title,
+          requirementText: task,
+          task
+        });
+        await collectText(agent, devPrompt, { cwd: worktreePath });
         this.deps.store.setStatus(entry, "pushing");
         ctx.logger.info(`gitlab-follow #${entry.issueIid}: agent done, advancing to pushing`);
       } catch (err) {
