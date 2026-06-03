@@ -215,7 +215,7 @@ export function feishuRuntimeContribution(
       ctx.workflows.register({
         definitionId: workbenchCardWorkflowId,
         version: 1,
-        concurrencyPolicy: "skip_if_running",
+        concurrencyPolicy: "allow_readonly_parallel",
         steps: [
           {
             stepId: "render_workbench",
