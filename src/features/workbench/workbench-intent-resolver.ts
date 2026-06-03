@@ -8,6 +8,9 @@ export const workbenchCardWorkflowId = "workbench.card";
 
 const SLUG_TO_BUTTON: Record<string, string> = {
   manage_repos: "manage_repos",
+  add_repo: "add_repo",
+  remove_repo: "remove_repo",
+  back: "back",
   discuss: "discuss_requirement",
   revise_requirement: "revise_requirement",
   generate_plan: "generate_plan",
