@@ -12,7 +12,9 @@ export const intentKinds = [
   "requirement_verify",
   "requirement_accept",
   "requirement_intake",
-  "requirement_cancel"
+  "requirement_cancel",
+  "workbench_card",
+  "workbench_action"
 ] as const;
 
 export type IntentKind = (typeof intentKinds)[number];

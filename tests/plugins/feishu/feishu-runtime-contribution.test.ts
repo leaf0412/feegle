@@ -61,16 +61,23 @@ describe("feishuRuntimeContribution", () => {
       triggerEventId: "trg_1",
       source: { pluginId: "feishu", adapterId: "long_connection", triggerType: "message" },
       receivedAt: "2026-05-31T00:00:00.000Z",
-      external: { chatId: "oc_1", messageId: "om_1", resolvedWorkspaceId: "ws_test", resolvedProjectId: "project_test", commandType: "chat" },
+      external: {
+        chatId: "oc_1",
+        messageId: "om_1",
+        resolvedWorkspaceId: "ws_test",
+        resolvedProjectId: "project_test",
+        resolvedUserId: "ou_1",
+        commandType: "chat"
+      },
       actorHint: { provider: "feishu", externalUserId: "ou_1" },
       conversationHint: { conversationKey: "feishu:oc_1" },
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
 
-    expect(intent.kind).toBe("chat");
+    expect(intent.kind).toBe("workbench_card");
     expect(intent.workspaceId).toBe("ws_test");
     expect(intent.projectId).toBe("project_test");
-    expect(ctx.workflowSelector.select(intent).definitionId).toBe("agent.conversation.workflow");
+    expect(ctx.workflowSelector.select(intent).definitionId).toBe("workbench.card");
   });
 
   it("keeps Feishu chat selection isolated when GitLab runtime is also registered", async () => {
@@ -95,6 +102,7 @@ describe("feishuRuntimeContribution", () => {
         raw: "hello",
         resolvedWorkspaceId: "ws_test",
         resolvedProjectId: "project_test",
+        resolvedUserId: "ou_1",
         commandType: "chat"
       },
       actorHint: { provider: "feishu", externalUserId: "ou_1" },
@@ -102,7 +110,8 @@ describe("feishuRuntimeContribution", () => {
       payloadSummary: { commandType: "chat", textLength: 5 }
     });
 
-    expect(ctx.workflowSelector.select(intent).definitionId).toBe("agent.conversation.workflow");
+    expect(intent.kind).toBe("workbench_card");
+    expect(ctx.workflowSelector.select(intent).definitionId).toBe("workbench.card");
   });
 
   it("feishu reply effect calls client.replyText with correct args", async () => {

@@ -1,4 +1,6 @@
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
+import { buildDevelopmentTaskPrompt } from "@integrations/agent/agent-prompts.js";
 import type { RequirementDevelopmentAgent } from "./requirement-execution-service.js";
 
 /**
@@ -33,23 +35,15 @@ export function createRequirementDevelopmentAgent(
         throw new Error("No active agent provider for requirement development");
       }
 
-      const requirementContext = {
-        requirementId: input.requirementId,
-        title: input.requirementId,
-        requirementText: input.prompt
-      };
-
-      const repositoryContext = {
-        repositoryId: input.requirementId,
+      const prompt = buildDevelopmentTaskPrompt({
         localPath: input.cwd,
-        branchName: ""
-      };
+        branchName: "",
+        title: input.requirementId,
+        requirementText: input.prompt,
+        task: input.prompt
+      });
 
-      const summary = await agent.runDevelopmentTask(
-        requirementContext,
-        repositoryContext,
-        input.prompt
-      );
+      const summary = await collectText(agent, prompt, { cwd: input.cwd });
 
       return { exitCode: 0, summary };
     }

@@ -4,9 +4,16 @@ import type { IntentKind } from "@core/ingress/intent.js";
 import type { TriggerEvent } from "@core/ingress/trigger-event.js";
 import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import type { FeishuCloudDocClientPort } from "@integrations/feishu/feishu-cloud-doc-client.js";
+import type { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
+import { renderFeishuCard } from "@integrations/feishu/feishu-card-renderer.js";
 import { renderFeishuAgentConversationResult } from "./feishu-agent-conversation-renderer.js";
 import { registerFeishuRequirementIntentResolvers } from "./feishu-requirement-intent-resolver.js";
 import { registerFeishuRequirementRenderEffects } from "./feishu-requirement-renderer.js";
+import {
+  registerWorkbenchIntentResolver,
+  registerWorkbenchCardWorkflowSelector,
+  workbenchCardWorkflowId
+} from "@features/workbench/workbench-intent-resolver.js";
 
 function intentKindFromEvent(event: TriggerEvent): IntentKind {
   const commandType = event.external.commandType;
@@ -42,11 +49,20 @@ function textFromEvent(event: TriggerEvent): string | undefined {
   return typeof commandText === "string" ? commandText : undefined;
 }
 
-export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: FeishuCloudDocClientPort): RuntimeContributionModule {
+export function feishuRuntimeContribution(
+  client: FeishuClientPort,
+  cloudDoc: FeishuCloudDocClientPort,
+  getWorkbenchCardService?: () => WorkbenchCardService
+): RuntimeContributionModule {
   return {
     id: "feishu-runtime",
     register: (ctx) => {
       // --- Intent resolvers ---
+
+      // Workbench card: claims chat messages before feishu-message so idle chat
+      // is replaced by the workbench card flow.
+      registerWorkbenchIntentResolver(ctx.intentResolvers);
+      registerWorkbenchCardWorkflowSelector(ctx.workflowSelector);
 
       // Requirement message events: claim before feishu-message so requirement
       // texts are routed to requirement_intake rather than agent chat.
@@ -194,6 +210,33 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
         ]
       });
 
+      // Workbench card workflow: renders the workbench card for chat messages
+      // OR processes a button click (workbench_action intent) and updates the card.
+      ctx.workflows.register({
+        definitionId: workbenchCardWorkflowId,
+        version: 1,
+        concurrencyPolicy: "allow_readonly_parallel",
+        steps: [
+          {
+            stepId: "render_workbench",
+            run: async (stepCtx) => {
+              const payload = stepCtx.input as Record<string, unknown>;
+              const chatId = payload.chatId as string;
+              const messageId = payload.messageId as string;
+              const button = payload.button as string | undefined;
+              const actionPayload = payload.payload as string | undefined;
+              const formValue = payload.formValue as Record<string, unknown> | undefined;
+              const card = await stepCtx.executeEffect({
+                pluginId: "feishu",
+                effectType: "workbench.render",
+                input: { chatId, messageId, button, payload: actionPayload, formValue }
+              });
+              return { kind: "complete", output: card };
+            }
+          }
+        ]
+      });
+
       // --- Client-backed effect handlers ---
 
       ctx.effectHandlers.register({
@@ -247,6 +290,50 @@ export function feishuRuntimeContribution(client: FeishuClientPort, cloudDoc: Fe
       });
 
       registerFeishuRequirementRenderEffects(ctx.effectHandlers, client, cloudDoc);
+
+      // Workbench render/update effect: get card from WorkbenchCardService and
+      // send it via replyInteractiveCard (new card) or updateInteractiveCard (in place).
+      ctx.effectHandlers.register({
+        pluginId: "feishu",
+        effectType: "workbench.render",
+        execute: async (effect) => {
+          const input = effect.input as {
+            chatId?: string;
+            messageId?: string;
+            button?: string;
+            payload?: string;
+            formValue?: Record<string, unknown>;
+          };
+          const chatId = typeof input.chatId === "string" ? input.chatId : null;
+          const messageId = typeof input.messageId === "string" ? input.messageId : null;
+          if (!chatId || !messageId) {
+            throw new Error("feishu.workbench.render requires chatId and messageId");
+          }
+          if (!getWorkbenchCardService) {
+            throw new Error("feishu.workbench.render: WorkbenchCardService not available");
+          }
+          const service = getWorkbenchCardService();
+          const button = typeof input.button === "string" ? input.button : null;
+          const payload = typeof input.payload === "string" ? input.payload : undefined;
+          const card = button
+            ? await service.handleAction(
+                chatId,
+                button as import("@features/workbench/workbench-models.js").WorkbenchButton,
+                payload,
+                { formValue: input.formValue }
+              )
+            : await service.getCard(chatId);
+          const rendered = renderFeishuCard(card);
+          if (button) {
+            // Update existing card in place (user clicked a button on this card).
+            await client.updateInteractiveCard(messageId, rendered);
+          } else {
+            // Reply with a new card (chat message triggered this render).
+            await client.replyInteractiveCard(messageId, rendered);
+          }
+          return { rendered: true, chatId, action: button ? "updated" : "replied" };
+        }
+      });
     }
   };
 }

@@ -6,8 +6,40 @@ import { openRuntimeDb, type RuntimeDb } from "@infra/app/runtime-db.js";
 import { GitLabFollowStore, type FollowEntry, type FollowStatus } from "@integrations/gitlab/gitlab-follow-store.js";
 import { GitLabFollowKind } from "@features/scheduler/kinds/gitlab-follow-kind.js";
 import type { TaskContext } from "@features/scheduler/task-context.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
 
 const ISSUE_URL = "https://gitlab.example.com/group/proj/-/issues/42";
+
+// A fake Agent recording each turn; `setError` makes the next turn throw.
+function makeFakeAgent() {
+  const sends: Array<{ prompt: string; cwd?: string }> = [];
+  let reply = "agent reply";
+  let error: string | undefined;
+  const agent: Agent = {
+    startSession(options) {
+      return {
+        async *send(prompt) {
+          sends.push({ prompt, cwd: options?.cwd });
+          if (error) throw new Error(error);
+          yield { kind: "text", text: reply };
+          yield { kind: "result" };
+        },
+        currentSessionId: () => undefined,
+        async close() {}
+      };
+    }
+  };
+  return {
+    agent,
+    sends,
+    setReply: (text: string) => {
+      reply = text;
+    },
+    setError: (message: string) => {
+      error = message;
+    }
+  };
+}
 
 function makeCtx(): TaskContext {
   const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -70,8 +102,8 @@ describe("GitLabFollowKind state machine", () => {
     getNotes: ReturnType<typeof vi.fn>;
     postNote: ReturnType<typeof vi.fn>;
   };
-  let agent: { chat: ReturnType<typeof vi.fn>; runDevelopmentTask: ReturnType<typeof vi.fn> };
-  let agents: { resolveActiveAgent: ReturnType<typeof vi.fn> };
+  let agent: ReturnType<typeof makeFakeAgent>;
+  let agents: { resolveActiveAgent: () => Agent };
   let git: {
     cloneWithToken: ReturnType<typeof vi.fn>;
     createWorktree: ReturnType<typeof vi.fn>;
@@ -91,11 +123,8 @@ describe("GitLabFollowKind state machine", () => {
       getNotes: vi.fn().mockResolvedValue([]),
       postNote: vi.fn().mockResolvedValue(undefined)
     };
-    agent = {
-      chat: vi.fn().mockResolvedValue("agent reply"),
-      runDevelopmentTask: vi.fn().mockResolvedValue(undefined)
-    };
-    agents = { resolveActiveAgent: vi.fn().mockReturnValue(agent) };
+    agent = makeFakeAgent();
+    agents = { resolveActiveAgent: () => agent.agent };
     git = {
       cloneWithToken: vi.fn().mockResolvedValue(undefined),
       createWorktree: vi.fn().mockResolvedValue(undefined),
@@ -169,11 +198,11 @@ describe("GitLabFollowKind state machine", () => {
 
   it("cloning -> proposed: runs agent analysis and posts a comment", async () => {
     seedEntry("cloning");
-    agent.chat.mockResolvedValue("这是实现方案");
+    agent.setReply("这是实现方案");
 
     await buildKind().run(makeCtx(), { botUsername: "bot" });
 
-    expect(agent.chat).toHaveBeenCalledTimes(1);
+    expect(agent.sends).toHaveLength(1);
     expect(gitlab.postNote).toHaveBeenCalledTimes(1);
     const [, body] = gitlab.postNote.mock.calls[0]!;
     expect(body).toContain("自动分析");
@@ -190,7 +219,7 @@ describe("GitLabFollowKind state machine", () => {
       { body: "## 自动分析", system: false, author: { username: "bot" } },
       { body: "方案不错，继续", system: false, author: { username: "human" } }
     ]);
-    agent.chat.mockResolvedValue("yb/feat/fix_thing");
+    agent.setReply("yb/feat/fix_thing");
 
     await buildKind().run(makeCtx(), { botUsername: "bot" });
 
@@ -210,7 +239,7 @@ describe("GitLabFollowKind state machine", () => {
     await buildKind().run(makeCtx(), { botUsername: "bot" });
 
     expect(reload().status).toBe("rejected");
-    expect(agent.chat).not.toHaveBeenCalled(); // must not waste an agent call on a rejection
+    expect(agent.sends).toHaveLength(0); // must not waste an agent call on a rejection
   });
 
   it("proposed stays put while waiting for a user reply", async () => {
@@ -239,7 +268,9 @@ describe("GitLabFollowKind state machine", () => {
     expect(arg.newBranch).toBe("yb/feat/fix_thing");
     expect(arg.baseBranch).toBe("main"); // getBranchSha("main") resolved
     // note: "executing" is a transient state — runExecution fires immediately,
-    // so we assert the worktree wiring here and the final pushing state in the next test
+    // so we assert the worktree wiring here and the final pushing state in the next test.
+    // Drain the fire-and-forget execution so it doesn't touch the db after teardown.
+    await flush(() => reload().status === "pushing");
   });
 
   it("executing eventually reaches pushing once the agent finishes", async () => {
@@ -252,7 +283,7 @@ describe("GitLabFollowKind state machine", () => {
     await buildKind().run(makeCtx(), { botUsername: "bot" });
     await flush(() => reload().status === "pushing");
 
-    expect(agent.runDevelopmentTask).toHaveBeenCalledTimes(1);
+    expect(agent.sends).toHaveLength(1);
     expect(reload().status).toBe("pushing");
   });
 
@@ -267,7 +298,7 @@ describe("GitLabFollowKind state machine", () => {
 
   it("marks an entry failed and continues when a step throws", async () => {
     seedEntry("cloning");
-    agent.chat.mockRejectedValue(new Error("agent exploded"));
+    agent.setError("agent exploded");
 
     await buildKind().run(makeCtx(), { botUsername: "bot" });
 

@@ -339,7 +339,7 @@ export class RuntimeStore {
   }): void {
     this.db
       .prepare(
-        `insert into runtime_events
+        `insert or ignore into runtime_events
           (id, workspace_id, workflow_instance_id, run_attempt_id, step_state_id, effect_execution_id, category, type, payload_json, created_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )

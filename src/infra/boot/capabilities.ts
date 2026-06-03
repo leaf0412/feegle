@@ -46,6 +46,7 @@ import type { StockStore } from "@integrations/stock/stock-store.js";
 import type { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
 import type { IngressDispatcher } from "@core/ingress/ingress-dispatcher.js";
 import type { RequirementWorkflowStore } from "@plugins/requirement-workflow/requirement-workflow-store.js";
+import type { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
 
 /**
  * The catalog of every capability the host can provide during boot. Grows only
@@ -101,6 +102,7 @@ export interface Capabilities {
   gitService: GitService;
   notify: NotificationBroker;
   quote: QuoteClient;
+  workbenchCardService: WorkbenchCardService;
   // kinds / scheduler
   kinds: HandlerKindRegistry;
   scheduler: TaskScheduler;

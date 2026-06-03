@@ -389,6 +389,53 @@ describe("Workflow Concurrency Policies", () => {
     expect(result3.status).toBe("waiting");
   });
 
+  it("allow_readonly_parallel allows different instances of same definition to execute independently", async () => {
+    // Simulates the workbench card scenario: two different chats (different
+    // workflowInstanceId) use the same definition and should NOT block each
+    // other even when one is running a long effect.
+    registry.register({
+      definitionId: "def.parallel.chats",
+      version: 1,
+      concurrencyPolicy: "allow_readonly_parallel",
+      steps: [
+        {
+          stepId: "slow",
+          run: () => ({ kind: "wait", reason: "slow", waitFor: { kind: "control_action", action: "resume" } })
+        }
+      ]
+    });
+
+    const runtime = makeRuntime();
+
+    // Chat A starts
+    const resultA = await runtime.start({
+      workflowInstanceId: "wfi_chat_a",
+      runAttemptId: "run_chat_a",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "def.parallel.chats",
+      input: { chatId: "chat_a" },
+      now
+    });
+    expect(resultA.status).toBe("waiting");
+
+    // Chat B also starts — must NOT be skipped because it's a different instance
+    const resultB = await runtime.start({
+      workflowInstanceId: "wfi_chat_b",
+      runAttemptId: "run_chat_b",
+      workspaceId: "ws_1",
+      projectId: null,
+      definitionId: "def.parallel.chats",
+      input: { chatId: "chat_b" },
+      now
+    });
+    expect(resultB.status).toBe("waiting");
+
+    // Both attempts are running independently
+    expect(store.getRunAttempt("run_chat_a")?.status).toBe("waiting");
+    expect(store.getRunAttempt("run_chat_b")?.status).toBe("waiting");
+  });
+
   it("each policy emits the correct runtime event for first attempt", async () => {
     const policies: Array<{ name: string; definitionId: string; steps: Array<{ stepId: string; run: () => { kind: "complete"; output: Record<string, unknown> } }> }> = [
       {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import type { QuoteClient } from "@integrations/stock/stock-quote-port.js";
 import type { PortfolioPosition } from "@integrations/stock/stock-store-types.js";
 import { riskLevel } from "@integrations/stock/stock-domain.js";
@@ -58,9 +59,10 @@ export class StockAdvisorKind implements HandlerKind<Params> {
     }
     let response: string;
     try {
-      response = await provider.buildAgent().chat([
-        { role: "user", content: params.promptTemplate.replace("{{CONTEXT}}", context) }
-      ]);
+      response = await collectText(
+        provider.buildAgent(),
+        params.promptTemplate.replace("{{CONTEXT}}", context)
+      );
     } catch (error) {
       throw new AgentRunError(params.provider, error);
     }

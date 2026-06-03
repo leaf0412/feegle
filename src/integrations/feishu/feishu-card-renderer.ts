@@ -2,6 +2,7 @@ import type { PlatformCard, PlatformCardButton } from "@platform/platform-card.j
 
 export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Record<string, unknown> {
   const result: Record<string, unknown> = {
+    schema: "2.0",
     config: {
       wide_screen_mode: true,
       update_multi: true
@@ -83,6 +84,23 @@ export function renderFeishuCard(card: PlatformCard, sessionKey?: string): Recor
               value: sessionKey ? { session_key: sessionKey } : undefined,
               initial_option: element.initialAction
             }
+          ]
+        }
+      ];
+    }
+    if (element.kind === "form_input") {
+      const submitButton = renderButton(element.button, sessionKey);
+      return [
+        {
+          tag: "form",
+          name: `${element.name}_form`,
+          elements: [
+            {
+              tag: "input",
+              name: element.name,
+              placeholder: plainText(element.placeholder)
+            },
+            { ...submitButton, name: `${element.name}_submit`, action_type: "form_submit" }
           ]
         }
       ];

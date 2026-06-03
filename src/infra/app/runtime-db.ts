@@ -428,6 +428,24 @@ export function migrate(db: RuntimeDb): void {
     create unique index if not exists agent_providers_key_idx
       on agent_providers(workspace_id, provider_key);
   `);
+
+  db.exec(`
+    create table if not exists chat_workbench (
+      chat_id        text primary key,
+      repositories   text not null default '[]',
+      req_id         text,
+      req_text       text,
+      req_doc_url    text,
+      req_version    integer not null default 0,
+      plan_text      text,
+      plan_doc_url   text,
+      plan_version   integer not null default 0,
+      plan_stale     integer not null default 0,
+      updated_at     text not null
+    );
+  `);
+
+  ensureColumn(db, "chat_workbench", "req_id", "text");
 }
 
 function ensureColumn(db: RuntimeDb, table: string, column: string, type: string): void {

@@ -8,6 +8,7 @@ import type { FeishuClientPort } from "@integrations/feishu/feishu-client.js";
 import { PlanArtifactService } from "@features/workbench/plan-artifact-service.js";
 import { PlanArtifactStore } from "@features/workbench/plan-artifact-store.js";
 import { makeFakeFeishuClient } from "../fixtures/fake-feishu-client.js";
+import { fakeAgentFromEvents } from "../fixtures/fake-agent.js";
 
 describe("PlanArtifactService", () => {
   let home: string;
@@ -102,12 +103,13 @@ describe("PlanArtifactService", () => {
     const v2 = await service.revisePlan({
       planId: v1.planId,
       revisionNote: "Add Playwright verification\nCall out deployment risk",
-      agent: {
-        chat: async (messages) => {
-          prompts.push(messages[0]?.content ?? "");
-          return "# Plan v2\n\n- Step 1\n- Add Playwright verification\n- Risk: deployment env";
-        }
-      }
+      agent: fakeAgentFromEvents((prompt) => {
+        prompts.push(prompt);
+        return [
+          { kind: "text", text: "# Plan v2\n\n- Step 1\n- Add Playwright verification\n- Risk: deployment env" },
+          { kind: "result" }
+        ];
+      })
     });
 
     expect(v2.version).toBe(2);

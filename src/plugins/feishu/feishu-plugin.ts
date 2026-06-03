@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { CapabilityContext } from "@infra/boot/boot-context.js";
 import type { FeeglePlugin } from "@infra/boot/feegle-plugin.js";
 import type { Startable } from "@infra/app/feegle-app.js";
@@ -9,6 +10,9 @@ import {
   logFeishuCommandTrace
 } from "@integrations/feishu/feishu-command-responder.js";
 import { FeishuUserDirectory } from "@integrations/feishu/feishu-user-directory.js";
+import { WorkbenchStore } from "@features/workbench/workbench-store.js";
+import { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
+import { createWorkbenchAgent } from "@features/workbench/workbench-agent-adapter.js";
 import { feishuRuntimeContribution } from "./feishu-runtime-contribution.js";
 
 export interface FeishuPluginDeps {
@@ -19,6 +23,8 @@ export interface FeishuPluginDeps {
 }
 
 export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
+  let _workbenchCardService: WorkbenchCardService | undefined;
+
   return {
     id: "feishu",
     manifest: {
@@ -31,7 +37,7 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         { pluginId: "feishu", effectType: "reply" },
         { pluginId: "feishu", effectType: "card.update" }
       ],
-      intentKinds: ["chat"],
+      intentKinds: ["chat", "workbench_card", "workbench_action"],
       controlActionTypes: ["card.revise", "card.approve", "card.cancel", "card.push", "card.revision_submit"],
       permissions: ["read_feishu_messages", "send_feishu_messages", "manage_feishu_cards"],
       secretRefs: ["FEISHU_APP_ID", "FEISHU_APP_SECRET"],
@@ -40,7 +46,18 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
     provides: [
       {
         phase: "providers",
-        run: (ctx) => ctx.provide("userDirectory", new FeishuUserDirectory(deps.feishuClient))
+        run: (ctx) => {
+          ctx.provide("userDirectory", new FeishuUserDirectory(deps.feishuClient));
+          const workbenchStore = new WorkbenchStore(ctx.require("runtimeDb"));
+          const agents = ctx.require("agents");
+          _workbenchCardService = new WorkbenchCardService({
+            store: workbenchStore,
+            cloudDoc: deps.cloudDoc,
+            requirementIdFactory: () => randomUUID(),
+            agent: createWorkbenchAgent(agents)
+          });
+          ctx.provide("workbenchCardService", _workbenchCardService);
+        }
       }
     ],
     platformRuntimes: [
@@ -49,7 +66,20 @@ export function createFeishuPlugin(deps: FeishuPluginDeps): FeeglePlugin {
         create: (ctx) => buildFeishuRuntime(deps, ctx)
       }
     ],
-    runtimeContributions: [feishuRuntimeContribution(deps.feishuClient, deps.cloudDoc)]
+    runtimeContributions: [
+      feishuRuntimeContribution(
+        deps.feishuClient,
+        deps.cloudDoc,
+        () => {
+          if (!_workbenchCardService) {
+            throw new Error(
+              "WorkbenchCardService not initialized: providers phase must run before runtime-contributions"
+            );
+          }
+          return _workbenchCardService;
+        }
+      )
+    ]
   };
 }
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { checkAgentReadiness } from "@infra/boot/warn-startup-gaps.js";
-import type { AgentCli } from "@integrations/agent/agent-cli.js";
+import type { Agent } from "@integrations/agent/agent-session.js";
 
-function ok(): AgentCli {
-  return {} as AgentCli;
+function ok(): Agent {
+  return {} as Agent;
 }
-function missing(kind: string): () => AgentCli {
+function missing(kind: string): () => Agent {
   return () => {
     throw new Error(`agent binary "${kind}" not found on PATH. Install it or set "command" ...`);
   };

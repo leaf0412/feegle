@@ -16,6 +16,7 @@ import type { WorkflowRuntime } from "@core/runtime/workflow-runtime.js";
 import type { RuntimeInspectionService } from "@core/operations/runtime-inspection-service.js";
 import type { RecoveryService } from "@core/recovery/recovery-service.js";
 import type { ControlActionStore } from "@core/control/control-action-store.js";
+import type { WorkbenchCardService } from "@features/workbench/workbench-card-service.js";
 
 export interface SlashCommandRegistryDeps {
   repositories: RepositoryListSource;
@@ -43,6 +44,7 @@ export interface SlashCommandRegistryDeps {
   runtimeInspectionService?: RuntimeInspectionService;
   recoveryService?: RecoveryService;
   controlActionStore?: ControlActionStore;
+  workbenchCardService?: WorkbenchCardService;
   /** Operator workspace used by CLI/control-path commands when no per-conversation
    *  workspace binding exists. Configured from the `defaultWorkspace` config key. */
   operatorWorkspaceId?: string;

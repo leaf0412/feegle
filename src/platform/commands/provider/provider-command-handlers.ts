@@ -1,9 +1,6 @@
 import { stat } from "node:fs/promises";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
-import {
-  buildProviderAdapter,
-  defaultProviderDisplayName
-} from "@integrations/agent/provider-adapter-factory.js";
+import { buildAgent } from "@integrations/agent/build-agent.js";
 import {
   ProviderRecordSchema,
   type ProviderRecord,
@@ -97,11 +94,11 @@ export class ProviderRegisterCommandHandler extends ProviderCommand {
     }
     this.deps.providers.register({
       kind: coerced.kind,
-      displayName: defaultProviderDisplayName(coerced.kind),
-      buildAgent: () => buildProviderAdapter(coerced)
+      displayName: coerced.kind,
+      buildAgent: () => buildAgent(coerced)
     });
     return textReply(
-      `${defaultProviderDisplayName(coerced.kind)} 已注册（未激活）。运行 /provider use ${coerced.kind} 激活。`
+      `${coerced.kind} 已注册（未激活）。运行 /provider use ${coerced.kind} 激活。`
     );
   }
 }
@@ -150,7 +147,7 @@ export class ProviderUseCommandHandler extends ProviderCommand {
     }
     this.deps.providers.setActive(kind);
     return textReply(
-      `${defaultProviderDisplayName(kind)} 已设为配置类命令与定时任务的默认 agent。自然语言聊天在注册了多个 agent 时会自动负载均衡。`
+      `${kind} 已设为配置类命令与定时任务的默认 agent。自然语言聊天在注册了多个 agent 时会自动负载均衡。`
     );
   }
 }

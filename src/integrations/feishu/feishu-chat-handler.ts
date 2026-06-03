@@ -1,9 +1,5 @@
-import type {
-  AgentChatMessage,
-  AgentCli,
-  AgentProgressUpdate,
-  AgentRunOptions
-} from "@integrations/agent/agent-cli.js";
+import type { AgentEvent } from "@integrations/agent/agent-session.js";
+import { promptFromMessages, streamAgentText } from "@integrations/agent/collect-text.js";
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
 import { AgentLoadBalancer } from "@integrations/agent/agent-load-balancer.js";
 import type { AgentProviderDefinition } from "@integrations/agent/agent-provider-registry.js";
@@ -72,7 +68,7 @@ export class FeishuChatHandler {
 
     const cwd = this.deps.workspaceDir;
 
-    const agent: AgentCli = provider.buildAgent();
+    const agent = provider.buildAgent();
 
     this.deps.history.append(request.sessionKey, { role: "user", content: request.userText });
     const messages = this.deps.history.get(request.sessionKey);
@@ -88,19 +84,20 @@ export class FeishuChatHandler {
       replyToMessageId: request.triggerMessageId
     });
 
-    const options: AgentRunOptions = {
-      cwd,
-      onProgress: async (update) => {
-        applyProgress(renderState, update);
-        await this.safeUpdate(preview, renderState, "working", true);
-      }
-    };
     const stopHeartbeat = this.startProgressHeartbeat(preview, renderState);
 
     this.balancer.acquire(provider.kind);
     let answer: string;
     try {
-      answer = (await agent.chat(messages, options)).trim();
+      answer = (
+        await streamAgentText(agent, promptFromMessages(messages), {
+          cwd,
+          onEvent: async (event) => {
+            applyProgress(renderState, event);
+            await this.safeUpdate(preview, renderState, "working", true);
+          }
+        })
+      ).trim();
     } catch (error) {
       stopHeartbeat();
       const reason = errorMessage(error);
@@ -259,7 +256,7 @@ interface PreviewRenderState {
   errorMessage?: string;
 }
 
-function applyProgress(state: PreviewRenderState, update: AgentProgressUpdate): void {
+function applyProgress(state: PreviewRenderState, update: AgentEvent): void {
   if (update.kind === "tool_use") {
     state.steps.push({
       kind: "tool_step",

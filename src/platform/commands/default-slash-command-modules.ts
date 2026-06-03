@@ -8,6 +8,7 @@ import { schedulerCommandModule } from "./scheduler-command-module.js";
 import { sessionCommandModule } from "./session-command-module.js";
 import { setupCommandModule } from "./setup-command-module.js";
 import { systemCommandModule } from "./system-command-module.js";
+import { workbenchCommandModule } from "@features/workbench/workbench-command-module.js";
 
 export function defaultSlashCommandModules(operatorWorkspaceId?: string): SlashCommandModule[] {
   return [
@@ -19,6 +20,7 @@ export function defaultSlashCommandModules(operatorWorkspaceId?: string): SlashC
     schedulerCommandModule(),
     providerCommandModule(),
     glsumCommandModule(),
-    runtimeCommandModule(operatorWorkspaceId)
+    runtimeCommandModule(operatorWorkspaceId),
+    workbenchCommandModule()
   ];
 }

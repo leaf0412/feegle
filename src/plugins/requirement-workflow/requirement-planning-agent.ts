@@ -1,4 +1,5 @@
 import type { AgentProviderRegistry } from "@integrations/agent/agent-provider-registry.js";
+import { collectText } from "@integrations/agent/collect-text.js";
 import type { RequirementPlanningAgent } from "./requirement-planning-service.js";
 
 const MAX_SUMMARY_LENGTH = 80;
@@ -52,7 +53,7 @@ export function createRequirementPlanningAgent(
         throw new Error("No active agent provider for requirement planning");
       }
       const prompt = buildGenerationPrompt(requirementText);
-      const reply = await agent.chat([{ role: "user", content: prompt }]);
+      const reply = await collectText(agent, prompt);
       return parseAgentReply(reply);
     },
 
@@ -62,7 +63,7 @@ export function createRequirementPlanningAgent(
         throw new Error("No active agent provider for requirement planning");
       }
       const prompt = buildRevisionPrompt(requirementText, currentPlanMarkdown, feedback);
-      const reply = await agent.chat([{ role: "user", content: prompt }]);
+      const reply = await collectText(agent, prompt);
       return parseAgentReply(reply);
     }
   };
