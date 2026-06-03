@@ -51,7 +51,7 @@ export type FeishuCommand =
       scopeNoun: string;
     }
   | { type: "bind_repo_cancel"; scopeKey: string }
-  | { type: "platform_action"; action: PlatformAction; sessionKey?: string }
+  | { type: "platform_action"; action: PlatformAction; sessionKey?: string; form_value?: unknown }
   | { type: "unknown"; raw: string };
 
 export function parseFeishuCommand(raw: string): FeishuCommand {
@@ -278,7 +278,8 @@ export function parseFeishuCardActionValue(value: unknown): FeishuCommand {
       return {
         type: "platform_action",
         action,
-        sessionKey: typeof value.session_key === "string" ? value.session_key : undefined
+        sessionKey: typeof value.session_key === "string" ? value.session_key : undefined,
+        form_value: isRecord(value.form_value) ? value.form_value : undefined
       };
     }
   }

@@ -125,7 +125,12 @@ describe("parseFeishuCommand", () => {
         args: "directory submit",
         raw: "act:/workbench directory submit"
       },
-      sessionKey: undefined
+      sessionKey: undefined,
+      form_value: {
+        provider: "codex",
+        workspace_path: "/repo/shortcut",
+        manual_path: "/repo/manual"
+      }
     });
   });
 
