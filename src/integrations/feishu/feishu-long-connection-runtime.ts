@@ -171,8 +171,8 @@ export class FeishuLongConnectionRuntime {
         // actions never share a messageId.)
         if (this.markUnhandled("card", envelope.messageId)) {
           if (this.ingress) {
-            await this.ingress
-              .dispatch(
+            try {
+              const result = await this.ingress.dispatch(
                 feishuCardActionToTriggerEvent({
                   triggerEventId: `feishu:${envelope.messageId}`,
                   receivedAt: new Date().toISOString(),
@@ -182,8 +182,20 @@ export class FeishuLongConnectionRuntime {
                   actionType: envelope.command.type,
                   actionPayload: envelope.command as unknown as Record<string, unknown>
                 })
-              )
-              .catch((error) => console.error("Feishu card ingress dispatch failed", error));
+              );
+              if (result.status === "failed") {
+                console.error("Feishu card ingress dispatch failed", {
+                  messageId: envelope.messageId,
+                  status: result.status,
+                  reason: result.reason
+                });
+              }
+            } catch (error) {
+              console.error("Feishu card ingress dispatch threw", {
+                messageId: envelope.messageId,
+                error: String(error)
+              });
+            }
           } else {
             console.warn("Feishu card action dropped — no ingress configured", {
               messageId: envelope.messageId,
